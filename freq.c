@@ -32,7 +32,7 @@ int main(int argc, char **argv)
 	int ret = 0;
 	FILE *fp = NULL;
 	struct stat st;
-	size_t filesize;
+	size_t filesize = 0;
 	char *buf = NULL;
 	ssize_t len;
 	size_t read;
