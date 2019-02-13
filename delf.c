@@ -24,6 +24,7 @@
 
 #define INIT_BUF_SIZE 1024
 #define NUM_CH UCHAR_MAX + 1
+#define MAX_LINES 100
 
 int main(int argc, char **argv)
 {
@@ -89,7 +90,7 @@ int main(int argc, char **argv)
 	buf_size = INIT_BUF_SIZE;
 
 	row_count = 0;
-	while ((line_len = getline(&buf, &buf_size, fp)) > 0) {
+	while ((line_len = getline(&buf, &buf_size, fp)) > 0 && row_count < MAX_LINES) {
 		++row_count;
 
 		if (row_count == 1) {

@@ -1,0 +1,64 @@
+.\"
+.\" Copyright (c) 2019 Logan Ryan McLintock
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd February 13, 2019
+.Dt DELIM 1
+.Os
+.Sh NAME
+.Nm delim
+.Nd delimiter checker
+.Sh SYNOPSIS
+.Nm
+.Ar delimiter
+.Op Ar file
+.Sh DESCRIPTION
+.Nm
+checks that each line has the same number of delimiter characters.
+If
+.Ar file
+is absent then
+.Nm
+reads from the standard input.
+.Pp
+Quotes are not interpreted.
+The
+.Ar delimiter
+cannot be
+.Sq \en
+as this is used to separate lines.
+.Pp
+A delimiter mismatch is considered an error, and if this occurs, the number
+of delimiter characters in the first line is printed
+along with the line number and number of delimiter characters in the first
+offending line.
+.Pp
+.Nm
+is released under the ISC licence (OpenBSD style).
+.Sh EXIT STATUS
+.Ex -std
+.Sh EXAMPLES
+.Dl $ delim ',' file
+.Dl $ delim $(delf file) file
+.Sh SEE ALSO
+.Xr delf 1
+.Xr freq 1
+.Sh AUTHORS
+.Nm
+was written by
+.An "Logan Ryan McLintock".
+.Sh CAVEATS
+.Nm
+does not support multi-byte character encodings,
+or multi-character delimiters.

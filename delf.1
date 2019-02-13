@@ -1,0 +1,70 @@
+.\"
+.\" Copyright (c) 2019 Logan Ryan McLintock
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd February 13, 2019
+.Dt DELF 1
+.Os
+.Sh NAME
+.Nm delf
+.Nd delimiter finder
+.Sh SYNOPSIS
+.Nm
+.Op Ar file
+.Sh DESCRIPTION
+.Nm
+automatically finds the delimiter character by eliminating characters not present
+or that have a frequency that is not the same in all of the first
+.Dv MAX_LINES
+lines. The non-eliminated character with the highest frequency, and if there are ties,
+the lowest encoded value,
+will be chosen.
+If
+.Ar file
+is absent then
+.Nm
+reads from the standard input.
+.Pp
+Quotes are not interpreted.
+The
+.Ar delimiter
+cannot be
+.Sq \en
+as this is used to separate lines.
+.Pp
+Upon success the delimiter character is printed.
+Failing to find the delimiter is considered an error, and if this occurs,
+-1 is printed.
+.Pp
+.Dv MAX_LINES
+is set to 100 by default.
+.Pp
+.Nm
+is released under the ISC licence (OpenBSD style).
+.Sh EXIT STATUS
+.Ex -std
+.Sh EXAMPLES
+.Dl $ delf file
+.Dl $ delim $(delf file) file
+.Sh SEE ALSO
+.Xr delim 1
+.Xr freq 1
+.Sh AUTHORS
+.Nm
+was written by
+.An "Logan Ryan McLintock".
+.Sh CAVEATS
+.Nm
+does not support multi-byte character encodings,
+or multi-character delimiters.
