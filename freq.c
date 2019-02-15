@@ -20,11 +20,11 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define LOGERR(m) (void) fprintf(stderr, "%s:%d: error: " m "\n",    \
 					__FILE__, __LINE__)
 
-#define BUF_SIZE 1024
 #define NUM_CH UCHAR_MAX + 1
 
 int main(int argc, char **argv)
@@ -32,7 +32,7 @@ int main(int argc, char **argv)
 	int ret = 0;
 	FILE *fp = NULL;
 	struct stat st;
-	size_t filesize = 0;
+	size_t filesize;
 	char *buf = NULL;
 	ssize_t len;
 	size_t read;
@@ -44,8 +44,9 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (argc == 1) {
+	if (argc == 1 || !strcmp(argv[1], "-")) {
 		fp = stdin;
+		filesize = 0; /* Unknown */
 	} else {
 
 		if (stat(argv[1], &st)) {
@@ -75,7 +76,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	buf = malloc(BUF_SIZE);
+	buf = malloc(BUFSIZ);
 
 	if (buf == NULL) {
 		LOGERR("malloc failed");
@@ -84,17 +85,23 @@ int main(int argc, char **argv)
 	}
 
 	read = 0;
-	while ((len = fread(buf, 1, BUF_SIZE, fp)) > 0) {
+	while ((len = fread(buf, 1, BUFSIZ, fp)) > 0) {
 		read += len;
 		for (i = 0; i < (size_t) len; ++i) {
 			++freq[(int)buf[i]];
 		}
 	}
 
-	if (read != filesize || !feof(fp) || ferror(fp)) {
+	if (!feof(fp) || ferror(fp)) {
 		LOGERR("fread failed");
 		ret = 1;
 		goto clean_up;
+	}
+
+	if (fp != NULL && fp != stdin && read != filesize) {
+	  LOGERR("fread failed");
+	  ret = 1;
+	  goto clean_up;
 	}
 
 	for (i = 0; i < NUM_CH; ++i) {

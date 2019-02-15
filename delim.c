@@ -16,6 +16,7 @@
 
 #define _GNU_SOURCE
 #include <sys/stat.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,6 +38,7 @@ int main(int argc, char **argv)
 	size_t first_delim_count;
 
 	struct stat st;
+	char *delim_str;
 	char delim;
 
 	if (argc != 2 && argc != 3) {
@@ -44,19 +46,50 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (strnlen(argv[1], 2) != 1) {
+	delim_str = argv[1];
+
+	switch (strnlen(delim_str, 3)) {
+	case 1:
+		delim = delim_str[0];
+		break;
+	case 2:
+		if (delim_str[0] == '\\') {
+			switch (delim_str[1]) {
+			case '0':
+				delim = '\0';
+				break;
+			case 't':
+				delim = '\t';
+				break;
+			case 'n':
+				delim = '\n';
+				break;
+			default:
+				LOGERR
+				    ("delimiter contains invaild escape sequence");
+				return 1;
+			}
+		} else {
+			if (isxdigit(delim_str[0]) && isxdigit(delim_str[1])) {
+				delim = delim_str[0] * 16 + delim_str[1];
+			} else {
+				LOGERR
+				    ("delimiter contains invalid hexadecimal code");
+				return 1;
+			}
+		}
+		break;
+	default:
 		LOGERR("delimiter must be one character");
 		return 1;
 	}
 
-	delim = argv[1][0];
-
 	if (delim == '\n') {
-		LOGERR("delimiter cannot a \\n character");
+		LOGERR("delimiter cannot be a \\n character");
 		return 1;
 	}
 
-	if (argc == 2) {
+	if (argc == 2 || !strcmp(argv[2], "-")) {
 		fp = stdin;
 	} else {
 

@@ -16,9 +16,11 @@
 
 #define _GNU_SOURCE
 #include <sys/stat.h>
+#include <ctype.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define LOGERR(m) (void) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
 
@@ -50,7 +52,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (argc == 1) {
+	if (argc == 1 || !strcmp(argv[1], "-")) {
 		fp = stdin;
 	} else {
 
@@ -90,7 +92,8 @@ int main(int argc, char **argv)
 	buf_size = INIT_BUF_SIZE;
 
 	row_count = 0;
-	while ((line_len = getline(&buf, &buf_size, fp)) > 0 && row_count < MAX_LINES) {
+	while ((line_len = getline(&buf, &buf_size, fp)) > 0
+	       && row_count < MAX_LINES) {
 		++row_count;
 
 		if (row_count == 1) {
@@ -128,8 +131,22 @@ int main(int argc, char **argv)
 
 	if (delim == -1) {
 		ret = 1;
+		printf("%d\n", delim);
 	} else {
-		printf("%c\n", delim);
+		if (isprint(delim)) {
+			printf("%c\n", delim);
+		} else {
+			switch (delim) {
+			case '\0':
+				printf("\\0\n");
+				break;
+			case '\t':
+				printf("\\t\n");
+				break;
+			default:
+				printf("%02x\n", (unsigned char)delim);
+			}
+		}
 	}
 
  clean_up:

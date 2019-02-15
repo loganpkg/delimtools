@@ -44,6 +44,22 @@ cannot be
 as this is used to separate lines.
 .Pp
 Upon success the delimiter character is printed.
+The format depends upon the delimiter character as follows:
+.Bl -bullet -offset indent
+.It
+If it is a printable glyph in the C locale,
+then it is printed as itself.
+.It
+The escape sequences
+.Sq \e0
+and
+.Sq \et
+are used to print the null character and tab character, respectively.
+.It
+All other characters are printed as the two digit hexadecimal
+representation of their encoded value (without a prefix).
+.El
+.Pp
 Failing to find the delimiter is considered an error, and if this occurs,
 -1 is printed.
 .Pp

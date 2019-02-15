@@ -38,6 +38,15 @@ The
 cannot be
 .Sq \en
 as this is used to separate lines.
+.Ar delimiter
+can be any printable glyph in the C locale, a two digit hexadecimal code
+(without a prefix), or the following escape sequences:
+.Bl -tag -width flag -compact
+.It \e0
+Null character
+.It \et
+Tab character
+.El
 .Pp
 A delimiter mismatch is considered an error, and if this occurs, the number
 of delimiter characters in the first line is printed

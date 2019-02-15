@@ -31,9 +31,12 @@ is absent then
 .Nm
 reads from the standard input.
 .Pp
-Upon success three tab delimited columns are printed with one row for each present character.
-The first column is the decimal value of the character, the second column is the ASCII printable
-character or the hexadecimal value, and the final column is the frequency.
+Upon success three tab delimited columns are printed
+with one row for each character present.
+The first column is the decimal value of the character,
+the second column is the printable glyph in the C locale or
+the two digit hexadecimal value (without a prefix),
+and the final column is the frequency.
 .Pp
 .Nm
 is released under the ISC licence (OpenBSD style).
