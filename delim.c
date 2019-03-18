@@ -21,6 +21,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <utf8.h>
+
 #define LOGERR(m) (void) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
 
 #define INIT_BUF_SIZE 1024
