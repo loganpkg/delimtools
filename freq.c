@@ -18,16 +18,16 @@
 #include <sys/stat.h>
 #include <ctype.h>
 #include <limits.h>
+#include <locale.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <macros.h>
 #include <utf8.h>
 
-#define LOGERR(m) (void) fprintf(stderr, "%s:%d: error: " m "\n",    \
-					__FILE__, __LINE__)
-
-#define NUM_CH UCHAR_MAX + 1
+#define INIT_BUF_SIZE 1024
 
 int main(int argc, char **argv)
 {
@@ -36,10 +36,24 @@ int main(int argc, char **argv)
 	struct stat st;
 	size_t filesize;
 	char *buf = NULL;
-	ssize_t len;
-	size_t read;
-	size_t freq[NUM_CH] = { 0 };
+	size_t buf_size;
+	size_t line_len;
+	size_t freq[NUMCP] = { 0 };
 	size_t i;
+
+	/* Set to the environment locale */
+	if (setlocale(LC_CTYPE, "") == NULL) {
+		LOGERR("setlocale failed");
+		return 1;
+	}
+
+	/* This should be 4 for UTF-8 */
+	if (MB_CUR_MAX != 1 && MB_CUR_MAX != 4) {
+		if (setlocale(LC_CTYPE, "C") == NULL) {
+			LOGERR("setlocale failed");
+			return 1;
+		}
+	}
 
 	if (argc != 1 && argc != 2) {
 		fprintf(stderr, "Usage: %s: [file]\n", argv[0]);
@@ -48,7 +62,7 @@ int main(int argc, char **argv)
 
 	if (argc == 1 || !strcmp(argv[1], "-")) {
 		fp = stdin;
-		filesize = 0; /* Unknown */
+		filesize = 0;	/* Unknown */
 	} else {
 
 		if (stat(argv[1], &st)) {
@@ -70,15 +84,13 @@ int main(int argc, char **argv)
 			return 1;
 		}
 
-		filesize = (size_t) st.st_size;
-
 		if ((fp = fopen(argv[1], "r")) == NULL) {
 			LOGERR("fopen failed");
 			return 1;
 		}
 	}
 
-	buf = malloc(BUFSIZ);
+	buf = malloc(INIT_BUF_SIZE);
 
 	if (buf == NULL) {
 		LOGERR("malloc failed");
@@ -86,34 +98,33 @@ int main(int argc, char **argv)
 		goto clean_up;
 	}
 
-	read = 0;
-	while ((len = fread(buf, 1, BUFSIZ, fp)) > 0) {
-		read += len;
-		for (i = 0; i < (size_t) len; ++i) {
-			++freq[(int)buf[i]];
+	buf_size = INIT_BUF_SIZE;
+
+	while ((line_len = getline(&buf, &buf_size, fp)) > 0) {
+
+		if (MB_CUR_MAX == 4) {
+			if (ufreq(buf, line_len, freq)) {
+				ret = 1;
+				goto clean_up;
+			}
+		} else {
+			for (i = 0; i < line_len; ++i) {
+				++freq[(unsigned char)buf[i]];
+			}
 		}
 	}
 
-	if (!feof(fp) || ferror(fp)) {
-		LOGERR("fread failed");
-		ret = 1;
-		goto clean_up;
-	}
-
-	if (fp != NULL && fp != stdin && read != filesize) {
-	  LOGERR("fread failed");
-	  ret = 1;
-	  goto clean_up;
-	}
-
-	for (i = 0; i < NUM_CH; ++i) {
-		if (freq[i]) {
-			if (isprint(i)) {
-				printf("%d\t%c\t%lu\n", (int)i, (char)i,
-				       freq[i]);
-			} else {
-				printf("%d\t%02x\t%lu\n", (int)i,
-				       (unsigned char)i, freq[i]);
+	if (MB_CUR_MAX == 4) {
+		for (i = 0; i < NUMCP; ++i) {
+			if (freq[i]) {
+				uprintcp(i);
+				printf("\t%lu\n", freq[i]);
+			}
+		}
+	} else {
+		for (i = 0; i <= UCHAR_MAX; ++i) {
+			if (freq[i]) {
+			  printf("%c\t%lu\n", (char) i, freq[i]);
 			}
 		}
 	}
