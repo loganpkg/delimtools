@@ -37,9 +37,10 @@ int main(int argc, char **argv)
 	size_t filesize;
 	char *buf = NULL;
 	size_t buf_size;
-	size_t line_len;
+	ssize_t line_len;
 	size_t freq[NUMCP] = { 0 };
-	size_t i;
+	ssize_t i;
+	uint32_t j;
 
 	/* Set to the environment locale */
 	if (setlocale(LC_CTYPE, "") == NULL) {
@@ -102,6 +103,8 @@ int main(int argc, char **argv)
 
 	while ((line_len = getline(&buf, &buf_size, fp)) > 0) {
 
+		printf("line_len: %lu\n", line_len);
+
 		if (MB_CUR_MAX == 4) {
 			if (ufreq(buf, line_len, freq)) {
 				ret = 1;
@@ -115,16 +118,17 @@ int main(int argc, char **argv)
 	}
 
 	if (MB_CUR_MAX == 4) {
-		for (i = 0; i < NUMCP; ++i) {
-			if (freq[i]) {
-				uprintcp(i);
-				printf("\t%lu\n", freq[i]);
+		for (j = 0; j < NUMCP; ++j) {
+			if (freq[j]) {
+				printf("cp:%u\t", j);
+				uprintcp(j);
+				printf("\t%lu\n", freq[j]);
 			}
 		}
 	} else {
-		for (i = 0; i <= UCHAR_MAX; ++i) {
-			if (freq[i]) {
-			  printf("%c\t%lu\n", (char) i, freq[i]);
+		for (j = 0; j <= UCHAR_MAX; ++j) {
+			if (freq[j]) {
+				printf("%c\t%lu\n", (char)j, freq[j]);
 			}
 		}
 	}
