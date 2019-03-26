@@ -103,8 +103,6 @@ int main(int argc, char **argv)
 
 	while ((line_len = getline(&buf, &buf_size, fp)) > 0) {
 
-		printf("line_len: %lu\n", line_len);
-
 		if (MB_CUR_MAX == 4) {
 			if (ufreq(buf, line_len, freq)) {
 				ret = 1;
@@ -120,7 +118,7 @@ int main(int argc, char **argv)
 	if (MB_CUR_MAX == 4) {
 		for (j = 0; j < NUMCP; ++j) {
 			if (freq[j]) {
-				printf("cp:%u\t", j);
+				printf("%u\t", j);
 				uprintcp(j);
 				printf("\t%lu\n", freq[j]);
 			}
