@@ -167,12 +167,12 @@ int main(int argc, char **argv)
 
 	if (!set) {
 		ret = 1;
- goto:		clean_up;
+		goto clean_up;
 	}
 
 	if (uprintcp(delim)) {
 		ret = 1;
- goto:		clean_up;
+		goto clean_up;
 	}
 
  clean_up:
