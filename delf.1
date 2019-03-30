@@ -73,7 +73,8 @@ is released under the ISC licence (OpenBSD style).
 .Ex -std
 .Sh EXAMPLES
 .Dl $ delf file
-.Dl $ delim $(delf file) file
+.Dl $ LC_CTYPE=C delf file
+.Dl $ delim "$(delf file)" file
 .Sh SEE ALSO
 .Xr delim 1
 .Xr freq 1
