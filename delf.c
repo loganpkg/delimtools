@@ -174,6 +174,7 @@ int main(int argc, char **argv)
 		ret = 1;
 		goto clean_up;
 	}
+	putchar('\n');
 
  clean_up:
 	if (fp != NULL && fp != stdin) {
