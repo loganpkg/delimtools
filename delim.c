@@ -49,19 +49,19 @@ int main(int argc, char **argv)
 
 	delim_str = argv[1];
 
-	if  (!strlen(delim_str)) {
-	  LOGERR("empty delimiter");
-	  return 1;
+	if (!strlen(delim_str)) {
+		LOGERR("empty delimiter");
+		return 1;
 	} else if (!strcmp(delim_str, "\\t")) {
-	    delim_str[0] = '\t';
-	    delim_str[1] = '\0';
+		delim_str[0] = '\t';
+		delim_str[1] = '\0';
 	} else if (!strcmp(delim_str, "\\n") || !strcmp(delim_str, "\n")) {
-	  LOGERR("delimiter cannot be a line feed character");
-	  return 1;
+		LOGERR("delimiter cannot be a line feed character");
+		return 1;
 	}
 
 	delim_len = strlen(delim_str);
-	
+
 	if (argc == 2 || !strcmp(argv[2], "-")) {
 		fp = stdin;
 	} else {
@@ -105,18 +105,20 @@ int main(int argc, char **argv)
 	delim_count = 0;
 
 	while ((line_len = getline(&buf, &buf_size, fp)) > 0) {
-	  ++row_count;
+		++row_count;
 
-	  start = buf;
-	  
-	  while ((match = memmem(start, (size_t)line_len, delim_str, delim_len)) != NULL) {
-	    ++delim_count;
-	    if (match - buf != line_len) {
-	      start = match + 1;
-	    } else {
-	      break;
-	    }
-	  }
+		start = buf;
+
+		while ((match =
+			memmem(start, (size_t) line_len, delim_str,
+			       delim_len)) != NULL) {
+			++delim_count;
+			if (match - buf != line_len) {
+				start = match + 1;
+			} else {
+				break;
+			}
+		}
 
 		if (row_count == 1) {
 			first_delim_count = delim_count;

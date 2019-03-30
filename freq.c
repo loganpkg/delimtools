@@ -118,8 +118,8 @@ int main(int argc, char **argv)
 			if (freq[j]) {
 				printf("%u\t", j);
 				if (uprintcp(j)) {
-				  ret = 1;
-				  goto clean_up;
+					ret = 1;
+					goto clean_up;
 				}
 				printf("\t%lu\n", freq[j]);
 			}
