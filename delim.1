@@ -25,7 +25,7 @@
 .Op Ar file
 .Sh DESCRIPTION
 .Nm
-checks that each line has the same number of delimiter characters.
+checks that each line has the same number of delimiters.
 If
 .Ar file
 is absent or
@@ -41,14 +41,18 @@ cannot be
 .Sq \en
 as this is used to separate lines.
 .Ar delimiter
-can be any printable glyph in the C locale, a two digit hexadecimal code
-(without a prefix), or the following escape sequences:
-.Bl -tag -width flag -compact
-.It \e0
-Null character
-.It \et
-Tab character
-.El
+can be any series of characters.
+If
+.Ar delimiter
+is only a backslash followed by the letter t,
+then this will be converted into a tab character.
+Likewise, if
+.Ar delimiter
+is only a backslash followed by the letter n,
+then this will be converted into a line feed character.
+However,
+.Ar delimiter
+cannot be the line feed character as this is used to separate lines.
 .Pp
 A delimiter mismatch is considered an error, and if this occurs, the number
 of delimiter characters in the first line is printed
@@ -61,7 +65,7 @@ is released under the ISC licence (OpenBSD style).
 .Ex -std
 .Sh EXAMPLES
 .Dl $ delim ',' file
-.Dl $ delim $(delf file) file
+.Dl $ delim "$(delf file)" file
 .Sh SEE ALSO
 .Xr delf 1
 .Xr freq 1
@@ -69,6 +73,3 @@ is released under the ISC licence (OpenBSD style).
 .Nm
 was written by
 .An "Logan Ryan McLintock".
-.Sh CAVEATS
-.Nm
-does not support multi-character delimiters.

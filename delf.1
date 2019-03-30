@@ -41,32 +41,31 @@ reads from the standard input.
 Quotes are not interpreted.
 The
 .Ar delimiter
-cannot be
-.Sq \en
+cannot be the line feed character
 as this is used to separate lines.
 .Pp
-Upon success the delimiter character is printed.
-The format depends upon the delimiter character as follows:
-.Bl -bullet -offset indent
-.It
-If it is a printable glyph in the C locale,
-then it is printed as itself.
-.It
-The escape sequences
-.Sq \e0
-and
-.Sq \et
-are used to print the null character and tab character, respectively.
-.It
-All other characters are printed as the two digit hexadecimal
-representation of their encoded value (without a prefix).
-.El
+Upon success the delimiter character is printed
+(although it may not be visible).
 .Pp
-Failing to find the delimiter is considered an error, and if this occurs,
--1 is printed.
+Failing to find the delimiter is considered an error, and nothing will be printed.
 .Pp
 .Dv MAX_LINES
 is set to 100 by default.
+.Pp
+.Nm
+can run in two modes, UTF-8 mode, and single-byte mode.
+If your locale is set such that
+.Dv MB_CUR_MAX
+is 4, then
+.Nm
+will run in UTF-8 mode. Otherwise,
+.Nm
+will run in single-byte mode.
+Setting
+.Dv LC_CTYPE
+to C will make
+.Nm
+run in single-byte mode.
 .Pp
 .Nm
 is released under the ISC licence (OpenBSD style).
@@ -82,6 +81,3 @@ is released under the ISC licence (OpenBSD style).
 .Nm
 was written by
 .An "Logan Ryan McLintock".
-.Sh CAVEATS
-.Nm
-does not support multi-character delimiters.

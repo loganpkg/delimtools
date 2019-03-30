@@ -36,9 +36,24 @@ reads from the standard input.
 Upon success three tab delimited columns are printed
 with one row for each character present.
 The first column is the decimal value of the character,
-the second column is the printable glyph in the C locale or
-the two digit hexadecimal value (without a prefix),
+the second column is the glyph (which may not be visible),
 and the final column is the frequency.
+.Pp
+.Nm
+can run in two modes, UTF-8 mode, and single-byte mode.
+If your locale is set such that
+.Dv MB_CUR_MAX
+is 4, then
+.Nm
+will run in UTF-8 mode, and the decimal value displayed for a character
+will be its Unicode code point value. Otherwise,
+.Nm
+will run in single-byte mode.
+Setting
+.Dv LC_CTYPE
+to C will make
+.Nm
+run in single-byte mode.
 .Pp
 .Nm
 is released under the ISC licence (OpenBSD style).
@@ -53,5 +68,3 @@ is released under the ISC licence (OpenBSD style).
 .Nm
 was written by
 .An "Logan Ryan McLintock".
-.Sh CAVEATS
-
