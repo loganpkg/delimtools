@@ -20,13 +20,10 @@ delimtools is a collection of utilities for working with delimited files.
 
 ## Installation
 
-The makefiles are setup for installation in the user's home directory.
-This is useful on systems where you do not have access to install for
-all users.
+Firstly, install the `utf8` and `gapbuf` libraries (see the `gapbuf` repository
+`README.md` for instructions).
 
-Firstly,
-
-Create a directory for the source code:
+Then, create a directory for the source code:
 
     $ cd ~
     $ mkdir delimtools_src
@@ -40,47 +37,41 @@ Download the source code from the offical fossil repository:
 If you don't have `fossil` then you can mannually download the files
 into `delimtools_src`.
 
+`/usr/local` is the default installation directory. This can be changed by editing
+each makefile and changing the `install_dir` variable.
+
 Now it's time to build the software:
 
-    $ make && make install
+    $ make clean
+    $ make
+    $ make install
 
-If there is a problem, run `make clean` before trying to `make` again.
+You might need to use `sudo` for the `make install` step.
 
-The following instructions may be sightly different depending on the shell
-and operating system you are using.
+If you installed to a location other than `/usr/local` then some paths might need
+to be added to your shell's configuration file.
+Depending on your shell and operating system, the following instructions will be
+slightly different.
 
-If:
+Add the following lines to `~/.shrc` as necessary:
 
-    $ which delim
-    $ echo "$?"
+    # Set this to install directory that you used
+    install_dir="$HOME"
+    # If the executable is not found
+    export PATH="$install_dir"/bin:"$PATH"
+    # If the shared object is not found
+    export LD_LIBRARY_PATH="$install_dir"/lib:"$LD_LIBRARY_PATH"
+    # If the manual page is not found
+    export MANPATH="$install_dir"/man:"$(manpath)"
 
-is non-zero, then add the following line to your `~/.shrc` file:
-
-    export PATH="$HOME/bin:$PATH"
-
-then:
-
-    $ . ~/.shrc
-
-Now `which delim` should work.
-
-If:
-
-    $ man delim
-
-returns the error:
-
-    No manual entry for delim
-
-then add the following line to your `~/.shrc` file:
-
-    export MANPATH="$HOME/man:$(manpath)"
-
-then
+then reload the configuration file:
 
     $ . ~/.shrc
 
-Now `man delim` should work.
+You can check that the correct utf8 shared object is being used:
+
+    $ ldd "$(which freq)"
+
 
 ## Printing
 
