@@ -18,16 +18,15 @@
 #include <sys/stat.h>
 #include <ctype.h>
 #include <limits.h>
+#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <macros.h>
 #include <utf8.h>
 
-#define LOGERR(m) (void) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
-
 #define INIT_BUF_SIZE 1024
-#define NUM_CH UCHAR_MAX + 1
 #define MAX_LINES 100
 
 int main(int argc, char **argv)
@@ -35,19 +34,38 @@ int main(int argc, char **argv)
 	int ret = 0;
 	FILE *fp = NULL;
 	struct stat st;
-
 	char *buf = NULL;
 	size_t buf_size = 0;
 	ssize_t line_len;
-
-	size_t first_freq[NUM_CH] = { 0 };
-	size_t sub_freq[NUM_CH] = { 0 };
-	int eliminated[NUM_CH] = { 0 };
-
+	size_t first_freq[NUMCP] = { 0 };
+	size_t sub_freq[NUMCP] = { 0 };
+	int eliminated[NUMCP] = { 0 };
+	size_t num;
 	size_t row_count;
 	size_t i;
-	int delim;
+	uint32_t delim;
 	size_t weight;
+	int set;
+
+	/* Set to the environment locale */
+	if (setlocale(LC_CTYPE, "") == NULL) {
+		LOGERR("setlocale failed");
+		return 1;
+	}
+
+	/* This should be 4 for UTF-8 */
+	if (MB_CUR_MAX != 1 && MB_CUR_MAX != 4) {
+		if (setlocale(LC_CTYPE, "C") == NULL) {
+			LOGERR("setlocale failed");
+			return 1;
+		}
+	}
+
+	if (MB_CUR_MAX == 4) {
+		num = NUMCP;
+	} else {
+		num = UCHAR_MAX + 1;
+	}
 
 	if (argc != 1 && argc != 2) {
 		fprintf(stderr, "Usage: %s: [file]\n", argv[0]);
@@ -96,59 +114,65 @@ int main(int argc, char **argv)
 	row_count = 0;
 	while ((line_len = getline(&buf, &buf_size, fp)) > 0
 	       && row_count < MAX_LINES) {
+
 		++row_count;
 
 		if (row_count == 1) {
-			for (i = 0; i < (size_t) line_len; ++i) {
-				++first_freq[(int)buf[i]];
+			if (MB_CUR_MAX == 4) {
+				if (ufreq(buf, line_len, first_freq)) {
+					ret = 1;
+					goto clean_up;
+				}
+			} else {
+				for (i = 0; i < (size_t) line_len; ++i) {
+					++first_freq[(int)buf[i]];
+				}
 			}
-			for (i = 0; i < NUM_CH; ++i) {
+			for (i = 0; i < num; ++i) {
 				if (first_freq[i] == 0) {
 					eliminated[i] = 1;
 				}
 			}
 		} else {
-			for (i = 0; i < (size_t) line_len; ++i) {
-				++sub_freq[(int)buf[i]];
+			if (MB_CUR_MAX == 4) {
+				if (ufreq(buf, line_len, sub_freq)) {
+					ret = 1;
+					goto clean_up;
+				}
+			} else {
+				for (i = 0; i < (size_t) line_len; ++i) {
+					++sub_freq[(int)buf[i]];
+				}
 			}
-			for (i = 0; i < NUM_CH; ++i) {
+			for (i = 0; i < num; ++i) {
 				if (sub_freq[i] != first_freq[i]) {
 					eliminated[i] = 1;
 				}
 			}
-			for (i = 0; i < NUM_CH; ++i) {
+			for (i = 0; i < num; ++i) {
 				sub_freq[i] = 0;
 			}
 		}
 	}
 
-	delim = -1;
+	set = 0;
 	weight = 0;
-	for (i = 0; i < NUM_CH; ++i) {
+	for (i = 0; i < num; ++i) {
 		if (!eliminated[i] && first_freq[i] > weight && i != '\n') {
 			delim = i;
+			set = 1;
 			weight = first_freq[i];
 		}
 	}
 
-	if (delim == -1) {
+	if (!set) {
 		ret = 1;
-		printf("%d\n", delim);
-	} else {
-		if (isprint(delim)) {
-			printf("%c\n", delim);
-		} else {
-			switch (delim) {
-			case '\0':
-				printf("\\0\n");
-				break;
-			case '\t':
-				printf("\\t\n");
-				break;
-			default:
-				printf("%02x\n", (unsigned char)delim);
-			}
-		}
+		goto: clean_up;
+	}
+
+	if (uprintcp(delim)) {
+	  ret = 1;
+	  goto: clean_up;
 	}
 
  clean_up:

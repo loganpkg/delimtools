@@ -34,7 +34,6 @@ int main(int argc, char **argv)
 	int ret = 0;
 	FILE *fp = NULL;
 	struct stat st;
-	size_t filesize;
 	char *buf = NULL;
 	size_t buf_size;
 	ssize_t line_len;
@@ -63,7 +62,6 @@ int main(int argc, char **argv)
 
 	if (argc == 1 || !strcmp(argv[1], "-")) {
 		fp = stdin;
-		filesize = 0;	/* Unknown */
 	} else {
 
 		if (stat(argv[1], &st)) {
@@ -119,7 +117,10 @@ int main(int argc, char **argv)
 		for (j = 0; j < NUMCP; ++j) {
 			if (freq[j]) {
 				printf("%u\t", j);
-				uprintcp(j);
+				if (uprintcp(j)) {
+				  ret = 1;
+				  goto clean_up;
+				}
 				printf("\t%lu\n", freq[j]);
 			}
 		}
