@@ -30,7 +30,7 @@ mkdir = mkdir -p
 all: delim delf freq
 
 delim: delim.c
-	$(CC) $(CFLAGS) $(include_path) $(link_path) -o delim delim.c $(libs)
+	$(CC) $(CFLAGS) $(include_path) -o delim delim.c
 
 delf: delf.c
 	$(CC) $(CFLAGS) $(include_path) $(link_path) -o delf delf.c $(libs)

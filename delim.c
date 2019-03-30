@@ -21,9 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <utf8.h>
-
-#define LOGERR(m) (void) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
+#include <macros.h>
 
 #define INIT_BUF_SIZE 1024
 
@@ -35,13 +33,14 @@ int main(int argc, char **argv)
 	size_t buf_size = 0;
 	ssize_t line_len;
 	size_t row_count;
-	size_t i;
+	char *start;
+	char *match;
 	size_t delim_count;
 	size_t first_delim_count;
 
 	struct stat st;
 	char *delim_str;
-	char delim;
+	size_t delim_len;
 
 	if (argc != 2 && argc != 3) {
 		fprintf(stderr, "Usage: %s: delimiter [file]\n", argv[0]);
@@ -50,47 +49,19 @@ int main(int argc, char **argv)
 
 	delim_str = argv[1];
 
-	switch (strnlen(delim_str, 3)) {
-	case 1:
-		delim = delim_str[0];
-		break;
-	case 2:
-		if (delim_str[0] == '\\') {
-			switch (delim_str[1]) {
-			case '0':
-				delim = '\0';
-				break;
-			case 't':
-				delim = '\t';
-				break;
-			case 'n':
-				delim = '\n';
-				break;
-			default:
-				LOGERR
-				    ("delimiter contains invaild escape sequence");
-				return 1;
-			}
-		} else {
-			if (isxdigit(delim_str[0]) && isxdigit(delim_str[1])) {
-				delim = delim_str[0] * 16 + delim_str[1];
-			} else {
-				LOGERR
-				    ("delimiter contains invalid hexadecimal code");
-				return 1;
-			}
-		}
-		break;
-	default:
-		LOGERR("delimiter must be one character");
-		return 1;
+	if  (!strlen(delim_str)) {
+	  LOGERR("empty delimiter");
+	  return 1;
+	} else if (!strcmp(delim_str, "\\t")) {
+	    delim_str[0] = '\t';
+	    delim_str[1] = '\0';
+	} else if (!strcmp(delim_str, "\\n") || !strcmp(delim_str, "\n")) {
+	  LOGERR("delimiter cannot be a line feed character");
+	  return 1;
 	}
 
-	if (delim == '\n') {
-		LOGERR("delimiter cannot be a \\n character");
-		return 1;
-	}
-
+	delim_len = strlen(delim_str);
+	
 	if (argc == 2 || !strcmp(argv[2], "-")) {
 		fp = stdin;
 	} else {
@@ -134,17 +105,21 @@ int main(int argc, char **argv)
 	delim_count = 0;
 
 	while ((line_len = getline(&buf, &buf_size, fp)) > 0) {
-		++row_count;
+	  ++row_count;
 
-		for (i = 0; i < (size_t) line_len; ++i) {
-			if (buf[i] == delim) {
-				++delim_count;
-			}
-		}
+	  start = buf;
+	  
+	  while ((match = memmem(start, (size_t)line_len, delim_str, delim_len)) != NULL) {
+	    ++delim_count;
+	    if (match - buf != line_len) {
+	      start = match + 1;
+	    } else {
+	      break;
+	    }
+	  }
 
 		if (row_count == 1) {
 			first_delim_count = delim_count;
-
 		} else if (delim_count != first_delim_count) {
 			fprintf(stderr,
 				"%s: Delimiter mismatch:\nLine 1: %lu\nLine %lu: %lu\n",
