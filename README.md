@@ -42,9 +42,8 @@ each makefile and changing the `install_dir` variable.
 
 Now it's time to build the software:
 
-    $ make clean
     $ make
-    $ make install
+    $ sudo make install
 
 You might need to use `sudo` for the `make install` step.
 
