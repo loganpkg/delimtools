@@ -71,7 +71,6 @@ You can check that the correct utf8 shared object is being used:
 
     $ ldd "$(which freq)"
 
-
 ## Printing
 
 There is a `LaTeX` file `print.tex` that you can use to create a
