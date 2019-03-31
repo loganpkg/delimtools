@@ -37,9 +37,9 @@ int main(int argc, char **argv)
 	char *buf = NULL;
 	size_t buf_size = 0;
 	ssize_t line_len;
-	size_t first_freq[NUMCP] = { 0 };
-	size_t sub_freq[NUMCP] = { 0 };
-	int eliminated[NUMCP] = { 0 };
+	size_t *first_freq = NULL;
+	size_t *sub_freq = NULL;
+	int *eliminated = NULL;
 	size_t num;
 	size_t row_count;
 	size_t i;
@@ -99,6 +99,42 @@ int main(int argc, char **argv)
 			LOGERR("fopen failed");
 			return 1;
 		}
+	}
+
+	if (MULTOF(NUMCP, sizeof(size_t))) {
+		LOGERR("multiplication overflow");
+		ret = 1;
+		goto clean_up;
+	}
+
+	if (MULTOF(NUMCP, sizeof(int))) {
+		LOGERR("multiplication overflow");
+		ret = 1;
+		goto clean_up;
+	}
+
+	first_freq = calloc(NUMCP, sizeof(size_t));
+
+	if (first_freq == NULL) {
+		LOGERR("calloc failed");
+		ret = 1;
+		goto clean_up;
+	}
+
+	sub_freq = calloc(NUMCP, sizeof(size_t));
+
+	if (sub_freq == NULL) {
+		LOGERR("calloc failed");
+		ret = 1;
+		goto clean_up;
+	}
+
+	eliminated = calloc(NUMCP, sizeof(int));
+
+	if (eliminated == NULL) {
+		LOGERR("calloc failed");
+		ret = 1;
+		goto clean_up;
 	}
 
 	buf = malloc(INIT_BUF_SIZE);
@@ -182,6 +218,18 @@ int main(int argc, char **argv)
 			LOGERR("fclose failed");
 			ret = 1;
 		}
+	}
+
+	if (first_freq != NULL) {
+		free(first_freq);
+	}
+
+	if (sub_freq != NULL) {
+		free(sub_freq);
+	}
+
+	if (eliminated != NULL) {
+		free(eliminated);
 	}
 
 	if (buf != NULL) {

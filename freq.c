@@ -36,7 +36,7 @@ int main(int argc, char **argv)
 	char *buf = NULL;
 	size_t buf_size;
 	ssize_t line_len;
-	size_t freq[NUMCP] = { 0 };
+	size_t *freq = NULL;
 	ssize_t i;
 	uint32_t j;
 
@@ -88,6 +88,20 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (MULTOF(NUMCP, sizeof(size_t))) {
+		LOGERR("multiplication overflow");
+		ret = 1;
+		goto clean_up;
+	}
+
+	freq = calloc(NUMCP, sizeof(size_t));
+
+	if (freq == NULL) {
+		LOGERR("calloc failed");
+		ret = 1;
+		goto clean_up;
+	}
+
 	buf = malloc(INIT_BUF_SIZE);
 
 	if (buf == NULL) {
@@ -137,6 +151,10 @@ int main(int argc, char **argv)
 			LOGERR("fclose failed");
 			ret = 1;
 		}
+	}
+
+	if (freq != NULL) {
+		free(freq);
 	}
 
 	if (buf != NULL) {
