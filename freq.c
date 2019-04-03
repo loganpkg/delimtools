@@ -130,17 +130,33 @@ int main(int argc, char **argv)
 		for (j = 0; j < NUMCP; ++j) {
 			if (freq[j]) {
 				printf("%u\t", j);
-				if (uprintcp(j)) {
+
+				if (j == 9) {
+					printf("\\t");
+				} else if (j == 10) {
+					printf("\\n");
+				} else if (uprintcp(j)) {
 					ret = 1;
 					goto clean_up;
 				}
+
 				printf("\t%lu\n", freq[j]);
 			}
 		}
 	} else {
 		for (j = 0; j <= UCHAR_MAX; ++j) {
 			if (freq[j]) {
-				printf("%c\t%lu\n", (char)j, freq[j]);
+				printf("%u\t", j);
+
+				if (j == 9) {
+					printf("\\t");
+				} else if (j == 10) {
+					printf("\\n");
+				} else {
+					printf("%c", (char)j);
+				}
+
+				printf("\t%lu\n", freq[j]);
 			}
 		}
 	}

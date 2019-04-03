@@ -206,7 +206,9 @@ int main(int argc, char **argv)
 		goto clean_up;
 	}
 
-	if (uprintcp(delim)) {
+	if (delim == 9) {
+		printf("\\t");
+	} else if (uprintcp(delim)) {
 		ret = 1;
 		goto clean_up;
 	}
