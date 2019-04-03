@@ -44,8 +44,9 @@ The
 cannot be the line feed character
 as this is used to separate lines.
 .Pp
-Upon success the delimiter character is printed
-(although it may not be visible).
+Upon success the delimiter is printed as its glyph
+or as a backslash t if it is a tab.
+Glyphs may not be visible.
 .Pp
 Failing to find the delimiter is considered an error, and nothing will be printed.
 .Pp
