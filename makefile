@@ -14,15 +14,13 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-# Set this
-install_dir = /usr/local
 
 CC = cc
-CFLAGS = -ansi -Ofast -Wall -Wextra -pedantic
+CFLAGS = -ansi -O2 -g -Wall -Wextra -pedantic
 RM = rm -f
 
-include_path = -I$(install_dir)/include
-link_path = -L$(install_dir)/lib
+include_path = -I${PREFIX}/include
+link_path = -L${PREFIX}/lib
 libs = -lutf8
 cp = cp
 mkdir = mkdir -p
@@ -30,25 +28,25 @@ mkdir = mkdir -p
 all: delim delf freq
 
 delim: delim.c
-	$(CC) $(CFLAGS) $(include_path) -o delim delim.c
+	${CC} ${CFLAGS} ${include_path} -o delim delim.c
 
 delf: delf.c
-	$(CC) $(CFLAGS) $(include_path) $(link_path) -o delf delf.c $(libs)
+	${CC} ${CFLAGS} ${include_path} ${link_path} -o delf delf.c ${libs}
 
 freq: freq.c
-	$(CC) $(CFLAGS) $(include_path) $(link_path) -o freq freq.c $(libs)
+	${CC} ${CFLAGS} ${include_path} ${link_path} -o freq freq.c ${libs}
 
 .PHONY: clean
 clean:
-	$(RM) delim delf freq
+	${RM} delim delf freq
 
 .PHONY: install
 install:
-	$(mkdir) $(install_dir)/bin
-	$(mkdir) $(install_dir)/man/man1
-	$(cp) delim $(install_dir)/bin/
-	$(cp) delf $(install_dir)/bin/	
-	$(cp) freq $(install_dir)/bin/
-	$(cp) delim.1 $(install_dir)/man/man1/
-	$(cp) delf.1 $(install_dir)/man/man1/
-	$(cp) freq.1 $(install_dir)/man/man1/
+	${mkdir} ${PREFIX}/bin
+	${mkdir} ${PREFIX}/man/man1
+	${cp} delim ${PREFIX}/bin/
+	${cp} delf ${PREFIX}/bin/
+	${cp} freq ${PREFIX}/bin/
+	${cp} delim.1 ${PREFIX}/man/man1/
+	${cp} delf.1 ${PREFIX}/man/man1/
+	${cp} freq.1 ${PREFIX}/man/man1/
