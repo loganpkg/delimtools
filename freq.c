@@ -22,9 +22,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "utf8.h"
 
-#include <macros.h>
-#include <utf8.h>
 
 #define INIT_BUF_SIZE 1024
 

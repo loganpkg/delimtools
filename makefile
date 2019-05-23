@@ -19,22 +19,19 @@ CC = cc
 CFLAGS = -ansi -O2 -g -Wall -Wextra -pedantic
 RM = rm -f
 
-include_path = -I${PREFIX}/include
-link_path = -L${PREFIX}/lib
-libs = -lutf8
 cp = cp
 mkdir = mkdir -p
 
 all: delim delf freq
 
 delim: delim.c
-	${CC} ${CFLAGS} ${include_path} -o delim delim.c
+	${CC} ${CFLAGS} -o delim delim.c
 
 delf: delf.c
-	${CC} ${CFLAGS} ${include_path} ${link_path} -o delf delf.c ${libs}
+	${CC} ${CFLAGS} -o delf delf.c utf8.c
 
 freq: freq.c
-	${CC} ${CFLAGS} ${include_path} ${link_path} -o freq freq.c ${libs}
+	${CC} ${CFLAGS} -o freq freq.c utf8.c
 
 .PHONY: clean
 clean:

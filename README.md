@@ -20,10 +20,7 @@ delimtools is a collection of utilities for working with delimited files.
 
 ## Installation
 
-Firstly, install the `utf8` and `gapbuf` libraries (see the `gapbuf` repository
-`README.md` for instructions).
-
-Then, create a directory for the source code:
+Create a directory for the source code:
 
     $ cd ~
     $ mkdir delimtools_src
@@ -37,24 +34,20 @@ Download the source code from the offical fossil repository:
 If you don't have `fossil` then you can mannually download the files
 into `delimtools_src`.
 
-`/usr/local` is the default installation directory. This can be changed by editing
-each makefile and changing the `install_dir` variable.
-
 Now it's time to build the software:
 
     $ make
-    $ sudo make install
+    $ PREFIX="$HOME" make install
 
-You might need to use `sudo` for the `make install` step.
+You might need to use `sudo` for the `make install` step depending on your choice of `PREFIX`.
 
-If you installed to a location other than `/usr/local` then some paths might need
-to be added to your shell's configuration file.
+Some paths might need to be added to your shell's configuration file.
 Depending on your shell and operating system, the following instructions will be
 slightly different.
 
 Add the following lines to `~/.shrc` as necessary:
 
-    # Set this to install directory that you used
+    # Set this to the PREFIX that you used
     install_dir="$HOME"
     # If the executable is not found
     export PATH="$install_dir"/bin:"$PATH"
