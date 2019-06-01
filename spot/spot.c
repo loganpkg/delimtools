@@ -25,6 +25,8 @@
 /* Default gap size */
 #define GAP 100
 
+#define REGION_COLORS 1
+
 #define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
 /* size_t addtion overflow test */
 #define ADDOF(a, b) ((a) > SIZE_MAX - (b))
@@ -48,6 +50,7 @@ struct buf {
 	size_t t;		/* Row number of top of screen */
 	int m_set;		/* If the mark is set */
 	int mod;		/* If the buffer is modified */
+	int v;			/* veritcal centring requested */
 };
 
 int safeadd(size_t * res, int num_args, ...)
@@ -370,6 +373,24 @@ int initnc(void)
 		goto clean_up;
 	}
 
+	if (has_colors() == FALSE) {
+		LOG("has_colors failed");
+		ret = -1;
+		goto clean_up;
+	}
+
+	if (start_color() == ERR) {
+		LOG("start_color failed");
+		ret = -1;
+		goto clean_up;
+	}
+
+	if (init_pair(REGION_COLORS, COLOR_YELLOW, COLOR_MAGENTA) == ERR) {
+		LOG("init_pair failed");
+		ret = -1;
+		goto clean_up;
+	}
+
  clean_up:
 	if (ret) {
 		if (endwin() == ERR)
@@ -383,6 +404,289 @@ int freenc(void)
 {
 	if (endwin() == ERR) {
 		LOG("endwin failed");
+		return -1;
+	}
+
+	return 0;
+}
+
+void level(struct buf *b)
+{
+	if (clear() == ERR)
+		LOG("clear failed");
+
+	b->v = 1;
+}
+
+void centre(struct buf *b, int th)
+{
+	/* Max row index where centring will result in t being set to zero */
+	size_t t_zero_range;
+
+	/* If text portion screen height is odd */
+	if (th % 2) {
+		t_zero_range = th / 2;
+	} else {
+		t_zero_range = th / 2 - 1;
+	}
+
+	/* If near top of buffer */
+	if (b->r <= t_zero_range) {
+		b->t = 0;
+	} else {
+		b->t = b->r - t_zero_range;
+	}
+
+	b->v = 0;
+}
+
+void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx, int cursor_start)
+{
+	char *p, end_of_buf;
+	size_t count;
+	int hl_on;		/* If region highlighting is on */
+
+	if (cursor_start) {
+		p = b->c;
+	} else {
+		/* Search backwards to find the start of row t */
+		if (!b->t) {
+			p = b->a;
+		} else {
+			p = b->g - 1;
+			count = 0;
+
+			while (p != b->a) {
+				if (*p == '\n') {
+					++count;
+				}
+
+				if (count == b->r - b->t + 1) {
+					break;
+				}
+				--p;
+			}
+
+			if (*p == '\n') {
+				++p;
+			}
+		}
+	}
+
+	*cp_set = 0;
+
+	hl_on = 0;
+	if (b->m_set && b->m < p) {
+		attron(COLOR_PAIR(REGION_COLORS));
+		hl_on = 1;
+	}
+
+	end_of_buf = b->a + b->s;
+	while (p < end_of_buf) {
+		/* Gap */
+		if (p == b->g) {
+			/* Skip gap */
+			p = b->c;
+
+			/* Record cursor position */
+			getyx(stdscr, *cy, *cx);
+			*cp_set = 1;
+
+			if (hl_on) {
+				attroff(COLOR_PAIR(REGION_COLORS));
+				hl_on = 0;
+			}
+			if (b->m_set && b->m > p) {
+				attron(COLOR_PAIR(REGION_COLORS));
+				hl_on = 1;
+			}
+		} else {
+			if (b->m_set && p == b->m) {
+				if (hl_on) {
+					attroff(COLOR_PAIR(REGION_COLORS));
+					hl_on = 0;
+				} else {
+					attron(COLOR_PAIR(REGION_COLORS));
+					hl_on = 1;
+				}
+			}
+		}
+
+		if (isprint(*p) || *p == '\t' || *p == '\n') {
+			/* If printing is off screen */
+			if (addch(*p) == ERR) {
+				return;
+			}
+		} else {
+			/*
+			 * Unprintable character.
+			 * If printing is off screen.
+			 */
+			if (addch('?') == ERR) {
+				return;
+			}
+		}
+		++p;
+	}
+}
+
+int drawscreen(struct ed *e)
+{
+	struct buf *b = e->t[e->ab];	/* Active text buffer pointer */
+	struct buf *cl = e->cl;	/* Command line buffer pointer */
+	/* Height and width of screen */
+	int h;
+	int w;
+	int th;			/* Height of text portion of the screen */
+	int cp_set;		/* If the cursor position has been set */
+	/* Text buffer cursor index */
+	int cy;
+	int cx;
+	/* Command line cursor index */
+	int cl_cy;
+	int cl_cx;
+	char *sb = NULL;	/* Status bar */
+	size_t sb_s;		/* Size of the status bar */
+
+	getmaxyx(stdscr, h, w);
+
+	/* Cannot draw on a screen this small */
+	if (h < 3 || w < 1) {
+		LOG("screen too small");
+		return -1;
+	}
+
+	/* Height of text portion of the screen */
+	th = h - 2;
+
+	/* If need to centre */
+	if (b->r < b->t || b->r >= b->t + th)
+		centre(b, th);
+
+	/* 1st attempt: from t line */
+	if (erase() == ERR) {
+		LOG("erase failed");
+		return -1;
+	}
+	cy = 0;
+	cx = 0;
+	bdraw(b, &cp_set, &cy, &cx, 0);
+
+	/* 2nd attempt: draw from start of cursor's line */
+	if (!cp_set || cy >= th) {
+		if (erase() == ERR) {
+			LOG("erase failed");
+			return -1;
+		}
+		b->t = b->r;
+		cy = 0;
+		cx = 0;
+		bdraw(b, &cp_set, &cy, &cx, 0);
+
+		/* 3rd attempt: draw from the cursor */
+		if (!cp_set || cy >= th) {
+			if (erase() == ERR) {
+				LOG("erase failed");
+				return -1;
+			}
+			cy = 0;
+			cx = 0;
+			bdraw(b, &cp_set, &cy, &cx, 1);
+		}
+	}
+
+	/* Status bar */
+	if (ADDOF((size_t) w, 1)) {
+		LOG("addition integer overflow");
+		return -1;
+	}
+
+	sb_s = w + 1;
+
+	if ((sb = malloc(sb_s)) == NULL) {
+		LOG("malloc failed");
+		return -1;
+	}
+
+	/* Create status bar */
+	if (snprintf(sb, sb_s, "%c%c %s (%lu) %02x %d %s",
+		     (b->mod) ? '*' : ' ',
+		     (e->cmd_ret) ? 'F' : ' ',
+		     b->fn,
+		     b->r, (unsigned char)b->c, e->shell_ret, e->msg) < 0) {
+		LOG("snprintf failed");
+		free(sb);
+		return -1;
+	}
+
+	/* Clear status bar line */
+	if (move(h - 2, 0) == ERR) {
+		LOG("move failed");
+		return -1;
+	}
+	if (clrtoeol() == ERR) {
+		LOG("clrtoeol failed");
+		return -1;
+	}
+
+	/* Add status bar */
+	if (addnstr(sb, w) == ERR) {
+		LOG("addnstr failed");
+		free(sb);
+		return -1;
+	}
+
+	free(sb);
+
+	/* Highlight status bar */
+	if (mvchgat(h - 2, 0, w, A_STANDOUT, 0, NULL) == ERR) {
+		LOG("mvchgat failed");
+		return -1;
+	}
+
+	/* First draw command line attempt */
+	if (move(h - 1, 0) == ERR) {
+		LOG("move failed");
+		return -1;
+	}
+	if (clrtoeol() == ERR) {
+		LOG("clrtoeol failed");
+		return -1;
+	}
+	cl_cy = h - 1;
+	cl_cx = 0;
+	bdraw(cl, &cp_set, &cl_cy, &cl_cx, 0);
+
+	/* Second draw command line */
+	if (!cp_set || cl_cx >= w) {
+		if (move(h - 1, 0) == ERR) {
+			LOG("move failed");
+			return -1;
+		}
+		if (clrtoeol() == ERR) {
+			LOG("clrtoeol failed");
+			return -1;
+		}
+		cl_cy = h - 1;
+		cl_cx = 0;
+		bdraw(cl, &cp_set, &cl_cy, &cl_cx, 1);
+	}
+
+	/* Set cursor */
+	if (e->cl_active) {
+		if (move(cl_cy, cl_cx) == ERR) {
+			LOG("move failed");
+			return -1;
+		}
+	} else {
+		if (move(cy, cx) == ERR) {
+			LOG("move failed");
+			return -1;
+		}
+	}
+
+	if (refresh() == ERR) {
+		LOG("refresh failed");
 		return -1;
 	}
 
