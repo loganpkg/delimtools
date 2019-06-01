@@ -22,6 +22,12 @@
  * then place spot somewhere in your PATH.
  */
 
+#define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
+/* size_t addtion overflow test */
+#define ADDOF(a, b) ((a) > SIZE_MAX - (b))
+/* size_t multiplication overflow test */
+#define MULTOF(a, b) ((a) && (b) > SIZE_MAX / (a))
+
 struct buf {
   char *fn; /* Filename */
   char *a; /* Array */
@@ -34,3 +40,24 @@ struct buf {
   int m_set; /* If the mark is set */
   int mod; /* If the buffer is modified */
 };
+
+int safeadd(size_t * res, int num_args, ...)
+{
+	va_list ap;
+	int i;
+	size_t total = 0;
+	size_t arg_val = 0;
+
+	va_start(ap, num_args);
+	for (i = 0; i < num_args; ++i) {
+		arg_val = va_arg(ap, size_t);
+		if (ADDOF(total, arg_val)) {
+			va_end(ap);
+			return -1;
+		}
+		total += arg_val;
+	}
+	va_end(ap);
+	*res = total;
+	return 0;
+}
