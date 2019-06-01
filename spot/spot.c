@@ -281,3 +281,20 @@ int save(struct buf *b)
 
 	return ret;
 }
+
+void end(struct buf *b) {
+  int x;
+  while ((x = rightch(b)) != -1) {
+    if (x == '\n') break;
+  }
+}
+
+void home(struct buf *b) {
+  int x;
+  while ((x = leftch(b)) != -1) {
+    if (x == '\n') {
+      rightch(b);
+      break;
+    }
+  }
+}
