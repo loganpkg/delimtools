@@ -242,3 +242,42 @@ int insertfile(stuct buf * b, char *fn)
 
 	return ret;
 }
+
+int save(struct buf *b)
+{
+	int ret = 0;
+	FILE *fp = NULL;
+
+	if (!b->mod)
+		return 0;
+
+	if ((fp = fopen(b->fn, "w")) == NULL) {
+		LOG("fopen failed");
+		return -1;
+	}
+
+	/* Before gap */
+	if (fwrite(b->a, 1, b->g - b->a, fp) != b->g - b->a) {
+		LOG("fwrite failed before gap");
+		ret = -1;
+		goto clean_up;
+	}
+
+	/* After gap */
+	if (fwrite(b->c, 1, b->s - 1, fp) != b->s - 1) {
+		LOG("fwrite failed after gap");
+		ret = -1;
+		goto clean_up;
+	}
+
+ clean_up:
+	if (fclose(fp)) {
+		LOG("fclose failed");
+		ret = -1;
+	}
+
+	if (!ret)
+		b->mod = 0;
+
+	return ret;
+}
