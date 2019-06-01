@@ -298,3 +298,11 @@ void home(struct buf *b) {
     }
   }
 }
+
+void first(struct buf *b) {
+  while(leftch(b) != -1);
+}
+
+void last(struct buf *b) {
+  while(right(b) != -1);
+}
