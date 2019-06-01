@@ -34,10 +34,15 @@
 #define MULTOF(a, b) ((a) && (b) > SIZE_MAX / (a))
 
 #define INSERT(b, ch) do { \
-if (ch == '\n') ++b->r; \
-*b->g = ch; \
-++b->g; \
+    if ((ch) == '\n') ++(b)->r; \
+    *(b)->g = (ch); \
+    ++(b)->g; \
 } while (0)
+
+#define INSERTANDLEFT(b, ch) (*(--(b)->c) = (ch))
+
+#define DELETE(b) (*((b)->c++))
+#define BACKSPACE(b) (*(--(b)->g))
 
 struct buf {
 	char *fn;		/* Filename */
@@ -116,22 +121,30 @@ int insertch(struct buf *b, char ch)
 
 	b->m_set = 0;
 	b->mod = 1;
+	
 	INSERT(b, ch);
 	return 0;
 }
 
 int deletech(struct buf *b)
 {
-	char ch;
-
 	if (b->c == b->a + b->s - 1)
 		return -1;
 
 	b->m_set = 0;
 	b->mod = 1;
-	ch = *b->c;
-	++b->c;
-	return ch;
+
+	return DELETE(b);
+}
+
+int backspace(struct buf *b) {
+	if (b->g == b->a)
+		return -1;
+
+	b->m_set = 0;
+	b->mod = 1;
+
+	return BACKSPACE(b);  
 }
 
 int leftch(struct buf *b)
@@ -167,6 +180,65 @@ int rightch(struct buf *b)
 	++b->g;
 	++b->c;
 	return *b->c;
+}
+
+int insertbuf(struct buf *b, struct buf *k) {
+  int x;
+
+  if (growgap(b, k->s - (k->c - k->g))) {
+    LOG("growgap failed");
+    return -1;
+  }
+
+  	b->m_set = 0;
+	b->mod = 1;
+  
+  first(k);
+  INSERT(b, *k->c);
+  while ((x = right(k)) != -1) INSERT(b, x);
+
+  return 0;
+}
+
+void setmark(struct buf *b) {
+  b->m_set = 1;
+  b->m = b->c;
+}
+
+int killregion(struct buf *b, struct buf *k) {
+
+  if (!b->m_set || b->c == b->m) return -1;
+  
+  /* Cursor before mark */
+  if (b->c < b->m) {
+    if (growgap(b, b->m - b->c)) {
+      LOG("growgap failed");
+      return -1;
+    }
+
+      	b->m_set = 0;
+	b->mod = 1;
+
+	k->m_set = 0;
+	k->mod = 1;
+
+	while (b->c != b->m) INSERT(k, DELETE(b));
+  } else {
+    /* Mark before cursor */
+    if (growgap(b, b->g - b->m)) {
+      LOG("growgap failed");
+      return -1;
+    }
+
+        b->m_set = 0;
+	b->mod = 1;
+
+	k->m_set = 0;
+	k->mod = 1;
+
+	while (b->g != b->m) INSERTANDLEFT(k, BACKSPACE(b));
+  }
+  return 0;
 }
 
 int filesize(size_t * fs, char *fn)
@@ -315,7 +387,7 @@ void last(struct buf *b)
 	while (right(b) != -1) ;
 }
 
-int bracematch(struct buf *b)
+int matchbrace(struct buf *b)
 {
 	int (*move) (struct buf *);
 	char original;
@@ -380,6 +452,51 @@ int bracematch(struct buf *b)
 		return -1;
 	else
 		return 0;
+}
+
+void trimwhitespace(struct buf *b)
+{
+	char ch;
+	int line_feed;
+	int end_of_line;
+
+	last(b);
+
+	/* Trim end of buffer */
+	line_feed = 0;
+	while (leftch(b) != -1) {
+		ch = *b->c;
+		if (ch == '\n') {
+		  if (!line_feed) {
+				line_feed = 1;
+		  } else {
+			  deletech(b);
+		  }
+		} else if (ch == ' ' || ch == '\t') {
+		  deletech(b);
+		} else {
+			break;
+		}
+	}
+	
+	/* Trim body */
+	end_of_line = 1;
+	while (leftch(b) != -1) {
+	  ch = *b->c;
+		switch (ch) {
+		case '\n':
+			end_of_line = 1;
+			break;
+		case ' ':
+		case '\t':
+			if (end_of_line) {
+			  deletech(b);
+			}
+			break;
+		default:
+			end_of_line = 0;
+		}
+	}
 }
 
 int hexnum(int *h, int c)
