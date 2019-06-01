@@ -282,34 +282,40 @@ int save(struct buf *b)
 	return ret;
 }
 
-void end(struct buf *b) {
-  int x;
-  while ((x = rightch(b)) != -1) {
-    if (x == '\n') break;
-  }
+void end(struct buf *b)
+{
+	int x;
+	while ((x = rightch(b)) != -1) {
+		if (x == '\n')
+			break;
+	}
 }
 
-void home(struct buf *b) {
-  int x;
-  while ((x = leftch(b)) != -1) {
-    if (x == '\n') {
-      rightch(b);
-      break;
-    }
-  }
+void home(struct buf *b)
+{
+	int x;
+	while ((x = leftch(b)) != -1) {
+		if (x == '\n') {
+			rightch(b);
+			break;
+		}
+	}
 }
 
-void first(struct buf *b) {
-  while(leftch(b) != -1);
+void first(struct buf *b)
+{
+	while (leftch(b) != -1) ;
 }
 
-void last(struct buf *b) {
-  while(right(b) != -1);
+void last(struct buf *b)
+{
+	while (right(b) != -1) ;
 }
 
 int hexnum(int *h, int c)
 {
-	if (!isxdigit(c)) return -1;
+	if (!isxdigit(c))
+		return -1;
 
 	if (isdigit(c))
 		*h = c - '0';
@@ -326,10 +332,59 @@ void inserthex(struct buf *b)
 	int c0, c1, h0, h1;
 
 	c0 = getch();
-	if (hex_num(&h0, c0)) return;
+	if (hex_num(&h0, c0))
+		return;
 
 	c1 = getch();
-	if (hex_num(&h1, c1)) return;
+	if (hex_num(&h1, c1))
+		return;
 
 	insertch(b, h0 * 16 + h1);
+}
+
+int initnc(void)
+{
+	int ret = 0;
+	WINDOW *w = NULL;
+
+	if ((w = initscr()) == NULL) {
+		LOG("initscr failed");
+		return -1;
+	}
+
+	if (raw() == ERR) {
+		LOG("raw failed");
+		ret = -1;
+		goto clean_up;
+	}
+
+	if (noecho() == ERR) {
+		LOG("noecho failed");
+		ret = -1;
+		goto clean_up;
+	}
+
+	if (keypad(stdscr, TRUE) == ERR) {
+		LOG("keypad failed");
+		ret = -1;
+		goto clean_up;
+	}
+
+ clean_up:
+	if (ret) {
+		if (endwin() == ERR)
+			LOG("endwin failed");
+	}
+
+	return ret;
+}
+
+int freenc(void)
+{
+	if (endwin() == ERR) {
+		LOG("endwin failed");
+		return -1;
+	}
+
+	return 0;
 }
