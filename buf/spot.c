@@ -21,3 +21,16 @@
  * cc -ansi -O2 -g -Wall -Wextra -pedantic -o spot spot.c -lncurses
  * then place spot somewhere in your PATH.
  */
+
+struct buf {
+  char *fn; /* Filename */
+  char *a; /* Array */
+  char *g; /* Start of gap */
+  char *c; /* Cursor */
+  char *m; /* Mark */
+  size_t s; /* Size of array */
+  size_t r; /* Cursor's row number */
+  size_t t; /* Row number of top of screen */
+  int m_set; /* If the mark is set */
+  int mod; /* If the buffer is modified */
+};
