@@ -345,6 +345,41 @@ void inserthex(struct buf *b)
 	insertch(b, h0 * 16 + h1);
 }
 
+int insertshell(struct buf *b, char *shellcmd, int *shellret)
+{
+	int ret = 0;
+	FILE *fp = NULL;
+	int x;
+	int st;
+
+	if ((fp = popen(shellcmd, "r")) == NULL) {
+		LOG("popen failed");
+		return -1;
+	}
+
+	while ((x = getc(fp)) != EOF) {
+		if (insertch(b, x)) {
+			LOG("insertch failed");
+			ret = -1;
+			goto clean_up;
+		}
+	}
+
+ clean_up:
+	if ((st = pclose(fp)) == -1) {
+		LOG("pclose failed");
+		ret = -1;
+	} else {
+		if (WIFSIGNALED(st)) {
+			*shellret = WTERMSIG(st);
+		} else if (WIFEXITED(st)) {
+			*shellret = WEXITSTATUS(st);
+		}
+	}
+
+	return ret;
+}
+
 int initnc(void)
 {
 	int ret = 0;
