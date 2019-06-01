@@ -306,3 +306,30 @@ void first(struct buf *b) {
 void last(struct buf *b) {
   while(right(b) != -1);
 }
+
+int hexnum(int *h, int c)
+{
+	if (!isxdigit(c)) return -1;
+
+	if (isdigit(c))
+		*h = c - '0';
+	else if (islower(c))
+		*h = c - 'a' + 10;
+	else
+		*h = c - 'A' + 10;
+
+	return 0;
+}
+
+void inserthex(struct buf *b)
+{
+	int c0, c1, h0, h1;
+
+	c0 = getch();
+	if (hex_num(&h0, c0)) return;
+
+	c1 = getch();
+	if (hex_num(&h1, c1)) return;
+
+	insertch(b, h0 * 16 + h1);
+}
