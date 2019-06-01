@@ -31,6 +31,11 @@
 /* size_t multiplication overflow test */
 #define MULTOF(a, b) ((a) && (b) > SIZE_MAX / (a))
 
+#define INSERT(b, ch) do { \
+if (ch == '\n') ++b->r; \
+*b->g = ch; \
+++b->g; \
+} while (0)
 
 struct buf {
   char *fn; /* Filename */
@@ -92,5 +97,18 @@ int growgap(struct buf *b, size_t will_use) {
   b->c = new_a + c_index;
   b->s = new_s;
 
+  return 0;
+}
+
+int insertch(struct buf *b, char ch) {
+  if (b->g == b->c) {
+    if (growgap(b, 1)) {
+      return -1;
+    }
+  }
+
+  b->m_set = 0;
+  b->mod = 1;
+  INSERT(b, ch);
   return 0;
 }
