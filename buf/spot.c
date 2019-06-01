@@ -138,3 +138,16 @@ int leftch(struct buf *b) {
 
   return *b->c;
 }
+
+int rightch(struct buf *b) {
+  if (b->c == b->a + b->s - 1) return -1;
+
+  if (b->m_set && b->c == b->m) b->m = b->g;
+
+  if (*b->c == '\n') ++b->r;
+
+  *b->g = *b->c;
+  ++b->g;
+  ++b->c;
+  return *b->c;
+}
