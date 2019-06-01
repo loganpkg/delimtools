@@ -112,3 +112,15 @@ int insertch(struct buf *b, char ch) {
   INSERT(b, ch);
   return 0;
 }
+
+int deletech(struct buf *b) {
+  char ch;
+
+  if (b->c == b->a + b->s - 1) return -1;
+
+  b->m_set = 0;
+  b->mod = 1;
+  ch = *b->c;
+  ++b->c;
+  return ch;
+}
