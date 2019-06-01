@@ -22,11 +22,15 @@
  * then place spot somewhere in your PATH.
  */
 
+/* Default gap size */
+#define GAP 100
+
 #define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
 /* size_t addtion overflow test */
 #define ADDOF(a, b) ((a) > SIZE_MAX - (b))
 /* size_t multiplication overflow test */
 #define MULTOF(a, b) ((a) && (b) > SIZE_MAX / (a))
+
 
 struct buf {
   char *fn; /* Filename */
@@ -60,4 +64,33 @@ int safeadd(size_t * res, int num_args, ...)
 	va_end(ap);
 	*res = total;
 	return 0;
+}
+
+int growgap(struct buf *b, size_t will_use) {
+  char *new_a = NULL;
+  size_t new_s;
+  size_t g_index = b->g - b->a;
+  size_t c_index = b->c - b->a;
+
+  if (will_use <= b->c - b->g) return 0;
+
+  if (safeadd(&new_s, 3, b->s, will_use, GAP)) {
+    LOG("safeadd failed");
+    return -1;
+  }
+  new_s -= b->c - b->g;
+
+  if ((new_a = realloc(b->a, new_s)) == NULL) {
+    LOG("realloc failed");
+    return -1;
+  }
+
+  memmove(new_a + c_index + new_s - b->s, new_a + c_index, b->s - c_index);
+
+  b->a = new_a;
+  b->g = new_a + g_index;
+  b->c = new_a + c_index;
+  b->s = new_s;
+
+  return 0;
 }
