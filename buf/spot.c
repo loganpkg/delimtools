@@ -124,3 +124,17 @@ int deletech(struct buf *b) {
   ++b->c;
   return ch;
 }
+
+int leftch(struct buf *b) {
+  if (b->g == b->a) return -1;
+
+  --b->g;
+  --b->c;
+  *b->c = *b->g;
+
+  if (b->m_set && b->g == b->m) b->m = b->c;
+
+  if (*b->c == '\n') --b->r;
+
+  return *b->c;
+}
