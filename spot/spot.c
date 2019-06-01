@@ -315,6 +315,73 @@ void last(struct buf *b)
 	while (right(b) != -1) ;
 }
 
+int bracematch(struct buf *b)
+{
+	int (*move) (struct buf *);
+	char original;
+	char target;
+	int fwd;
+	char ch;
+	size_t depth;
+	int found;
+
+	fwd = 0;
+	original = *b->c;
+	switch (original) {
+	case '}':
+		target = '{';
+		break;
+	case ')':
+		target = '(';
+		break;
+	case ']':
+		target = '[';
+		break;
+	case '{':
+		target = '}';
+		fwd = 1;
+		break;
+	case '(':
+		target = ')';
+		fwd = 1;
+		break;
+	case '[':
+		target = ']';
+		fwd = 1;
+		break;
+	default:
+		return -1;
+	}
+
+	if (fwd) {
+		move = &rightch;
+	} else {
+		move = &leftch;
+	}
+
+	depth = 0;
+	found = 0;
+	while (!(*move) (b)) {
+		ch = *b->c;
+		if (ch == original) {
+			++depth;
+		}
+		if (ch == target) {
+			if (depth == 0) {
+				found = 1;
+				break;
+			} else {
+				--depth;
+			}
+		}
+	}
+
+	if (!found)
+		return -1;
+	else
+		return 0;
+}
+
 int hexnum(int *h, int c)
 {
 	if (!isxdigit(c))
