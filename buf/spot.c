@@ -862,12 +862,10 @@ int drawscreen(struct ed *e)
 	}
 
 	/* Status bar */
-	if (ADDOF((size_t) w, 1)) {
-		LOG("addition integer overflow");
+	if (safeadd(sb_s, 2, (size_t) w, 1)) {
+		LOG("safeadd failed");
 		return -1;
 	}
-
-	sb_s = w + 1;
 
 	if ((sb = malloc(sb_s)) == NULL) {
 		LOG("malloc failed");
@@ -1045,5 +1043,49 @@ int setfilename(struct buf *b, char *filename)
 	free(b->fn);
 	b->fn = new_fn;
 	b->mod = 1;
+	return 0;
+}
+
+int newbuf(struct ed *e, char *filename)
+{
+	struct buf *new_buf = NULL;
+	struct buf **new_t = NULL;
+	size_t new_s, req_mem;
+
+	if ((new_buf = initbuf()) == NULL) {
+		LOG("initbuf failed");
+		return -1;
+	}
+
+	if (setfilename(new_buf, filename)) {
+		LOG("setfilename failed");
+		freebuf(new_buf);
+		return -1;
+	}
+
+	if (safeadd(&new_s, 2, e->s, 1)) {
+		LOG("safeadd failed");
+		freebuf(new_buf);
+		return -1;
+	}
+
+	if (MULTOF(new_s, sizeof(struct buf *))) {
+		freebuf(new_buf);
+		return -1;
+	}
+	req_mem = new_s * sizeof(struct buf *);
+
+	if ((new_t = realloc(e->t, req_mem)) == NULL) {
+		freebuf(new_buf);
+		return -1;
+	}
+
+	e->t = new_t;
+	e->s = new_s;
+
+	/* Set active buffer to new buffer */
+	e->ab = e->s - 1;
+	e->t[e->ab] = new_buf;
+
 	return 0;
 }
