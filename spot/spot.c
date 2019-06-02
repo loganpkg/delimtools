@@ -57,6 +57,23 @@ struct buf {
 	int v;			/* veritcal centring requested */
 };
 
+struct ed {
+	char *msg;		/* Status bar message, string litteral only, no free */
+	struct buf **t;		/* Array of text buffers */
+	size_t s;		/* Size of the text buffer array */
+	size_t ab;		/* Active text buffer */
+	struct buf *k;		/* Kill buffer */
+	struct buf *cl;		/* Command line buffer */
+	size_t acls;		/* Active command line string */
+	char *cl_str;		/* Command line string */
+	char *search_str;	/* Search string */
+	int cl_active;		/* Editing is in the command line */
+	int operation;		/* The operation that the command line is being used for */
+	int internal_ret;	/* Return value of internal operation */
+	int shell_ret;		/* Return value of shell command */
+	int running;		/* Editor is running */
+};
+
 int safeadd(size_t * res, int num_args, ...)
 {
 	va_list ap;
@@ -202,26 +219,25 @@ int insertbuf(struct buf *b, struct buf *k)
 	return 0;
 }
 
-struct buf *initbuf(void) {
-  struct buf *b = NULL;
+struct buf *initbuf(void)
+{
+	struct buf *b = NULL;
 
-  if ((b = calloc(1, sizeof(struct buf))) == NULL) {
-    LOG("calloc failed");
-    return NULL;
-  }
+	if ((b = calloc(1, sizeof(struct buf))) == NULL) {
+		LOG("calloc failed");
+		return NULL;
+	}
 
-  return b;
+	return b;
 }
 
-void freebuf(struct buf *b) {
-  if (b != NULL) {
-    free(b->fn);
-    b->fn = NULL;
-    free(b->a);
-    b->a = NULL;
-    free(b);
-    b = NULL;
-  }
+void freebuf(struct buf *b)
+{
+	if (b != NULL) {
+		free(b->fn);
+		free(b->a);
+		free(b);
+	}
 }
 
 void setmark(struct buf *b)
@@ -941,3 +957,55 @@ int drawscreen(struct ed *e)
 	return 0;
 }
 
+struct ed *inited(void)
+{
+	struct ed *e = NULL;
+
+	if ((e = calloc(1, sizeof(struct ed))) == NULL) {
+		LOG("calloc failed");
+		return NULL;
+	}
+
+	e->operation = -1;
+	e->running = 1;
+
+	if ((e->k = initbuf()) == NULL) {
+		free(e);
+		return NULL;
+	}
+
+	if ((e->cl = initbuf()) == NULL) {
+		freebuf(e->k);
+		free(e);
+		return NULL;
+	}
+
+	return e;
+}
+
+void freeed(struct ed *e)
+{
+	size_t i;
+
+	if (e != NULL) {
+		if (e->t != NULL) {
+			for (i = 0; i < e->s; ++i) {
+				freebuf(e->t[i]);
+			}
+			free(e->t);
+		}
+
+		freebuf(e->k);
+
+		HERE free(e->search_str);
+		e->search_str = NULL;
+
+		bfree(e->cl);
+		e->cl = NULL;
+
+		free(e->cl_str);
+		free(e->cl_str_pre_phase);
+		free(e);
+		e = NULL;
+	}
+}
