@@ -64,7 +64,6 @@ struct ed {
 	size_t ab;		/* Active text buffer */
 	struct buf *k;		/* Kill buffer */
 	struct buf *cl;		/* Command line buffer */
-	size_t acls;		/* Active command line string */
 	char *cl_str;		/* Command line string */
 	char *search_str;	/* Search string */
 	int cl_active;		/* Editing is in the command line */
@@ -235,8 +234,11 @@ void freebuf(struct buf *b)
 {
 	if (b != NULL) {
 		free(b->fn);
+		b->fn = NULL;
 		free(b->a);
+		b->a = NULL;
 		free(b);
+		b = NULL;
 	}
 }
 
@@ -880,6 +882,7 @@ int drawscreen(struct ed *e)
 		     b->r, (unsigned char)b->c, e->shell_ret, e->msg) < 0) {
 		LOG("snprintf failed");
 		free(sb);
+		sb = NULL;
 		return -1;
 	}
 
@@ -897,10 +900,12 @@ int drawscreen(struct ed *e)
 	if (addnstr(sb, w) == ERR) {
 		LOG("addnstr failed");
 		free(sb);
+		sb = NULL;
 		return -1;
 	}
 
 	free(sb);
+	sb = NULL;
 
 	/* Highlight status bar */
 	if (mvchgat(h - 2, 0, w, A_STANDOUT, 0, NULL) == ERR) {
@@ -971,12 +976,14 @@ struct ed *inited(void)
 
 	if ((e->k = initbuf()) == NULL) {
 		free(e);
+		e = NULL;
 		return NULL;
 	}
 
 	if ((e->cl = initbuf()) == NULL) {
 		freebuf(e->k);
 		free(e);
+		e = NULL;
 		return NULL;
 	}
 
@@ -993,19 +1000,50 @@ void freeed(struct ed *e)
 				freebuf(e->t[i]);
 			}
 			free(e->t);
+			e->t = NULL;
 		}
 
 		freebuf(e->k);
-
-		HERE free(e->search_str);
-		e->search_str = NULL;
-
-		bfree(e->cl);
-		e->cl = NULL;
+		freebuf(e->cl);
 
 		free(e->cl_str);
-		free(e->cl_str_pre_phase);
+		e->cl_str = NULL;
+
+		free(e->search_str);
+		e->search_str = NULL;
+
 		free(e);
 		e = NULL;
 	}
+}
+
+int setfilename(struct buf *b, char *filename)
+{
+	char *new_fn = NULL;
+	size_t len, res;
+
+	if (filename == NULL) {
+		free(b->fn);
+		b->fn = NULL;
+		return 0;
+	}
+
+	len = strlen(filename);
+
+	if (safeadd(&res, 2, len, 1)) {
+		LOG("safeadd failed");
+		return -1;
+	}
+
+	if ((new_fn = malloc(res)) == NULL) {
+		LOG("malloc failed");
+		return -1;
+	}
+
+	memcpy(new_fn, filename, res);
+
+	free(b->fn);
+	b->fn = new_fn;
+	b->mod = 1;
+	return 0;
 }
