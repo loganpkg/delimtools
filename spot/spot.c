@@ -202,6 +202,28 @@ int insertbuf(struct buf *b, struct buf *k)
 	return 0;
 }
 
+struct buf *initbuf(void) {
+  struct buf *b = NULL;
+
+  if ((b = calloc(1, sizeof(struct buf))) == NULL) {
+    LOG("calloc failed");
+    return NULL;
+  }
+
+  return b;
+}
+
+void freebuf(struct buf *b) {
+  if (b != NULL) {
+    free(b->fn);
+    b->fn = NULL;
+    free(b->a);
+    b->a = NULL;
+    free(b);
+    b = NULL;
+  }
+}
+
 void setmark(struct buf *b)
 {
 	b->m_set = 1;
@@ -918,3 +940,4 @@ int drawscreen(struct ed *e)
 
 	return 0;
 }
+
