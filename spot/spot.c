@@ -1089,3 +1089,33 @@ int newbuf(struct ed *e, char *filename)
 
 	return 0;
 }
+
+int newfile(struct ed *e, char *filename)
+{
+	if (insertfile(e->t[e->s - 1], filename)) {
+		LOG("insertfile failed");
+		return -1;
+	}
+	/* New file read, not a file insert, so clear mod indicator */
+	e->t[e->s - 1]->mod = 0;
+
+	return 0;
+}
+
+void nextbuf(struct ed *e)
+{
+	if (e->ab == e->s - 1) {
+		e->ab = 0;
+	} else {
+		++e->ab;
+	}
+}
+
+void previousbuf(struct ed *e)
+{
+	if (!e->ab) {
+		e->ab = e->s - 1;
+	} else {
+		--e->ab;
+	}
+}
