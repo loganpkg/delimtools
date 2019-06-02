@@ -1120,6 +1120,206 @@ void previousbuf(struct ed *e)
 	}
 }
 
+void key(struct ed *e)
+{
+	struct buf *b = NULL;
+	int x;
+
+	if (e->cl_active)
+		b = e->cl;
+	else
+		b = e->t[e->ab];
+
+	x = getch();
+
+	switch (x) {
+	case Cspc:
+		setmark(b);
+		break;
+	case Ca:
+	case KEY_HOME:
+		home(b);
+		break;
+	case Cb:
+	case KEY_LEFT:
+		leftch(b);
+		break;
+	case Cd:
+	case Cqm:
+	case KEY_DC:
+		deletech(b);
+		break;
+	case Ce:
+	case KEY_END:
+		end(b);
+		break;
+	case Cf:
+	case KEY_RIGHT:
+		rightch(b);
+		break;
+	case Cg:
+		if (e->cl_active) {
+			e->cl_active = 0;
+			e->operation = -1;
+		}
+		break;
+	case Ch:
+	case KEY_BACKSPACE:
+		backspacech(b);
+		break;
+	case Cl:
+		level(b);
+		break;
+	case Cq:
+		inserthex(b);
+		break;
+	case Cw:
+		killregion(b, e->k);
+		break;
+	case Cx:
+		keycx(e);
+		break;
+	case Cy:
+		insertbuf(b, e->k);
+		break;
+	case ESC:
+		keyesc(e);
+		break;
+	case '\n':
+		if (e->cl_active) {
+			keyn(e);
+		} else {
+			insertch(b, x);
+		}
+		break;
+	default:
+		if (isprint(x) || x == '\t')
+			insertch(b, x);
+	}
+}
+
+void keycx(struct ed *e)
+{
+	struct buf *b = NULL;
+	int y;
+
+	if (e->cl_active)
+		b = e->cl;
+	else
+		b = e->t[e->ab];
+
+	y = getch();
+	switch (y) {
+	case Cc:
+		e->running = 0;
+		break;
+	case Cf:
+		e->cl_active = 1;
+		e->operation = Cf;
+		break;
+	case Cg:
+		break;
+	case Cs:
+		e->internal_ret = save(b, b->fn);
+		if (e->internal_ret) {
+			e->msg = "save failed";
+		} else {
+			e->msg = "save OK";
+		}
+		break;
+	case Cr:
+		e->cl_active = 1;
+		e->operation = Cr;
+		/* Prefill command line buffer with existing buffername */
+
+		break;
+	case 'i':
+		e->cl_active = 1;
+		e->operation = 'i';
+		break;
+	}
+}
+
+void keyesc(struct ed *e)
+{
+	struct buf *b = NULL;
+	int z;
+
+	if (e->cl_active)
+		b = e->cl;
+	else
+		b = e->t[e->ab];
+
+	z = getch();
+	switch (z) {
+	case Cg:
+		break;
+	case ',':
+		previousbuf(e);
+		break;
+	case '.':
+		nextbuf(e);
+		break;
+	case '<':
+		first(b);
+		break;
+	case '>':
+		last(b);
+		break;
+	case 'm':
+		matchbrace(b);
+		break;
+	case 't':
+		trimwhitespace(b);
+		break;
+	case 'x':
+		e->cl_active = 1;
+		e->operation = 'x';
+		break;
+	}
+
+}
+
+void keyn(struct ed *e)
+{
+	struct buf *b = NULL;
+	int error = 0;
+	char **dst = NULL;
+
+	dst = &e->cl_str;
+
+	if (buftostr(e->cl, dst)) {
+		/* Clear operation */
+		e->cl_active = 0;
+		e->operation = -1;
+		return;
+	}
+
+	/* Clear the command line buffer */
+	deletebuf(e->cl);
+
+	/* Active buffer */
+	b = e->t[e->ab];
+
+	switch (e->operation) {
+	case Cf:
+		newfile(e, e->cl_str);
+		break;
+	case Cr:
+		setfilename(b, e->cl_str);
+		break;
+	case 'i':
+		insertfile(b, e->cl_str);
+		break;
+	case 'x':
+		e->internal_ret = insertshell(b, e->cl_str, &e->shell_ret);
+		break;
+	}
+
+	e->cl_active = 0;
+	e->operation = -1;
+}
+
 int main(int argc, char **argv)
 {
 	struct ed *e = NULL;
