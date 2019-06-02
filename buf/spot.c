@@ -1119,3 +1119,69 @@ void previousbuf(struct ed *e)
 		--e->ab;
 	}
 }
+
+int main(int argc, char **argv)
+{
+	struct ed *e = NULL;
+	int i;
+
+	if ((e = inited()) == NULL) {
+		LOG("inited failed");
+		return -1;
+	}
+
+	if (argc < 1) {
+		LOG("argc is less than one");
+		return -1;
+	}
+
+	if (argc == 1) {
+		if (newbuf(e, NULL)) {
+			LOG("newbuf failed");
+			freeed(e);
+			return -1;
+		}
+	} else {
+		for (i = 1; i < argc; ++i) {
+			if (access(argv[i], F_OK)) {
+				if (newbuf(e, argv[i])) {
+					LOG("newbuf failed");
+					freeed(e);
+					return -1;
+				}
+			} else {
+				if (newfile(e, argv[i])) {
+					LOG("newfile failed");
+					freeed(e);
+					return 1;
+				}
+			}
+		}
+		/* Start with first file specified */
+		e->ab = 0;
+	}
+
+	if (initnc()) {
+		LOG("initnc failed");
+		freeed(e);
+		return -1;
+	}
+
+	while (e->running) {
+		if (drawscreen(e))
+			LOG("drawscreen failed");
+
+		e->msg = "";
+
+		ekey(e);
+	}
+
+	if (freenc()) {
+		LOG("freenc failed");
+		freeed(e);
+		return -1;
+	}
+
+	freeed(e);
+	return 0;
+}
