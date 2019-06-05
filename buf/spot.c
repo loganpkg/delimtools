@@ -22,10 +22,50 @@
  * then place spot somewhere in your PATH.
  */
 
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <curses.h>
+#include <ctype.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+
 /* Default gap size */
 #define GAP 100
 
 #define REGION_COLORS 1
+
+#define Cspc 0
+#define Ca 1
+#define Cb 2
+#define Cc 3
+#define Cd 4
+#define Ce 5
+#define Cf 6
+#define Cg 7
+#define Ch 8
+#define Ci 9
+#define Cj 10
+#define Ck 11
+#define Cl 12
+#define Cm 13
+#define Cn 14
+#define Co 15
+#define Cp 16
+#define Cq 17
+#define Cr 18
+#define Cs 19
+#define Ct 20
+#define Cu 21
+#define Cv 22
+#define Cw 23
+#define Cx 24
+#define Cy 25
+#define Cz 26
+#define ESC 27
+#define Cqm 127
 
 #define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
 /* size_t addtion overflow test */
@@ -101,7 +141,7 @@ int growgap(struct buf *b, size_t will_use)
 	size_t g_index = b->g - b->a;
 	size_t c_index = b->c - b->a;
 
-	if (will_use <= b->c - b->g)
+	if (will_use <= (size_t) (b->c - b->g))
 		return 0;
 
 	if (safeadd(&new_s, 3, b->s, will_use, GAP)) {
@@ -152,7 +192,7 @@ int deletech(struct buf *b)
 	return DELETE(b);
 }
 
-int backspace(struct buf *b)
+int backspacech(struct buf *b)
 {
 	if (b->g == b->a)
 		return -1;
@@ -161,6 +201,47 @@ int backspace(struct buf *b)
 	b->mod = 1;
 
 	return BACKSPACE(b);
+}
+
+void deletebuf(struct buf *b) {
+  b->g = b->a;
+  b->c = b->a + b->s - 1;
+  b->m = NULL;
+  b->r = 0;
+  b->t = 0;
+  b->m_set = 0;
+  b->mod = 1;
+  b->v = 0;
+}
+
+int buftostr(struct buf *b, char **str)
+{
+  char *p, *q;
+  free(*str);
+  *str = NULL;
+
+  if ((*str = malloc(b->s - (b->c - b->g))) == NULL) {
+    LOG("malloc failed");
+    return -1;
+  }
+
+  q = *str;
+  /* Before gap */
+  for (p = b->a; p < b->g; ++p) {
+    if (*p != '\0') {
+      *q = *p;
+      ++q;
+    }
+  }
+  /* After gap */
+  for (p = b->c; p < b->a + b->s - 2; ++p) {
+    if (*p != '\0') {
+      *q = *p;
+      ++q;
+    }
+  }
+  *q = '\0';
+  return 0;
 }
 
 int leftch(struct buf *b)
@@ -198,6 +279,36 @@ int rightch(struct buf *b)
 	return *b->c;
 }
 
+void end(struct buf *b)
+{
+	int x;
+	while ((x = rightch(b)) != -1) {
+		if (x == '\n')
+			break;
+	}
+}
+
+void home(struct buf *b)
+{
+	int x;
+	while ((x = leftch(b)) != -1) {
+		if (x == '\n') {
+			rightch(b);
+			break;
+		}
+	}
+}
+
+void first(struct buf *b)
+{
+	while (leftch(b) != -1) ;
+}
+
+void last(struct buf *b)
+{
+	while (rightch(b) != -1) ;
+}
+
 int insertbuf(struct buf *b, struct buf *k)
 {
 	int x;
@@ -212,7 +323,7 @@ int insertbuf(struct buf *b, struct buf *k)
 
 	first(k);
 	INSERT(b, *k->c);
-	while ((x = right(k)) != -1)
+	while ((x = rightch(k)) != -1)
 		INSERT(b, x);
 
 	return 0;
@@ -316,7 +427,7 @@ int filesize(size_t * fs, char *fn)
 	return 0;
 }
 
-int insertfile(stuct buf * b, char *fn)
+int insertfile(struct buf * b, char *fn)
 {
 	int ret = 0;
 	size_t fs;
@@ -379,7 +490,7 @@ int save(struct buf *b)
 	}
 
 	/* Before gap */
-	if (fwrite(b->a, 1, b->g - b->a, fp) != b->g - b->a) {
+	if (fwrite(b->a, 1, b->g - b->a, fp) != (size_t) (b->g - b->a)) {
 		LOG("fwrite failed before gap");
 		ret = -1;
 		goto clean_up;
@@ -402,36 +513,6 @@ int save(struct buf *b)
 		b->mod = 0;
 
 	return ret;
-}
-
-void end(struct buf *b)
-{
-	int x;
-	while ((x = rightch(b)) != -1) {
-		if (x == '\n')
-			break;
-	}
-}
-
-void home(struct buf *b)
-{
-	int x;
-	while ((x = leftch(b)) != -1) {
-		if (x == '\n') {
-			rightch(b);
-			break;
-		}
-	}
-}
-
-void first(struct buf *b)
-{
-	while (leftch(b) != -1) ;
-}
-
-void last(struct buf *b)
-{
-	while (right(b) != -1) ;
 }
 
 int matchbrace(struct buf *b)
@@ -566,11 +647,11 @@ void inserthex(struct buf *b)
 	int c0, c1, h0, h1;
 
 	c0 = getch();
-	if (hex_num(&h0, c0))
+	if (hexnum(&h0, c0))
 		return;
 
 	c1 = getch();
-	if (hex_num(&h1, c1))
+	if (hexnum(&h1, c1))
 		return;
 
 	insertch(b, h0 * 16 + h1);
@@ -708,7 +789,7 @@ void centre(struct buf *b, int th)
 
 void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx, int cursor_start)
 {
-	char *p, end_of_buf;
+	char *p, *end_of_buf;
 	size_t count;
 	int hl_on;		/* If region highlighting is on */
 
@@ -836,7 +917,7 @@ int drawscreen(struct ed *e)
 	}
 	cy = 0;
 	cx = 0;
-	bdraw(b, &cp_set, &cy, &cx, 0);
+	drawbuf(b, &cp_set, &cy, &cx, 0);
 
 	/* 2nd attempt: draw from start of cursor's line */
 	if (!cp_set || cy >= th) {
@@ -847,7 +928,7 @@ int drawscreen(struct ed *e)
 		b->t = b->r;
 		cy = 0;
 		cx = 0;
-		bdraw(b, &cp_set, &cy, &cx, 0);
+		drawbuf(b, &cp_set, &cy, &cx, 0);
 
 		/* 3rd attempt: draw from the cursor */
 		if (!cp_set || cy >= th) {
@@ -857,12 +938,12 @@ int drawscreen(struct ed *e)
 			}
 			cy = 0;
 			cx = 0;
-			bdraw(b, &cp_set, &cy, &cx, 1);
+			drawbuf(b, &cp_set, &cy, &cx, 1);
 		}
 	}
 
 	/* Status bar */
-	if (safeadd(sb_s, 2, (size_t) w, 1)) {
+	if (safeadd(&sb_s, 2, (size_t) w, 1)) {
 		LOG("safeadd failed");
 		return -1;
 	}
@@ -875,7 +956,7 @@ int drawscreen(struct ed *e)
 	/* Create status bar */
 	if (snprintf(sb, sb_s, "%c%c %s (%lu) %02x %d %s",
 		     (b->mod) ? '*' : ' ',
-		     (e->cmd_ret) ? 'F' : ' ',
+		     (e->internal_ret) ? 'F' : ' ',
 		     b->fn,
 		     b->r, (unsigned char)b->c, e->shell_ret, e->msg) < 0) {
 		LOG("snprintf failed");
@@ -922,7 +1003,7 @@ int drawscreen(struct ed *e)
 	}
 	cl_cy = h - 1;
 	cl_cx = 0;
-	bdraw(cl, &cp_set, &cl_cy, &cl_cx, 0);
+	drawbuf(cl, &cp_set, &cl_cy, &cl_cx, 0);
 
 	/* Second draw command line */
 	if (!cp_set || cl_cx >= w) {
@@ -936,7 +1017,7 @@ int drawscreen(struct ed *e)
 		}
 		cl_cy = h - 1;
 		cl_cx = 0;
-		bdraw(cl, &cp_set, &cl_cy, &cl_cx, 1);
+		drawbuf(cl, &cp_set, &cl_cy, &cl_cx, 1);
 	}
 
 	/* Set cursor */
@@ -1120,6 +1201,128 @@ void previousbuf(struct ed *e)
 	}
 }
 
+
+void keycx(struct ed *e)
+{
+	struct buf *b = NULL;
+	int y;
+
+	if (e->cl_active)
+		b = e->cl;
+	else
+		b = e->t[e->ab];
+
+	y = getch();
+	switch (y) {
+	case Cc:
+		e->running = 0;
+		break;
+	case Cf:
+		e->cl_active = 1;
+		e->operation = Cf;
+		break;
+	case Cg:
+		break;
+	case Cs:
+		e->internal_ret = save(b);
+		if (e->internal_ret) {
+			e->msg = "save failed";
+		} else {
+			e->msg = "save OK";
+		}
+		break;
+	case Cr:
+		e->cl_active = 1;
+		e->operation = Cr;
+		/* Prefill command line buffer with existing buffername */
+
+		break;
+	case 'i':
+		e->cl_active = 1;
+		e->operation = 'i';
+		break;
+	}
+}
+
+void keyesc(struct ed *e)
+{
+	struct buf *b = NULL;
+	int z;
+
+	if (e->cl_active)
+		b = e->cl;
+	else
+		b = e->t[e->ab];
+
+	z = getch();
+	switch (z) {
+	case Cg:
+		break;
+	case ',':
+		previousbuf(e);
+		break;
+	case '.':
+		nextbuf(e);
+		break;
+	case '<':
+		first(b);
+		break;
+	case '>':
+		last(b);
+		break;
+	case 'm':
+		matchbrace(b);
+		break;
+	case 't':
+		trimwhitespace(b);
+		break;
+	case 'x':
+		e->cl_active = 1;
+		e->operation = 'x';
+		break;
+	}
+
+}
+
+void keyn(struct ed *e)
+{
+	struct buf *b = NULL;
+	char **dst = NULL;
+
+	dst = &e->cl_str;
+
+	if (buftostr(e->cl, dst)) {
+		/* Clear operation */
+		e->cl_active = 0;
+		e->operation = -1;
+		return;
+	}
+
+	/* Clear the command line buffer */
+	deletebuf(e->cl);
+
+	/* Active buffer */
+	b = e->t[e->ab];
+
+	switch (e->operation) {
+	case Cf:
+		newfile(e, e->cl_str);
+		break;
+	case Cr:
+		setfilename(b, e->cl_str);
+		break;
+	case 'i':
+		insertfile(b, e->cl_str);
+		break;
+	case 'x':
+		e->internal_ret = insertshell(b, e->cl_str, &e->shell_ret);
+		break;
+	}
+
+	e->cl_active = 0;
+	e->operation = -1;
+}
+
 void key(struct ed *e)
 {
 	struct buf *b = NULL;
@@ -1198,128 +1401,6 @@ void key(struct ed *e)
 	}
 }
 
-void keycx(struct ed *e)
-{
-	struct buf *b = NULL;
-	int y;
-
-	if (e->cl_active)
-		b = e->cl;
-	else
-		b = e->t[e->ab];
-
-	y = getch();
-	switch (y) {
-	case Cc:
-		e->running = 0;
-		break;
-	case Cf:
-		e->cl_active = 1;
-		e->operation = Cf;
-		break;
-	case Cg:
-		break;
-	case Cs:
-		e->internal_ret = save(b, b->fn);
-		if (e->internal_ret) {
-			e->msg = "save failed";
-		} else {
-			e->msg = "save OK";
-		}
-		break;
-	case Cr:
-		e->cl_active = 1;
-		e->operation = Cr;
-		/* Prefill command line buffer with existing buffername */
-
-		break;
-	case 'i':
-		e->cl_active = 1;
-		e->operation = 'i';
-		break;
-	}
-}
-
-void keyesc(struct ed *e)
-{
-	struct buf *b = NULL;
-	int z;
-
-	if (e->cl_active)
-		b = e->cl;
-	else
-		b = e->t[e->ab];
-
-	z = getch();
-	switch (z) {
-	case Cg:
-		break;
-	case ',':
-		previousbuf(e);
-		break;
-	case '.':
-		nextbuf(e);
-		break;
-	case '<':
-		first(b);
-		break;
-	case '>':
-		last(b);
-		break;
-	case 'm':
-		matchbrace(b);
-		break;
-	case 't':
-		trimwhitespace(b);
-		break;
-	case 'x':
-		e->cl_active = 1;
-		e->operation = 'x';
-		break;
-	}
-
-}
-
-void keyn(struct ed *e)
-{
-	struct buf *b = NULL;
-	int error = 0;
-	char **dst = NULL;
-
-	dst = &e->cl_str;
-
-	if (buftostr(e->cl, dst)) {
-		/* Clear operation */
-		e->cl_active = 0;
-		e->operation = -1;
-		return;
-	}
-
-	/* Clear the command line buffer */
-	deletebuf(e->cl);
-
-	/* Active buffer */
-	b = e->t[e->ab];
-
-	switch (e->operation) {
-	case Cf:
-		newfile(e, e->cl_str);
-		break;
-	case Cr:
-		setfilename(b, e->cl_str);
-		break;
-	case 'i':
-		insertfile(b, e->cl_str);
-		break;
-	case 'x':
-		e->internal_ret = insertshell(b, e->cl_str, &e->shell_ret);
-		break;
-	}
-
-	e->cl_active = 0;
-	e->operation = -1;
-}
-
 int main(int argc, char **argv)
 {
 	struct ed *e = NULL;
@@ -1373,7 +1454,7 @@ int main(int argc, char **argv)
 
 		e->msg = "";
 
-		ekey(e);
+		key(e);
 	}
 
 	if (freenc()) {
