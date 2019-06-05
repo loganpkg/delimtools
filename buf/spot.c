@@ -31,9 +31,8 @@
 #include <string.h>
 #include <unistd.h>
 
-
 /* Default gap size */
-#define GAP 100
+#define GAP 2
 
 #define REGION_COLORS 1
 
@@ -75,7 +74,7 @@
 
 #define INSERT(b, ch) do { \
     if ((ch) == '\n') ++(b)->r; \
-    *((b)->g++) = (ch);		\
+    *((b)->g++) = (ch);	\
 } while (0)
 
 #define INSERTANDLEFT(b, ch) (*(--(b)->c) = (ch))
@@ -137,30 +136,34 @@ int safeadd(size_t * res, int num_args, ...)
 int growgap(struct buf *b, size_t will_use)
 {
 	char *new_a = NULL;
-	size_t new_s;
+	size_t new_s, gap_s, non_gap_s, s_increase;
 	size_t g_index = b->g - b->a;
 	size_t c_index = b->c - b->a;
 
-	if (will_use <= (size_t) (b->c - b->g))
+	gap_s = b->c - b->g;
+
+	if (will_use <= gap_s)
 		return 0;
 
-	if (safeadd(&new_s, 3, b->s, will_use, GAP)) {
+	non_gap_s = b->s - gap_s;
+
+	if (safeadd(&new_s, 3, non_gap_s, will_use, GAP)) {
 		LOG("safeadd failed");
 		return -1;
 	}
-	new_s -= b->c - b->g;
+
+	s_increase = new_s - b->s;
 
 	if ((new_a = realloc(b->a, new_s)) == NULL) {
 		LOG("realloc failed");
 		return -1;
 	}
 
-	memmove(new_a + c_index + new_s - b->s, new_a + c_index,
-		b->s - c_index);
+	memmove(new_a + c_index + s_increase, new_a + c_index, b->s - c_index);
 
 	b->a = new_a;
 	b->g = new_a + g_index;
-	b->c = new_a + c_index;
+	b->c = new_a + c_index + s_increase;
 	b->s = new_s;
 
 	return 0;
@@ -203,45 +206,46 @@ int backspacech(struct buf *b)
 	return BACKSPACE(b);
 }
 
-void deletebuf(struct buf *b) {
-  b->g = b->a;
-  b->c = b->a + b->s - 1;
-  b->m = NULL;
-  b->r = 0;
-  b->t = 0;
-  b->m_set = 0;
-  b->mod = 1;
-  b->v = 0;
+void deletebuf(struct buf *b)
+{
+	b->g = b->a;
+	b->c = b->a + b->s - 1;
+	b->m = NULL;
+	b->r = 0;
+	b->t = 0;
+	b->m_set = 0;
+	b->mod = 1;
+	b->v = 0;
 }
 
 int buftostr(struct buf *b, char **str)
 {
-  char *p, *q;
-  free(*str);
-  *str = NULL;
+	char *p, *q;
+	free(*str);
+	*str = NULL;
 
-  if ((*str = malloc(b->s - (b->c - b->g))) == NULL) {
-    LOG("malloc failed");
-    return -1;
-  }
+	if ((*str = malloc(b->s - (b->c - b->g))) == NULL) {
+		LOG("malloc failed");
+		return -1;
+	}
 
-  q = *str;
-  /* Before gap */
-  for (p = b->a; p < b->g; ++p) {
-    if (*p != '\0') {
-      *q = *p;
-      ++q;
-    }
-  }
-  /* After gap */
-  for (p = b->c; p < b->a + b->s - 2; ++p) {
-    if (*p != '\0') {
-      *q = *p;
-      ++q;
-    }
-  }
-  *q = '\0';
-  return 0;
+	q = *str;
+	/* Before gap */
+	for (p = b->a; p < b->g; ++p) {
+		if (*p != '\0') {
+			*q = *p;
+			++q;
+		}
+	}
+	/* After gap */
+	for (p = b->c; p < b->a + b->s - 2; ++p) {
+		if (*p != '\0') {
+			*q = *p;
+			++q;
+		}
+	}
+	*q = '\0';
+	return 0;
 }
 
 int leftch(struct buf *b)
@@ -332,11 +336,28 @@ int insertbuf(struct buf *b, struct buf *k)
 struct buf *initbuf(void)
 {
 	struct buf *b = NULL;
+	size_t s;
 
 	if ((b = calloc(1, sizeof(struct buf))) == NULL) {
 		LOG("calloc failed");
 		return NULL;
 	}
+
+	if (safeadd(&s, 2, GAP, 1)) {
+		LOG("safeadd failed");
+		return NULL;
+	}
+
+	if ((b->a = malloc(s)) == NULL) {
+		LOG("malloc failed");
+		free(b);
+		return NULL;
+	}
+
+	b->g = b->a;
+	b->s = s;
+	b->c = b->a + GAP;
+	*b->c = '~';
 
 	return b;
 }
@@ -427,7 +448,7 @@ int filesize(size_t * fs, char *fn)
 	return 0;
 }
 
-int insertfile(struct buf * b, char *fn)
+int insertfile(struct buf *b, char *fn)
 {
 	int ret = 0;
 	size_t fs;
@@ -480,6 +501,7 @@ int save(struct buf *b)
 {
 	int ret = 0;
 	FILE *fp = NULL;
+	size_t s_before_gap, s_after_gap;
 
 	if (!b->mod)
 		return 0;
@@ -490,14 +512,16 @@ int save(struct buf *b)
 	}
 
 	/* Before gap */
-	if (fwrite(b->a, 1, b->g - b->a, fp) != (size_t) (b->g - b->a)) {
+	s_before_gap = b->g - b->a;
+	if (fwrite(b->a, 1, s_before_gap, fp) != s_before_gap) {
 		LOG("fwrite failed before gap");
 		ret = -1;
 		goto clean_up;
 	}
 
 	/* After gap */
-	if (fwrite(b->c, 1, b->s - 1, fp) != b->s - 1) {
+	s_after_gap = b->s - 1 - (b->c - b->a);
+	if (fwrite(b->c, 1, s_after_gap, fp) != s_after_gap) {
 		LOG("fwrite failed after gap");
 		ret = -1;
 		goto clean_up;
@@ -797,7 +821,7 @@ void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx, int cursor_start)
 		p = b->c;
 	} else {
 		/* Search backwards to find the start of row t */
-		if (!b->t) {
+		if (!b->t || b->g == b->a) {
 			p = b->a;
 		} else {
 			p = b->g - 1;
@@ -828,34 +852,59 @@ void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx, int cursor_start)
 		hl_on = 1;
 	}
 
-	end_of_buf = b->a + b->s;
-	while (p < end_of_buf) {
-		/* Gap */
-		if (p == b->g) {
-			/* Skip gap */
-			p = b->c;
-
-			/* Record cursor position */
-			getyx(stdscr, *cy, *cx);
-			*cp_set = 1;
-
+	/* Before the gap */
+	while (p < b->g) {
+		if (b->m_set && p == b->m) {
 			if (hl_on) {
 				attroff(COLOR_PAIR(REGION_COLORS));
 				hl_on = 0;
-			}
-			if (b->m_set && b->m > p) {
+			} else {
 				attron(COLOR_PAIR(REGION_COLORS));
 				hl_on = 1;
 			}
+		}
+
+		if (isprint(*p) || *p == '\t' || *p == '\n') {
+			/* If printing is off screen */
+			if (addch(*p) == ERR) {
+				return;
+			}
 		} else {
-			if (b->m_set && p == b->m) {
-				if (hl_on) {
-					attroff(COLOR_PAIR(REGION_COLORS));
-					hl_on = 0;
-				} else {
-					attron(COLOR_PAIR(REGION_COLORS));
-					hl_on = 1;
-				}
+			/*
+			 * Unprintable character.
+			 * If printing is off screen.
+			 */
+			if (addch('?') == ERR) {
+				return;
+			}
+		}
+		++p;
+	}
+
+	/* In the gap: record cursor screen position */
+	getyx(stdscr, *cy, *cx);
+	*cp_set = 1;
+
+	if (hl_on) {
+		attroff(COLOR_PAIR(REGION_COLORS));
+		hl_on = 0;
+	}
+	if (b->m_set && b->m > p) {
+		attron(COLOR_PAIR(REGION_COLORS));
+		hl_on = 1;
+	}
+
+	/* After the gap */
+	p = b->c;
+	end_of_buf = b->a + b->s;
+	while (p < end_of_buf) {
+		if (b->m_set && p == b->m) {
+			if (hl_on) {
+				attroff(COLOR_PAIR(REGION_COLORS));
+				hl_on = 0;
+			} else {
+				attron(COLOR_PAIR(REGION_COLORS));
+				hl_on = 1;
 			}
 		}
 
@@ -954,11 +1003,11 @@ int drawscreen(struct ed *e)
 	}
 
 	/* Create status bar */
-	if (snprintf(sb, sb_s, "%c%c %s (%lu) %02x %d %s",
-		     (b->mod) ? '*' : ' ',
-		     (e->internal_ret) ? 'F' : ' ',
-		     b->fn,
-		     b->r, (unsigned char)b->c, e->shell_ret, e->msg) < 0) {
+	if (snprintf
+	    (sb, sb_s, "[b->g:%lu b->c:%lu b->s:%lu] %c%c %s (%lu) %02x %d %s",
+	     b->g - b->a, b->c - b->a, b->s, (b->mod) ? '*' : ' ',
+	     (e->internal_ret) ? 'F' : ' ', b->fn, b->r, (unsigned char)b->c,
+	     e->shell_ret, e->msg) < 0) {
 		LOG("snprintf failed");
 		free(sb);
 		sb = NULL;
@@ -1173,10 +1222,16 @@ int newbuf(struct ed *e, char *filename)
 
 int newfile(struct ed *e, char *filename)
 {
+	if (newbuf(e, filename)) {
+		LOG("newbuf failed");
+		return -1;
+	}
+
 	if (insertfile(e->t[e->s - 1], filename)) {
 		LOG("insertfile failed");
 		return -1;
 	}
+
 	/* New file read, not a file insert, so clear mod indicator */
 	e->t[e->s - 1]->mod = 0;
 
@@ -1200,7 +1255,6 @@ void previousbuf(struct ed *e)
 		--e->ab;
 	}
 }
-
 
 void keycx(struct ed *e)
 {
