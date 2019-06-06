@@ -72,16 +72,6 @@
 /* size_t multiplication overflow test */
 #define MULTOF(a, b) ((a) && (b) > SIZE_MAX / (a))
 
-#define INSERT(b, ch) do { \
-    if ((ch) == '\n') ++(b)->r; \
-    *((b)->g++) = (ch);	\
-} while (0)
-
-#define INSERTANDLEFT(b, ch) (*(--(b)->c) = (ch))
-
-#define DELETE(b) (*((b)->c++))
-#define BACKSPACE(b) (*(--(b)->g))
-
 struct buf {
 	char *fn;		/* Filename */
 	char *a;		/* Array */
@@ -139,6 +129,7 @@ int growgap(struct buf *b, size_t will_use)
 	size_t new_s, gap_s, non_gap_s, s_increase;
 	size_t g_index = b->g - b->a;
 	size_t c_index = b->c - b->a;
+	size_t m_index = b->m - b->a;
 
 	gap_s = b->c - b->g;
 
@@ -164,6 +155,7 @@ int growgap(struct buf *b, size_t will_use)
 	b->a = new_a;
 	b->g = new_a + g_index;
 	b->c = new_a + c_index + s_increase;
+	b->m = b->a + m_index;
 	b->s = new_s;
 
 	return 0;
@@ -180,7 +172,27 @@ int insertch(struct buf *b, char ch)
 	b->m_set = 0;
 	b->mod = 1;
 
-	INSERT(b, ch);
+	if (ch == '\n')
+		++b->r;
+
+	*(b->g++) = ch;
+
+	return 0;
+}
+
+int insertandleftch(struct buf *b, char ch)
+{
+	if (b->g == b->c) {
+		if (growgap(b, 1)) {
+			return -1;
+		}
+	}
+
+	b->m_set = 0;
+	b->mod = 1;
+
+	*(--b->c) = ch;
+
 	return 0;
 }
 
@@ -192,7 +204,7 @@ int deletech(struct buf *b)
 	b->m_set = 0;
 	b->mod = 1;
 
-	return DELETE(b);
+	return *(b->c++);
 }
 
 int backspacech(struct buf *b)
@@ -203,7 +215,7 @@ int backspacech(struct buf *b)
 	b->m_set = 0;
 	b->mod = 1;
 
-	return BACKSPACE(b);
+	return *(--b->g);
 }
 
 void deletebuf(struct buf *b)
@@ -315,9 +327,9 @@ void last(struct buf *b)
 
 int insertbuf(struct buf *b, struct buf *k)
 {
-	int x;
+	size_t k_text_s = k->s - 1 - (k->c - k->g);
 
-	if (growgap(b, k->s - (k->c - k->g))) {
+	if (growgap(b, k_text_s)) {
 		LOG("growgap failed");
 		return -1;
 	}
@@ -326,9 +338,9 @@ int insertbuf(struct buf *b, struct buf *k)
 	b->mod = 1;
 
 	first(k);
-	INSERT(b, *k->c);
-	while ((x = rightch(k)) != -1)
-		INSERT(b, x);
+	insertch(b, *k->c);
+	while (--k_text_s)
+		insertch(b, rightch(k));
 
 	return 0;
 }
@@ -382,40 +394,31 @@ void setmark(struct buf *b)
 
 int killregion(struct buf *b, struct buf *k)
 {
-
 	if (!b->m_set || b->c == b->m)
 		return -1;
 
+	deletebuf(k);
+
 	/* Cursor before mark */
 	if (b->c < b->m) {
-		if (growgap(b, b->m - b->c)) {
+		if (growgap(k, b->m - b->c)) {
 			LOG("growgap failed");
 			return -1;
 		}
-
-		b->m_set = 0;
-		b->mod = 1;
-
-		k->m_set = 0;
-		k->mod = 1;
 
 		while (b->c != b->m)
-			INSERT(k, DELETE(b));
+			insertch(k, deletech(b));
+
 	} else {
 		/* Mark before cursor */
-		if (growgap(b, b->g - b->m)) {
+		if (growgap(k, b->g - b->m)) {
 			LOG("growgap failed");
 			return -1;
 		}
 
-		b->m_set = 0;
-		b->mod = 1;
-
-		k->m_set = 0;
-		k->mod = 1;
-
 		while (b->g != b->m)
-			INSERTANDLEFT(k, BACKSPACE(b));
+			insertandleftch(k, backspacech(b));
+
 	}
 	return 0;
 }
