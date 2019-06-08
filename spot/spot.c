@@ -81,22 +81,25 @@ struct buf {
 	size_t s;		/* Size of array */
 	size_t r;		/* Cursor's row number */
 	size_t t;		/* Row number of top of screen */
+	size_t mr;		/* Row number of mark */
 	int m_set;		/* If the mark is set */
 	int mod;		/* If the buffer is modified */
 	int v;			/* veritcal centring requested */
 };
 
 struct ed {
-	char *msg;		/* Status bar message, string litteral only, no free */
+	char *msg;		/* Status bar message, string litteral only */
 	struct buf **t;		/* Array of text buffers */
 	size_t s;		/* Size of the text buffer array */
 	size_t ab;		/* Active text buffer */
-	struct buf *k;		/* Kill buffer */
+	char *k;		/* Kill array */
+	size_t ks;		/* Size of kill array */
+	size_t kn;		/* Number of \n characters in kill array */
 	struct buf *cl;		/* Command line buffer */
 	char *cl_str;		/* Command line string */
 	char *search_str;	/* Search string */
 	int cl_active;		/* Editing is in the command line */
-	int operation;		/* The operation that the command line is being used for */
+	int operation;		/* Operation that requires the command line */
 	int internal_ret;	/* Return value of internal operation */
 	int shell_ret;		/* Return value of shell command */
 	int running;		/* Editor is running */
@@ -390,11 +393,12 @@ void setmark(struct buf *b)
 {
 	b->m_set = 1;
 	b->m = b->c;
+	b->mr = b->r;
 }
 
-int killregion(struct buf *b, struct buf *k)
+int killregion(struct buf *b, char **k, size_t * ks, size_t * kn)
 {
-	if (!b->m_set || b->c == b->m)
+	HERE if (!b->m_set || b->c == b->m)
 		return -1;
 
 	deletebuf(k);
