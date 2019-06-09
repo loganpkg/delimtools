@@ -309,6 +309,26 @@ void last(struct buf *b)
 	while (rightch(b) != -1) ;
 }
 
+int search(struct buf *b, char *str)
+{
+	char *p = NULL;
+
+	if (str == NULL || b->c == b->a + b->s - 1) {
+		return -1;
+	}
+
+	if ((p =
+	     memmem(b->c + 1, b->s - 1 - (b->c - b->a + 1), str,
+		    strlen(str))) == NULL) {
+		return -1;
+	}
+
+	while (b->c != p)
+		rightch(b);
+
+	return 0;
+}
+
 void deletebuf(struct buf *b)
 {
 	b->g = b->a;
@@ -1354,6 +1374,9 @@ void keyesc(struct ed *e)
 	case 'm':
 		e->in_ret = matchbrace(b);
 		break;
+	case 'n':
+		e->in_ret = search(b, e->search_str);
+		break;
 	case 't':
 		trimwhitespace(b);
 		break;
@@ -1372,7 +1395,10 @@ void keyn(struct ed *e)
 	struct buf *b = NULL;
 	char **dst = NULL;
 
-	dst = &e->cl_str;
+	if (e->operation == Cs)
+		dst = &e->search_str;
+	else
+		dst = &e->cl_str;
 
 	if (buftostr(e->cl, dst)) {
 		/* Clear operation */
@@ -1393,6 +1419,9 @@ void keyn(struct ed *e)
 		break;
 	case Cr:
 		e->in_ret = setfilename(b, e->cl_str);
+		break;
+	case Cs:
+		e->in_ret = search(b, e->search_str);
 		break;
 	case 'i':
 		e->in_ret = insertfile(b, e->cl_str);
@@ -1463,6 +1492,10 @@ void key(struct ed *e)
 		break;
 	case Cq:
 		e->in_ret = inserthex(b);
+		break;
+	case Cs:
+		e->cl_active = 1;
+		e->operation = Cs;
 		break;
 	case Cu:
 		e->in_ret = uproot(b, &e->k, &e->ks, &e->kn);
