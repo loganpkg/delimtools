@@ -22,6 +22,7 @@
  * then place spot somewhere in your PATH.
  */
 
+#define _GNU_SOURCE
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <curses.h>
@@ -474,7 +475,7 @@ int killregion(struct buf *b, char **k, size_t * ks, size_t * kn, int del)
 	return 0;
 }
 
-kill(struct buf * b, char **k, size_t * ks, size_t * kn)
+int killfwdline(struct buf * b, char **k, size_t * ks, size_t * kn)
 {
 	if (*b->c == '\n') {
 		deletech(b);
@@ -492,7 +493,7 @@ kill(struct buf * b, char **k, size_t * ks, size_t * kn)
 	return 0;
 }
 
-uproot(struct buf * b, char **k, size_t * ks, size_t * kn)
+int uproot(struct buf * b, char **k, size_t * ks, size_t * kn)
 {
 	setmark(b);
 	home(b);
@@ -1533,7 +1534,7 @@ void key(struct ed *e)
 		e->in_ret = backspacech(b);
 		break;
 	case Ck:
-		e->in_ret = kill(b, &e->k, &e->ks, &e->kn);
+		e->in_ret = killfwdline(b, &e->k, &e->ks, &e->kn);
 		break;
 	case Cl:
 		level(b);
