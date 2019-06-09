@@ -99,7 +99,7 @@ struct ed {
 	char *search_str;	/* Search string */
 	int cl_active;		/* Editing is in the command line */
 	int operation;		/* Operation that requires the command line */
-	int in_ret;	/* Return value of internal operation */
+	int in_ret;		/* Return value of internal operation */
 	int shell_ret;		/* Return value of shell command */
 	int running;		/* Editor is running */
 };
@@ -289,6 +289,10 @@ void home(struct buf *b)
 void end(struct buf *b)
 {
 	int x;
+
+	if (*b->c == '\n')
+		return;
+
 	while ((x = rightch(b)) != -1) {
 		if (x == '\n')
 			break;
@@ -357,8 +361,10 @@ void setmark(struct buf *b)
 
 int killregion(struct buf *b, char **k, size_t * ks, size_t * kn, int del)
 {
-	if (!b->m_set || b->c == b->m)
-		return -1;
+	if (!b->m_set || b->c == b->m) {
+		b->m_set = 0;
+		return 0;
+	}
 
 	*kn = b->r > b->mr ? b->r - b->mr : b->mr - b->r;
 
@@ -400,6 +406,32 @@ int killregion(struct buf *b, char **k, size_t * ks, size_t * kn, int del)
 
 	if (del)
 		b->mod = 1;
+
+	return 0;
+}
+
+kill(struct buf * b, char **k, size_t * ks, size_t * kn)
+{
+	setmark(b);
+	end(b);
+
+	if (killregion(b, k, ks, kn, 1)) {
+		LOG("killregion failed");
+		return -1;
+	}
+
+	return 0;
+}
+
+uproot(struct buf * b, char **k, size_t * ks, size_t * kn)
+{
+	setmark(b);
+	home(b);
+
+	if (killregion(b, k, ks, kn, 1)) {
+		LOG("killregion failed");
+		return -1;
+	}
 
 	return 0;
 }
@@ -681,10 +713,10 @@ int inserthex(struct buf *b)
 		return -1;
 
 	if (insertch(b, h0 * 16 + h1)) {
-	  LOG("insertch failed");
-	  return -1;
+		LOG("insertch failed");
+		return -1;
 	}
-	
+
 	return 0;
 }
 
@@ -1014,13 +1046,7 @@ int drawscreen(struct ed *e)
 	    (sb, sb_s, "%c%c:%s (%lu) [g:%lu c:%lu s:%lu] shell_ret:%d",
 	     b->mod ? '*' : ' ',
 	     e->in_ret == -1 ? 'F' : ' ',
-	     b->fn,
-	     b->r,
-	     b->g - b->a,
-	     b->c - b->a,
-	     b->s,
-	     e->shell_ret
-	     ) < 0) {
+	     b->fn, b->r, b->g - b->a, b->c - b->a, b->s, e->shell_ret) < 0) {
 		LOG("snprintf failed");
 		free(sb);
 		sb = NULL;
@@ -1277,11 +1303,11 @@ void keycx(struct ed *e)
 	y = getch();
 	switch (y) {
 	case '<':
-	  previousbuf(e);
-	  break;
+		previousbuf(e);
+		break;
 	case '>':
-	  nextbuf(e);
-	  break;
+		nextbuf(e);
+		break;
 	case Cc:
 		e->running = 0;
 		break;
@@ -1326,7 +1352,7 @@ void keyesc(struct ed *e)
 		last(b);
 		break;
 	case 'm':
-	  e->in_ret = matchbrace(b);
+		e->in_ret = matchbrace(b);
 		break;
 	case 't':
 		trimwhitespace(b);
@@ -1411,29 +1437,35 @@ void key(struct ed *e)
 		break;
 	case Ce:
 	case KEY_END:
-	  end(b);
+		end(b);
 		break;
 	case Cf:
 	case KEY_RIGHT:
 		e->in_ret = rightch(b);
 		break;
 	case Cg:
-	  if (b->m_set) {
-	    b->m_set = 0;
-	  } else if (e->cl_active) {
+		if (b->m_set) {
+			b->m_set = 0;
+		} else if (e->cl_active) {
 			e->cl_active = 0;
 			e->operation = -1;
-	  }
+		}
 		break;
 	case Ch:
 	case KEY_BACKSPACE:
 		e->in_ret = backspacech(b);
+		break;
+	case Ck:
+		e->in_ret = kill(b, &e->k, &e->ks, &e->kn);
 		break;
 	case Cl:
 		level(b);
 		break;
 	case Cq:
 		e->in_ret = inserthex(b);
+		break;
+	case Cu:
+		e->in_ret = uproot(b, &e->k, &e->ks, &e->kn);
 		break;
 	case Cw:
 		e->in_ret = killregion(b, &e->k, &e->ks, &e->kn, 1);
@@ -1512,7 +1544,7 @@ int main(int argc, char **argv)
 			LOG("drawscreen failed");
 
 		e->in_ret = 0;
-		
+
 		key(e);
 	}
 
