@@ -275,15 +275,19 @@ int rightch(struct buf *b)
 	return *b->c;
 }
 
-void home(struct buf *b)
+size_t home(struct buf * b)
 {
+	size_t count = 0;
 	int x;
 	while ((x = leftch(b)) != -1) {
 		if (x == '\n') {
 			rightch(b);
 			break;
 		}
+		++count;
 	}
+
+	return count;
 }
 
 void end(struct buf *b)
@@ -307,6 +311,47 @@ void first(struct buf *b)
 void last(struct buf *b)
 {
 	while (rightch(b) != -1) ;
+}
+
+void up(struct buf *b)
+{
+	size_t count;
+
+	if (!b->r)
+		return;
+
+	count = home(b);
+
+	leftch(b);
+
+	home(b);
+
+	while (count) {
+		if (rightch(b) == '\n')
+			break;
+
+		--count;
+	}
+}
+
+void down(struct buf *b)
+{
+	size_t count;
+
+	count = home(b);
+
+	end(b);
+
+	if (rightch(b) == -1) {
+		home(b);
+	}
+
+	while (count) {
+		if (rightch(b) == -1)
+			break;
+
+		--count;
+	}
 }
 
 int search(struct buf *b, char *str)
@@ -432,6 +477,11 @@ int killregion(struct buf *b, char **k, size_t * ks, size_t * kn, int del)
 
 kill(struct buf * b, char **k, size_t * ks, size_t * kn)
 {
+	if (*b->c == '\n') {
+		deletech(b);
+		return 0;
+	}
+
 	setmark(b);
 	end(b);
 
@@ -1489,6 +1539,14 @@ void key(struct ed *e)
 		break;
 	case Cl:
 		level(b);
+		break;
+	case Cn:
+	case KEY_DOWN:
+		down(b);
+		break;
+	case Cp:
+	case KEY_UP:
+		up(b);
 		break;
 	case Cq:
 		e->in_ret = inserthex(b);
