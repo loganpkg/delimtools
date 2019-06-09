@@ -88,7 +88,6 @@ struct buf {
 };
 
 struct ed {
-	char *msg;		/* Status bar message, string litteral only */
 	struct buf **t;		/* Array of text buffers */
 	size_t s;		/* Size of the text buffer array */
 	size_t ab;		/* Active text buffer */
@@ -100,7 +99,7 @@ struct ed {
 	char *search_str;	/* Search string */
 	int cl_active;		/* Editing is in the command line */
 	int operation;		/* Operation that requires the command line */
-	int internal_ret;	/* Return value of internal operation */
+	int in_ret;	/* Return value of internal operation */
 	int shell_ret;		/* Return value of shell command */
 	int running;		/* Editor is running */
 };
@@ -669,19 +668,24 @@ int hexnum(int *h, int c)
 	return 0;
 }
 
-void inserthex(struct buf *b)
+int inserthex(struct buf *b)
 {
 	int c0, c1, h0, h1;
 
 	c0 = getch();
 	if (hexnum(&h0, c0))
-		return;
+		return -1;
 
 	c1 = getch();
 	if (hexnum(&h1, c1))
-		return;
+		return -1;
 
-	insertch(b, h0 * 16 + h1);
+	if (insertch(b, h0 * 16 + h1)) {
+	  LOG("insertch failed");
+	  return -1;
+	}
+	
+	return 0;
 }
 
 int insertshell(struct buf *b, char *shellcmd, int *shellret)
@@ -1007,10 +1011,16 @@ int drawscreen(struct ed *e)
 
 	/* Create status bar */
 	if (snprintf
-	    (sb, sb_s, "[b->g:%lu b->c:%lu b->s:%lu] %c%c %s (%lu) %02x %d %s",
-	     b->g - b->a, b->c - b->a, b->s, (b->mod) ? '*' : ' ',
-	     (e->internal_ret) ? 'F' : ' ', b->fn, b->r, (unsigned char)b->c,
-	     e->shell_ret, e->msg) < 0) {
+	    (sb, sb_s, "%c%c:%s (%lu) [g:%lu c:%lu s:%lu] shell_ret:%d",
+	     b->mod ? '*' : ' ',
+	     e->in_ret == -1 ? 'F' : ' ',
+	     b->fn,
+	     b->r,
+	     b->g - b->a,
+	     b->c - b->a,
+	     b->s,
+	     e->shell_ret
+	     ) < 0) {
 		LOG("snprintf failed");
 		free(sb);
 		sb = NULL;
@@ -1266,6 +1276,12 @@ void keycx(struct ed *e)
 
 	y = getch();
 	switch (y) {
+	case '<':
+	  previousbuf(e);
+	  break;
+	case '>':
+	  nextbuf(e);
+	  break;
 	case Cc:
 		e->running = 0;
 		break;
@@ -1276,18 +1292,11 @@ void keycx(struct ed *e)
 	case Cg:
 		break;
 	case Cs:
-		e->internal_ret = save(b);
-		if (e->internal_ret) {
-			e->msg = "save failed";
-		} else {
-			e->msg = "save OK";
-		}
+		e->in_ret = save(b);
 		break;
 	case Cr:
 		e->cl_active = 1;
 		e->operation = Cr;
-		/* Prefill command line buffer with existing buffername */
-
 		break;
 	case 'i':
 		e->cl_active = 1;
@@ -1310,12 +1319,6 @@ void keyesc(struct ed *e)
 	switch (z) {
 	case Cg:
 		break;
-	case ',':
-		previousbuf(e);
-		break;
-	case '.':
-		nextbuf(e);
-		break;
 	case '<':
 		first(b);
 		break;
@@ -1323,20 +1326,19 @@ void keyesc(struct ed *e)
 		last(b);
 		break;
 	case 'm':
-		matchbrace(b);
+	  e->in_ret = matchbrace(b);
 		break;
 	case 't':
 		trimwhitespace(b);
 		break;
 	case 'w':
-		killregion(b, &e->k, &e->ks, &e->kn, 0);
+		e->in_ret = killregion(b, &e->k, &e->ks, &e->kn, 0);
 		break;
 	case 'x':
 		e->cl_active = 1;
 		e->operation = 'x';
 		break;
 	}
-
 }
 
 void keyn(struct ed *e)
@@ -1361,16 +1363,16 @@ void keyn(struct ed *e)
 
 	switch (e->operation) {
 	case Cf:
-		newfile(e, e->cl_str);
+		e->in_ret = newfile(e, e->cl_str);
 		break;
 	case Cr:
-		setfilename(b, e->cl_str);
+		e->in_ret = setfilename(b, e->cl_str);
 		break;
 	case 'i':
-		insertfile(b, e->cl_str);
+		e->in_ret = insertfile(b, e->cl_str);
 		break;
 	case 'x':
-		e->internal_ret = insertshell(b, e->cl_str, &e->shell_ret);
+		e->in_ret = insertshell(b, e->cl_str, &e->shell_ret);
 		break;
 	}
 
@@ -1400,45 +1402,47 @@ void key(struct ed *e)
 		break;
 	case Cb:
 	case KEY_LEFT:
-		leftch(b);
+		e->in_ret = leftch(b);
 		break;
 	case Cd:
 	case Cqm:
 	case KEY_DC:
-		deletech(b);
+		e->in_ret = deletech(b);
 		break;
 	case Ce:
 	case KEY_END:
-		end(b);
+	  end(b);
 		break;
 	case Cf:
 	case KEY_RIGHT:
-		rightch(b);
+		e->in_ret = rightch(b);
 		break;
 	case Cg:
-		if (e->cl_active) {
+	  if (b->m_set) {
+	    b->m_set = 0;
+	  } else if (e->cl_active) {
 			e->cl_active = 0;
 			e->operation = -1;
-		}
+	  }
 		break;
 	case Ch:
 	case KEY_BACKSPACE:
-		backspacech(b);
+		e->in_ret = backspacech(b);
 		break;
 	case Cl:
 		level(b);
 		break;
 	case Cq:
-		inserthex(b);
+		e->in_ret = inserthex(b);
 		break;
 	case Cw:
-		killregion(b, &e->k, &e->ks, &e->kn, 1);
+		e->in_ret = killregion(b, &e->k, &e->ks, &e->kn, 1);
 		break;
 	case Cx:
 		keycx(e);
 		break;
 	case Cy:
-		yank(b, e->k, e->ks, e->kn);
+		e->in_ret = yank(b, e->k, e->ks, e->kn);
 		break;
 	case ESC:
 		keyesc(e);
@@ -1447,12 +1451,12 @@ void key(struct ed *e)
 		if (e->cl_active) {
 			keyn(e);
 		} else {
-			insertch(b, x);
+			e->in_ret = insertch(b, x);
 		}
 		break;
 	default:
 		if (isprint(x) || x == '\t')
-			insertch(b, x);
+			e->in_ret = insertch(b, x);
 	}
 }
 
@@ -1507,8 +1511,8 @@ int main(int argc, char **argv)
 		if (drawscreen(e))
 			LOG("drawscreen failed");
 
-		e->msg = "";
-
+		e->in_ret = 0;
+		
 		key(e);
 	}
 
