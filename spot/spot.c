@@ -32,7 +32,7 @@
 #include <unistd.h>
 
 /* Default gap size */
-#define GAP 2
+#define GAP 1023
 
 #define REGION_COLORS 1
 
@@ -64,7 +64,6 @@
 #define Cy 25
 #define Cz 26
 #define ESC 27
-#define Cqm 127
 
 #define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
 /* size_t addtion overflow test */
@@ -1372,10 +1371,10 @@ void keycx(struct ed *e)
 
 	y = getch();
 	switch (y) {
-	case '<':
+	case KEY_LEFT:
 		previousbuf(e);
 		break;
-	case '>':
+	case KEY_RIGHT:
 		nextbuf(e);
 		break;
 	case Cc:
@@ -1510,7 +1509,6 @@ void key(struct ed *e)
 		e->in_ret = leftch(b);
 		break;
 	case Cd:
-	case Cqm:
 	case KEY_DC:
 		e->in_ret = deletech(b);
 		break;
