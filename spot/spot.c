@@ -126,6 +126,46 @@ int safeadd(size_t * res, int num_args, ...)
 	return 0;
 }
 
+struct buf *initbuf(void)
+{
+	struct buf *b = NULL;
+	size_t s;
+
+	if ((b = calloc(1, sizeof(struct buf))) == NULL) {
+		LOG("calloc failed");
+		return NULL;
+	}
+
+	if (safeadd(&s, 2, GAP, 1)) {
+		LOG("safeadd failed");
+		return NULL;
+	}
+
+	b->a = NULL;
+	if ((b->a = malloc(s)) == NULL) {
+		LOG("malloc failed");
+		return NULL;
+	}
+
+	b->g = b->a;
+	*(b->c = b->a + GAP) = '~';
+	b->s = s;
+
+	return b;
+}
+
+void freebuf(struct buf *b)
+{
+	if (b != NULL) {
+		free(b->fn);
+		b->fn = NULL;
+		free(b->a);
+		b->a = NULL;
+		free(b);
+		b = NULL;
+	}
+}
+
 int growgap(struct buf *b, size_t will_use)
 {
 	char *new_a = NULL;
@@ -183,22 +223,6 @@ int insertch(struct buf *b, char ch)
 	return 0;
 }
 
-int insertandleftch(struct buf *b, char ch)
-{
-	if (b->g == b->c) {
-		if (growgap(b, 1)) {
-			return -1;
-		}
-	}
-
-	b->m_set = 0;
-	b->mod = 1;
-
-	*(--b->c) = ch;
-
-	return 0;
-}
-
 int deletech(struct buf *b)
 {
 	if (b->c == b->a + b->s - 1)
@@ -221,6 +245,67 @@ int backspacech(struct buf *b)
 	return *(--b->g);
 }
 
+int leftch(struct buf *b)
+{
+	if (b->g == b->a)
+		return -1;
+
+	*(--b->c) = *(--b->g);
+
+	if (b->m_set && b->g == b->m)
+		b->m = b->c;
+
+	if (*b->c == '\n')
+		--b->r;
+
+	return *b->c;
+}
+
+int rightch(struct buf *b)
+{
+	if (b->c == b->a + b->s - 1)
+		return -1;
+
+	if (b->m_set && b->c == b->m)
+		b->m = b->g;
+
+	if (*b->c == '\n')
+		++b->r;
+
+	*(b->g++) = *(b->c++);
+	return *b->c;
+}
+
+void home(struct buf *b)
+{
+	int x;
+	while ((x = leftch(b)) != -1) {
+		if (x == '\n') {
+			rightch(b);
+			break;
+		}
+	}
+}
+
+void end(struct buf *b)
+{
+	int x;
+	while ((x = rightch(b)) != -1) {
+		if (x == '\n')
+			break;
+	}
+}
+
+void first(struct buf *b)
+{
+	while (leftch(b) != -1) ;
+}
+
+void last(struct buf *b)
+{
+	while (rightch(b) != -1) ;
+}
+
 void deletebuf(struct buf *b)
 {
 	b->g = b->a;
@@ -228,6 +313,7 @@ void deletebuf(struct buf *b)
 	b->m = NULL;
 	b->r = 0;
 	b->t = 0;
+	b->mr = 0;
 	b->m_set = 0;
 	b->mod = 1;
 	b->v = 0;
@@ -261,112 +347,6 @@ int buftostr(struct buf *b, char **str)
 	}
 	*q = '\0';
 	return 0;
-}
-
-int leftch(struct buf *b)
-{
-	if (b->g == b->a)
-		return -1;
-
-	--b->g;
-	--b->c;
-	*b->c = *b->g;
-
-	if (b->m_set && b->g == b->m)
-		b->m = b->c;
-
-	if (*b->c == '\n')
-		--b->r;
-
-	return *b->c;
-}
-
-int rightch(struct buf *b)
-{
-	if (b->c == b->a + b->s - 1)
-		return -1;
-
-	if (b->m_set && b->c == b->m)
-		b->m = b->g;
-
-	if (*b->c == '\n')
-		++b->r;
-
-	*b->g = *b->c;
-	++b->g;
-	++b->c;
-	return *b->c;
-}
-
-void end(struct buf *b)
-{
-	int x;
-	while ((x = rightch(b)) != -1) {
-		if (x == '\n')
-			break;
-	}
-}
-
-void home(struct buf *b)
-{
-	int x;
-	while ((x = leftch(b)) != -1) {
-		if (x == '\n') {
-			rightch(b);
-			break;
-		}
-	}
-}
-
-void first(struct buf *b)
-{
-	while (leftch(b) != -1) ;
-}
-
-void last(struct buf *b)
-{
-	while (rightch(b) != -1) ;
-}
-
-struct buf *initbuf(void)
-{
-	struct buf *b = NULL;
-	size_t s;
-
-	if ((b = calloc(1, sizeof(struct buf))) == NULL) {
-		LOG("calloc failed");
-		return NULL;
-	}
-
-	if (safeadd(&s, 2, GAP, 1)) {
-		LOG("safeadd failed");
-		return NULL;
-	}
-
-	if ((b->a = malloc(s)) == NULL) {
-		LOG("malloc failed");
-		free(b);
-		return NULL;
-	}
-
-	b->g = b->a;
-	b->s = s;
-	b->c = b->a + GAP;
-	*b->c = '~';
-
-	return b;
-}
-
-void freebuf(struct buf *b)
-{
-	if (b != NULL) {
-		free(b->fn);
-		b->fn = NULL;
-		free(b->a);
-		b->a = NULL;
-		free(b);
-		b = NULL;
-	}
 }
 
 void setmark(struct buf *b)
