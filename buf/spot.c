@@ -328,26 +328,6 @@ void last(struct buf *b)
 	while (rightch(b) != -1) ;
 }
 
-int insertbuf(struct buf *b, struct buf *k)
-{
-	size_t k_text_s = k->s - 1 - (k->c - k->g);
-
-	if (growgap(b, k_text_s)) {
-		LOG("growgap failed");
-		return -1;
-	}
-
-	b->m_set = 0;
-	b->mod = 1;
-
-	first(k);
-	insertch(b, *k->c);
-	while (--k_text_s)
-		insertch(b, rightch(k));
-
-	return 0;
-}
-
 struct buf *initbuf(void)
 {
 	struct buf *b = NULL;
@@ -396,34 +376,70 @@ void setmark(struct buf *b)
 	b->mr = b->r;
 }
 
-int killregion(struct buf *b, char **k, size_t * ks, size_t * kn)
+int killregion(struct buf *b, char **k, size_t * ks, size_t * kn, int del)
 {
-	HERE if (!b->m_set || b->c == b->m)
+	if (!b->m_set || b->c == b->m)
 		return -1;
 
-	deletebuf(k);
+	*kn = b->r > b->mr ? b->r - b->mr : b->mr - b->r;
+
+	free(*k);
+	*k = NULL;
 
 	/* Cursor before mark */
 	if (b->c < b->m) {
-		if (growgap(k, b->m - b->c)) {
-			LOG("growgap failed");
+		*ks = b->m - b->c;
+
+		if ((*k = malloc(*ks)) == NULL) {
+			LOG("malloc failed");
 			return -1;
 		}
 
-		while (b->c != b->m)
-			insertch(k, deletech(b));
+		memcpy(*k, b->c, *ks);
+
+		if (del)
+			b->c = b->m;
 
 	} else {
 		/* Mark before cursor */
-		if (growgap(k, b->g - b->m)) {
-			LOG("growgap failed");
+		*ks = b->g - b->m;
+
+		if ((*k = malloc(*ks)) == NULL) {
+			LOG("malloc failed");
 			return -1;
 		}
 
-		while (b->g != b->m)
-			insertandleftch(k, backspacech(b));
+		memcpy(*k, b->m, *ks);
 
+		if (del) {
+			b->g = b->m;
+			b->r -= *kn;
+		}
 	}
+
+	b->m_set = 0;
+
+	if (del)
+		b->mod = 1;
+
+	return 0;
+}
+
+int yank(struct buf *b, char *k, size_t ks, size_t kn)
+{
+	if (growgap(b, ks)) {
+		LOG("growgap failed");
+		return -1;
+	}
+
+	memcpy(b->g, k, ks);
+
+	b->g += ks;
+	b->r += kn;
+
+	b->m_set = 0;
+	b->mod = 1;
+
 	return 0;
 }
 
@@ -1106,21 +1122,14 @@ struct ed *inited(void)
 		return NULL;
 	}
 
+	if ((e->cl = initbuf()) == NULL) {
+		free(e);
+		e = NULL;
+		return NULL;
+	}
+
 	e->operation = -1;
 	e->running = 1;
-
-	if ((e->k = initbuf()) == NULL) {
-		free(e);
-		e = NULL;
-		return NULL;
-	}
-
-	if ((e->cl = initbuf()) == NULL) {
-		freebuf(e->k);
-		free(e);
-		e = NULL;
-		return NULL;
-	}
 
 	return e;
 }
@@ -1138,7 +1147,9 @@ void freeed(struct ed *e)
 			e->t = NULL;
 		}
 
-		freebuf(e->k);
+		free(e->k);
+		e->k = NULL;
+
 		freebuf(e->cl);
 
 		free(e->cl_str);
@@ -1337,6 +1348,9 @@ void keyesc(struct ed *e)
 	case 't':
 		trimwhitespace(b);
 		break;
+	case 'w':
+		killregion(b, &e->k, &e->ks, &e->kn, 0);
+		break;
 	case 'x':
 		e->cl_active = 1;
 		e->operation = 'x';
@@ -1438,13 +1452,13 @@ void key(struct ed *e)
 		inserthex(b);
 		break;
 	case Cw:
-		killregion(b, e->k);
+		killregion(b, &e->k, &e->ks, &e->kn, 1);
 		break;
 	case Cx:
 		keycx(e);
 		break;
 	case Cy:
-		insertbuf(b, e->k);
+		yank(b, e->k, e->ks, e->kn);
 		break;
 	case ESC:
 		keyesc(e);
