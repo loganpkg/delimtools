@@ -22,9 +22,10 @@
  * then place spot somewhere in your PATH.
  */
 
+
 #define _GNU_SOURCE
+
 #include <sys/stat.h>
-#include <sys/wait.h>
 #include <curses.h>
 #include <ctype.h>
 #include <stdint.h>
@@ -100,7 +101,6 @@ struct ed {
 	int cl_active;		/* Editing is in the command line */
 	int operation;		/* Operation that requires the command line */
 	int in_ret;		/* Return value of internal operation */
-	int shell_ret;		/* Return value of shell command */
 	int running;		/* Editor is running */
 };
 
@@ -475,7 +475,7 @@ int killregion(struct buf *b, char **k, size_t * ks, size_t * kn, int del)
 	return 0;
 }
 
-int killfwdline(struct buf * b, char **k, size_t * ks, size_t * kn)
+int killfwdline(struct buf *b, char **k, size_t * ks, size_t * kn)
 {
 	if (*b->c == '\n') {
 		deletech(b);
@@ -493,7 +493,7 @@ int killfwdline(struct buf * b, char **k, size_t * ks, size_t * kn)
 	return 0;
 }
 
-int uproot(struct buf * b, char **k, size_t * ks, size_t * kn)
+int uproot(struct buf *b, char **k, size_t * ks, size_t * kn)
 {
 	setmark(b);
 	home(b);
@@ -681,21 +681,18 @@ int matchbrace(struct buf *b)
 		return -1;
 	}
 
-	if (fwd) {
+	if (fwd)
 		move = &rightch;
-	} else {
+	else
 		move = &leftch;
-	}
 
 	depth = 0;
 	found = 0;
-	while (!(*move) (b)) {
-		ch = *b->c;
+	while ((ch = (*move) (b)) != -1) {
 		if (ch == original) {
 			++depth;
-		}
-		if (ch == target) {
-			if (depth == 0) {
+		} else if (ch == target) {
+			if (!depth) {
 				found = 1;
 				break;
 			} else {
@@ -788,41 +785,6 @@ int inserthex(struct buf *b)
 	}
 
 	return 0;
-}
-
-int insertshell(struct buf *b, char *shellcmd, int *shellret)
-{
-	int ret = 0;
-	FILE *fp = NULL;
-	int x;
-	int st;
-
-	if ((fp = popen(shellcmd, "r")) == NULL) {
-		LOG("popen failed");
-		return -1;
-	}
-
-	while ((x = getc(fp)) != EOF) {
-		if (insertch(b, x)) {
-			LOG("insertch failed");
-			ret = -1;
-			goto clean_up;
-		}
-	}
-
- clean_up:
-	if ((st = pclose(fp)) == -1) {
-		LOG("pclose failed");
-		ret = -1;
-	} else {
-		if (WIFSIGNALED(st)) {
-			*shellret = WTERMSIG(st);
-		} else if (WIFEXITED(st)) {
-			*shellret = WEXITSTATUS(st);
-		}
-	}
-
-	return ret;
 }
 
 int initnc(void)
@@ -1113,10 +1075,10 @@ int drawscreen(struct ed *e)
 
 	/* Create status bar */
 	if (snprintf
-	    (sb, sb_s, "%c%c:%s (%lu) [g:%lu c:%lu s:%lu] shell_ret:%d",
+	    (sb, sb_s, "%c%c:%s (%lu) [g:%lu c:%lu s:%lu]",
 	     b->mod ? '*' : ' ',
 	     e->in_ret == -1 ? 'F' : ' ',
-	     b->fn, b->r, b->g - b->a, b->c - b->a, b->s, e->shell_ret) < 0) {
+	     b->fn, b->r, b->g - b->a, b->c - b->a, b->s) < 0) {
 		LOG("snprintf failed");
 		free(sb);
 		sb = NULL;
@@ -1476,9 +1438,6 @@ void keyn(struct ed *e)
 	case 'i':
 		e->in_ret = insertfile(b, e->cl_str);
 		break;
-	case 'x':
-		e->in_ret = insertshell(b, e->cl_str, &e->shell_ret);
-		break;
 	}
 
 	e->cl_active = 0;
@@ -1589,19 +1548,19 @@ int main(int argc, char **argv)
 
 	if ((e = inited()) == NULL) {
 		LOG("inited failed");
-		return -1;
+		return 1;
 	}
 
 	if (argc < 1) {
 		LOG("argc is less than one");
-		return -1;
+		return 1;
 	}
 
 	if (argc == 1) {
 		if (newbuf(e, NULL)) {
 			LOG("newbuf failed");
 			freeed(e);
-			return -1;
+			return 1;
 		}
 	} else {
 		for (i = 1; i < argc; ++i) {
@@ -1609,7 +1568,7 @@ int main(int argc, char **argv)
 				if (newbuf(e, argv[i])) {
 					LOG("newbuf failed");
 					freeed(e);
-					return -1;
+					return 1;
 				}
 			} else {
 				if (newfile(e, argv[i])) {
@@ -1626,7 +1585,7 @@ int main(int argc, char **argv)
 	if (initnc()) {
 		LOG("initnc failed");
 		freeed(e);
-		return -1;
+		return 1;
 	}
 
 	while (e->running) {
@@ -1641,7 +1600,7 @@ int main(int argc, char **argv)
 	if (freenc()) {
 		LOG("freenc failed");
 		freeed(e);
-		return -1;
+		return 1;
 	}
 
 	freeed(e);
