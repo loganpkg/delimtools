@@ -22,7 +22,6 @@
  * then place spot somewhere in your PATH.
  */
 
-
 #define _GNU_SOURCE
 
 #include <sys/stat.h>
@@ -233,17 +232,6 @@ int deletech(struct buf *b)
 	return *(b->c++);
 }
 
-int backspacech(struct buf *b)
-{
-	if (b->g == b->a)
-		return -1;
-
-	b->m_set = 0;
-	b->mod = 1;
-
-	return *(--b->g);
-}
-
 int leftch(struct buf *b)
 {
 	if (b->g == b->a)
@@ -273,6 +261,14 @@ int rightch(struct buf *b)
 
 	*(b->g++) = *(b->c++);
 	return *b->c;
+}
+
+int backspacech(struct buf *b)
+{
+	if (leftch(b) == -1)
+		return -1;
+
+	return deletech(b);
 }
 
 size_t home(struct buf * b)
