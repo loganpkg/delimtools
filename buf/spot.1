@@ -1,0 +1,124 @@
+.\"
+.\" Copyright (c) 2019 Logan Ryan McLintock
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd June 12, 2019
+.Dt SPOT 1
+.Os
+.Sh NAME
+.Nm spot
+.Nd text editor
+.Sh SYNOPSIS
+.Nm
+.Op Ar
+.Sh DESCRIPTION
+.Nm spot
+is a minimalistic text editor that uses the gap buffer method and the
+ncurses library.
+It has many advanced features:
+.Bl -bullet -offset indent
+.It
+buffer sizes and number of buffers only limited by random access memory,
+.It
+efficient file reading and writing,
+and efficient killregion and yank functions,
+.It
+atomic navigation with row number and mark updating,
+.It
+intelligent gap increases,
+.It
+integer overflow protection,
+.It
+region highlighting,
+.It
+and full editing available in the command line.
+.El
+.Pp
+.Nm spot
+is released under the ISC licence (OpenBSD style).
+.Sh KEY BINDINGS
+C-f means press the Control key and the f key simultaneously.
+M-n means press the Meta key (or the Alt Key) and the n key simultaneously,
+or press the ESC key followed by the n key. The mark is a location saved in
+the buffer. The region is the text between the mark and the cursor.
+.Bl -tag -width 10n
+.It C-g
+Quit from region highlighting or from the command line.
+.It C-a
+Move cursor to the start of the line.
+.It C-e
+Move cursor to the end of the line.
+.It C-f
+Move cursor forward one character.
+.It C-b
+Move cursor back one character.
+.It C-p
+Move cursor to the previous line.
+.It C-n
+Move cursor to the next line.
+.It M-<
+Move cursor to the start of the buffer.
+.It M->
+Move cursor to the end of the buffer.
+.It M-m
+Move cursor to the matching brace.
+.It C-d
+Delete the character under the cursor.
+.It C-h
+Backspace.
+.It M-t
+Trim trailing whitespace.
+.It C-q
+Quote a two digit hexadecimal value.
+.It C-s
+Forward search.
+.It M-n
+Repeat last forward search.
+.It C-spc
+Set the mark at the cursor's location.
+.It C-k
+Kill to the end of the line.
+.It C-u
+Uproot (kill to the start of the line).
+.It C-w
+Wipe (kill region).
+.It M-w
+Soft wipe (copy region).
+.It C-y
+Yank (paste) the last killed or copied text.
+.It C-x i
+Insert file at cursor.
+.It C-x C-r
+Rename the buffer.
+.It C-x C-s
+Save the buffer.
+.It C-x C-f
+Open file into a new buffer.
+.It C-x LEFT
+Change to previous buffer.
+.It C-x RIGHT
+Change to next buffer.
+.It C-x C-c
+Close the editor. Unsaved modifications will be lost from all buffers.
+.El
+.Sh EXIT STATUS
+.Ex -std spot
+.Sh EXAMPLES
+.Dl $ spot file1 file2
+.Sh SEE ALSO
+.Xr ncurses 3
+.Sh AUTHORS
+.Nm spot
+was written by
+.An "Logan Ryan McLintock".
