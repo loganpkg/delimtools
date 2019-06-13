@@ -78,6 +78,7 @@ struct buf {
 	char *g;		/* Start of gap */
 	char *c;		/* Cursor */
 	char *m;		/* Mark */
+	char *d;		/* Draw start */
 	size_t s;		/* Size of array */
 	size_t r;		/* Cursor's row number */
 	size_t t;		/* Row number of top of screen */
@@ -147,6 +148,7 @@ struct buf *initbuf(void)
 
 	b->g = b->a;
 	*(b->c = b->a + GAP) = '~';
+	b->d = b->a;
 	b->s = s;
 
 	return b;
@@ -171,6 +173,7 @@ int growgap(struct buf *b, size_t will_use)
 	size_t g_index = b->g - b->a;
 	size_t c_index = b->c - b->a;
 	size_t m_index = b->m - b->a;
+	size_t d_index = b->d - b->a;
 
 	gap_s = b->c - b->g;
 
@@ -196,7 +199,8 @@ int growgap(struct buf *b, size_t will_use)
 	b->a = new_a;
 	b->g = new_a + g_index;
 	b->c = new_a + c_index + s_increase;
-	b->m = b->a + m_index;
+	b->m = new_a + m_index;
+	b->d = new_a + d_index;
 	b->s = new_s;
 
 	return 0;
@@ -858,6 +862,9 @@ void level(struct buf *b)
 
 void centre(struct buf *b, int th)
 {
+	char *p;
+	size_t count;
+
 	/* Max row index where centring will result in t being set to zero */
 	size_t t_zero_range;
 
@@ -875,41 +882,45 @@ void centre(struct buf *b, int th)
 		b->t = b->r - t_zero_range;
 	}
 
+	/* Search backwards to find the start of row t */
+	if (!b->t || b->g == b->a) {
+		p = b->a;
+	} else {
+		p = b->g - 1;
+		count = 0;
+
+		while (p != b->a) {
+			if (*p == '\n') {
+				++count;
+			}
+
+			if (count == b->r - b->t + 1) {
+				break;
+			}
+			--p;
+		}
+
+		if (*p == '\n') {
+			++p;
+		}
+	}
+
+	b->d = p;
+
 	b->v = 0;
 }
 
 void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx, int cursor_start)
 {
 	char *p, *end_of_buf;
-	size_t count;
+
 	int hl_on;		/* If region highlighting is on */
 
 	if (cursor_start) {
-		p = b->c;
-	} else {
-		/* Search backwards to find the start of row t */
-		if (!b->t || b->g == b->a) {
-			p = b->a;
-		} else {
-			p = b->g - 1;
-			count = 0;
-
-			while (p != b->a) {
-				if (*p == '\n') {
-					++count;
-				}
-
-				if (count == b->r - b->t + 1) {
-					break;
-				}
-				--p;
-			}
-
-			if (*p == '\n') {
-				++p;
-			}
-		}
+		b->d = b->c;
 	}
+
+	p = b->d;
 
 	*cp_set = 0;
 
@@ -963,8 +974,8 @@ void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx, int cursor_start)
 
 	/* After the gap */
 	p = b->c;
-	end_of_buf = b->a + b->s;
-	while (p < end_of_buf) {
+	end_of_buf = b->a + b->s - 1;
+	while (p <= end_of_buf) {
 		if (b->m_set && p == b->m) {
 			if (hl_on) {
 				attroff(COLOR_PAIR(REGION_COLORS));
@@ -1023,7 +1034,7 @@ int drawscreen(struct ed *e)
 	th = h - 2;
 
 	/* If need to centre */
-	if (b->r < b->t || b->r >= b->t + th)
+	if (b->v || b->r < b->t || b->r >= b->t + th || b->g > b->d + th * w)
 		centre(b, th);
 
 	/* 1st attempt: from t line */
