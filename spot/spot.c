@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <curses.h>
 #include <ctype.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -112,6 +113,7 @@ int safeadd(size_t * res, int num_args, ...)
 	for (i = 0; i < num_args; ++i) {
 		arg_val = va_arg(ap, size_t);
 		if (ADDOF(total, arg_val)) {
+			LOG("integer overflow");
 			va_end(ap);
 			return -1;
 		}
@@ -1070,8 +1072,13 @@ int drawscreen(struct ed *e)
 	/* Height of text portion of the screen */
 	th = h - 2;
 
+	if (th && w > INT_MAX / th) {
+		LOG("integer overflow");
+		return -1;
+	}
+
 	/* If need to centre */
-	if (b->v || b->r < b->t || b->r >= b->t + th || b->g > b->d + th * w)
+	if (b->v || b->r < b->t || b->r >= b->t + th || b->g - b->d > th * w)
 		centre(b, th);
 
 	/* 1st attempt: from t line */
@@ -1316,6 +1323,7 @@ int newbuf(struct ed *e, char *filename)
 	}
 
 	if (MULTOF(new_s, sizeof(struct buf *))) {
+		LOG("integer overflow");
 		freebuf(new_buf);
 		return -1;
 	}
