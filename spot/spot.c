@@ -1351,7 +1351,8 @@ int newfile(struct ed *e, char *filename)
 			LOG("insertfile failed");
 			return -1;
 		}
-/* Existing file read, not a file insert, so clear mod indicator */
+
+		/* Existing file read so clear modification indicator */
 		e->t[e->s - 1]->mod = 0;
 	}
 
