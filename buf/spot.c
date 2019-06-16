@@ -748,7 +748,7 @@ int matchbrace(struct buf *b)
 
 void trimwhitespace(struct buf *b)
 {
-	char ch;
+	int x;
 	int line_feed;
 	int end_of_line;
 
@@ -756,15 +756,14 @@ void trimwhitespace(struct buf *b)
 
 	/* Trim end of buffer */
 	line_feed = 0;
-	while (leftch(b) != -1) {
-		ch = *b->c;
-		if (ch == '\n') {
+	while ((x = leftch(b)) != -1) {
+		if (x == '\n') {
 			if (!line_feed) {
 				line_feed = 1;
 			} else {
 				deletech(b);
 			}
-		} else if (ch == ' ' || ch == '\t') {
+		} else if (x == ' ' || x == '\t') {
 			deletech(b);
 		} else {
 			break;
@@ -772,10 +771,9 @@ void trimwhitespace(struct buf *b)
 	}
 
 	/* Trim body */
-	end_of_line = 1;
-	while (leftch(b) != -1) {
-		ch = *b->c;
-		switch (ch) {
+	end_of_line = 0;
+	while ((x = leftch(b)) != -1) {
+		switch (x) {
 		case '\n':
 			end_of_line = 1;
 			break;
