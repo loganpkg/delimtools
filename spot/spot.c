@@ -305,12 +305,43 @@ void end(struct buf *b)
 
 void first(struct buf *b)
 {
-	while (leftch(b) != -1) ;
+	size_t gap_s;
+
+	if (b->g == b->a)
+		return;
+
+	gap_s = b->c - b->g;
+
+	if (b->m_set && b->m < b->g)
+		b->m += gap_s;
+
+	b->r = 0;
+
+	memmove(b->a + gap_s, b->a, b->g - b->a);
+
+	b->g = b->a;
+	b->c = b->a + gap_s;
 }
 
 void last(struct buf *b)
 {
-	while (rightch(b) != -1) ;
+	char *end_of_buf = b->a + b->s - 1;
+	size_t gap_s;
+
+	if (b->c == end_of_buf)
+		return;
+
+	gap_s = b->c - b->g;
+
+	if (b->m_set && b->m >= b->c && b->m != end_of_buf)
+		b->m -= gap_s;
+
+	while (b->c != end_of_buf) {
+		if (*b->c == '\n')
+			++b->r;
+
+		*(b->g++) = *(b->c++);
+	}
 }
 
 void up(struct buf *b)
@@ -326,6 +357,9 @@ void up(struct buf *b)
 
 	home(b);
 
+	if (*b->c == '\n')
+		return;
+
 	while (count) {
 		if (rightch(b) == '\n')
 			break;
@@ -337,6 +371,7 @@ void up(struct buf *b)
 void down(struct buf *b)
 {
 	size_t count;
+	int x;
 
 	count = home(b);
 
@@ -346,8 +381,12 @@ void down(struct buf *b)
 		home(b);
 	}
 
+	if (*b->c == '\n')
+		return;
+
 	while (count) {
-		if (rightch(b) == -1)
+		x = rightch(b);
+		if (x == '\n' || x == -1)
 			break;
 
 		--count;
@@ -649,7 +688,7 @@ int matchbrace(struct buf *b)
 	char original;
 	char target;
 	int fwd;
-	char ch;
+	int x;
 	size_t depth;
 	int found;
 
@@ -688,10 +727,10 @@ int matchbrace(struct buf *b)
 
 	depth = 0;
 	found = 0;
-	while ((ch = (*move) (b)) != -1) {
-		if (ch == original) {
+	while ((x = (*move) (b)) != -1) {
+		if (x == original) {
 			++depth;
-		} else if (ch == target) {
+		} else if (x == target) {
 			if (!depth) {
 				found = 1;
 				break;
@@ -752,31 +791,31 @@ void trimwhitespace(struct buf *b)
 	}
 }
 
-int hexnum(int *h, int c)
+int hexnum(int *h, int x)
 {
-	if (!isxdigit(c))
+	if (!isxdigit(x))
 		return -1;
 
-	if (isdigit(c))
-		*h = c - '0';
-	else if (islower(c))
-		*h = c - 'a' + 10;
+	if (isdigit(x))
+		*h = x - '0';
+	else if (islower(x))
+		*h = x - 'a' + 10;
 	else
-		*h = c - 'A' + 10;
+		*h = x - 'A' + 10;
 
 	return 0;
 }
 
 int inserthex(struct buf *b)
 {
-	int c0, c1, h0, h1;
+	int x0, x1, h0, h1;
 
-	c0 = getch();
-	if (hexnum(&h0, c0))
+	x0 = getch();
+	if (hexnum(&h0, x0))
 		return -1;
 
-	c1 = getch();
-	if (hexnum(&h1, c1))
+	x1 = getch();
+	if (hexnum(&h1, x1))
 		return -1;
 
 	if (insertch(b, h0 * 16 + h1)) {
@@ -1332,15 +1371,15 @@ void previousbuf(struct ed *e)
 void keycx(struct ed *e)
 {
 	struct buf *b = NULL;
-	int y;
+	int x;
 
 	if (e->cl_active)
 		b = e->cl;
 	else
 		b = e->t[e->ab];
 
-	y = getch();
-	switch (y) {
+	x = getch();
+	switch (x) {
 	case KEY_LEFT:
 		previousbuf(e);
 		break;
@@ -1373,15 +1412,15 @@ void keycx(struct ed *e)
 void keyesc(struct ed *e)
 {
 	struct buf *b = NULL;
-	int z;
+	int x;
 
 	if (e->cl_active)
 		b = e->cl;
 	else
 		b = e->t[e->ab];
 
-	z = getch();
-	switch (z) {
+	x = getch();
+	switch (x) {
 	case Cg:
 		break;
 	case '<':
