@@ -17,9 +17,6 @@
 /*
  * spot text editor.
  * Dedicated to my son who was just a "spot" in his first ultrasound.
- * To install
- * cc -ansi -O2 -g -Wall -Wextra -pedantic -o spot spot.c -lncurses
- * then place spot somewhere in your PATH.
  */
 
 #define _GNU_SOURCE
