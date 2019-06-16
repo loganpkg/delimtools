@@ -901,8 +901,7 @@ void level(struct buf *b)
 
 void centre(struct buf *b, int th)
 {
-	char *p;
-	size_t count;
+	size_t row;
 
 	/* Max row index where centring will result in t being set to zero */
 	size_t t_zero_range;
@@ -921,30 +920,26 @@ void centre(struct buf *b, int th)
 		b->t = b->r - t_zero_range;
 	}
 
-	/* Search backwards to find the start of row t */
 	if (!b->t || b->g == b->a) {
-		p = b->a;
-	} else {
-		p = b->g - 1;
-		count = 0;
-
-		while (p != b->a) {
-			if (*p == '\n') {
-				++count;
-			}
-
-			if (count == b->r - b->t + 1) {
-				break;
-			}
-			--p;
-		}
-
-		if (*p == '\n') {
-			++p;
-		}
+		b->d = b->a;
+		b->v = 0;
+		return;
 	}
 
-	b->d = p;
+	/* Search backwards to find the start of row t */
+	b->d = b->g - 1;
+	row = b->r;
+	while (b->d != b->a) {
+		if (*b->d == '\n') {
+			--row;
+			if (row == b->t - 1) {
+				++b->d;
+				break;
+			}
+		}
+
+		--b->d;
+	}
 
 	b->v = 0;
 }
@@ -952,14 +947,12 @@ void centre(struct buf *b, int th)
 void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx, int cursor_start)
 {
 	char *p, *end_of_buf;
-
 	int hl_on;		/* If region highlighting is on */
 
-	if (cursor_start) {
-		b->d = b->c;
-	}
-
-	p = b->d;
+	if (cursor_start)
+		p = b->g;
+	else
+		p = b->d;
 
 	*cp_set = 0;
 
@@ -1047,17 +1040,14 @@ int drawscreen(struct ed *e)
 {
 	struct buf *b = e->t[e->ab];	/* Active text buffer pointer */
 	struct buf *cl = e->cl;	/* Command line buffer pointer */
-	/* Height and width of screen */
-	int h;
-	int w;
+	int h;			/* Height of screen */
+	int w;			/* Width of screen */
 	int th;			/* Height of text portion of the screen */
 	int cp_set;		/* If the cursor position has been set */
-	/* Text buffer cursor index */
-	int cy;
-	int cx;
-	/* Command line cursor index */
-	int cl_cy;
-	int cl_cx;
+	int cy;			/* Text buffer cursor y index */
+	int cx;			/* Text buffer cursor x index */
+	int cl_cy;		/* Command line cursor y index */
+	int cl_cx;		/* Command line cursor x index */
 	char *sb = NULL;	/* Status bar */
 	size_t sb_s;		/* Size of the status bar */
 
