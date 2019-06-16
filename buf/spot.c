@@ -649,6 +649,9 @@ int save(struct buf *b)
 	if (!b->mod)
 		return 0;
 
+	if (b->fn == NULL)
+		return -1;
+
 	if ((fp = fopen(b->fn, "w")) == NULL) {
 		LOG("fopen failed");
 		return -1;
@@ -1268,6 +1271,12 @@ int setfilename(struct buf *b, char *filename)
 
 	len = strlen(filename);
 
+	if (!len) {
+		free(b->fn);
+		b->fn = NULL;
+		return 0;
+	}
+
 	if (safeadd(&res, 2, len, 1)) {
 		LOG("safeadd failed");
 		return -1;
@@ -1337,13 +1346,14 @@ int newfile(struct ed *e, char *filename)
 		return -1;
 	}
 
-	if (insertfile(e->t[e->s - 1], filename)) {
-		LOG("insertfile failed");
-		return -1;
+	if (!access(filename, F_OK)) {
+		if (insertfile(e->t[e->s - 1], filename)) {
+			LOG("insertfile failed");
+			return -1;
+		}
+/* Existing file read, not a file insert, so clear mod indicator */
+		e->t[e->s - 1]->mod = 0;
 	}
-
-	/* New file read, not a file insert, so clear mod indicator */
-	e->t[e->s - 1]->mod = 0;
 
 	return 0;
 }
@@ -1608,20 +1618,13 @@ int main(int argc, char **argv)
 		}
 	} else {
 		for (i = 1; i < argc; ++i) {
-			if (access(argv[i], F_OK)) {
-				if (newbuf(e, argv[i])) {
-					LOG("newbuf failed");
-					freeed(e);
-					return 1;
-				}
-			} else {
-				if (newfile(e, argv[i])) {
-					LOG("newfile failed");
-					freeed(e);
-					return 1;
-				}
+			if (newfile(e, argv[i])) {
+				LOG("newfile failed");
+				freeed(e);
+				return 1;
 			}
 		}
+
 		/* Start with first file specified */
 		e->ab = 0;
 	}
