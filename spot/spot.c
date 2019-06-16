@@ -31,7 +31,7 @@
 #include <unistd.h>
 
 /* Default gap size */
-#define GAP 1023
+#define GAP (BUFSIZ - 1)
 
 #define REGION_COLORS 1
 
