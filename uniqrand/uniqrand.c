@@ -58,8 +58,13 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if ((a = calloc(num, sizeof(u_int32_t))) == NULL) {
-		LOG("calloc failed");
+	if (UINT32_MAX > SIZE_MAX / sizeof(u_int32_t)) {
+		LOG("integer overflow");
+		return 1;
+	}
+
+	if ((a = malloc(num * sizeof(u_int32_t))) == NULL) {
+		LOG("malloc failed");
 		return 1;
 	}
 
@@ -78,18 +83,16 @@ int main(int argc, char **argv)
 	i = num - 1;
 	while (i) {
 		j = arc4random_uniform(i + 1);
-
 		/* Swap */
 		temp = a[i];
 		a[i] = a[j];
 		a[j] = temp;
-
 		--i;
 	}
 
 	/* Print results */
 	for (i = 0; i < num; i++)
-		printf("%u,%u\n", i, a[i]);
+		printf("%u,%u\n", i + 1, a[i]);
 
 	free(a);
 	a = NULL;
