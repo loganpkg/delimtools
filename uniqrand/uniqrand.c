@@ -19,14 +19,58 @@
  */
 
 #include <bsd/stdlib.h>
+#include <stdlib.h>
 
 #define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
 
 int main(int argc, char **argv)
 {
+	u_int32_t lower_inc, upper_exc, num, needed, window_s, i;
+	const char *error_str = NULL;
+	u_int32_t *a = NULL;
 
-	if (argc != 4)
+	if (argc != 4) {
 		fprintf(stderr, "Usage: %s lower_inc upper_exc num\n", argv[0]);
+		return 1;
+	}
+
+	lower_inc = strtonum(argv[1], 0, UINT32_MAX - 1, &error_str);
+	if (error_str != NULL) {
+		LOG("strtonum failed");
+		return 1;
+	}
+
+	upper_exc = strtonum(argv[2], 0, UINT32_MAX - 1, &error_str);
+	if (error_str != NULL) {
+		LOG("strtonum failed");
+		return 1;
+	}
+
+	num = strtonum(argv[3], 0, UINT32_MAX - 1, &error_str);
+	if (error_str != NULL) {
+		LOG("strtonum failed");
+		return 1;
+	}
+
+	if ((a = calloc(num, sizeof(u_int32_t))) == NULL) {
+		LOG("calloc failed");
+		return 1;
+	}
+
+	needed = num;
+	window_s = upper_exc - lower_inc;
+
+	while (window_s) {
+		if (arc4random_uniform(window_s) < needed) {
+			a[needed - 1] = lower_inc + window_s - 1;
+			--needed;
+		}
+		--window_s;
+	}
+
+	for (i = 0; i < num; i++) {
+		printf("%u\n", a[i]);
+	}
 
 	return 0;
 }
