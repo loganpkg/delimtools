@@ -16,6 +16,7 @@
 
 /*
  * uniqrand - unique uniformly distributed random numbers in a random order
+ * $ cc -ansi -O2 -g -Wall -Wextra -pedantic -o uniqrand uniqrand.c -lbsd
  */
 
 #include <bsd/stdlib.h>
@@ -52,6 +53,11 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if (!num || upper_exc <= lower_inc || num > upper_exc - lower_inc) {
+		LOG("invalid input");
+		return 1;
+	}
+
 	if ((a = calloc(num, sizeof(u_int32_t))) == NULL) {
 		LOG("calloc failed");
 		return 1;
@@ -81,8 +87,12 @@ int main(int argc, char **argv)
 		--i;
 	}
 
+	/* Print results */
 	for (i = 0; i < num; i++)
 		printf("%u,%u\n", i, a[i]);
+
+	free(a);
+	a = NULL;
 
 	return 0;
 }
