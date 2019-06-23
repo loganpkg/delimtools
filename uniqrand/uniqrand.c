@@ -25,7 +25,7 @@
 
 int main(int argc, char **argv)
 {
-	u_int32_t lower_inc, upper_exc, num, needed, window_s, i;
+	u_int32_t lower_inc, upper_exc, num, needed, window_s, i, j, temp;
 	const char *error_str = NULL;
 	u_int32_t *a = NULL;
 
@@ -57,9 +57,9 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	/* unique uniformly distributed random numbers */
 	needed = num;
 	window_s = upper_exc - lower_inc;
-
 	while (window_s) {
 		if (arc4random_uniform(window_s) < needed) {
 			a[needed - 1] = lower_inc + window_s - 1;
@@ -68,9 +68,21 @@ int main(int argc, char **argv)
 		--window_s;
 	}
 
-	for (i = 0; i < num; i++) {
-		printf("%u\n", a[i]);
+	/* Random shuffle */
+	i = num - 1;
+	while (i) {
+		j = arc4random_uniform(i + 1);
+
+		/* Swap */
+		temp = a[i];
+		a[i] = a[j];
+		a[j] = temp;
+
+		--i;
 	}
+
+	for (i = 0; i < num; i++)
+		printf("%u,%u\n", i, a[i]);
 
 	return 0;
 }
