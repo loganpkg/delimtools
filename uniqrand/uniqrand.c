@@ -35,19 +35,23 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	lower_inc = strtonum(argv[1], 0, UINT32_MAX - 1, &error_str);
+	lower_inc = strtonum(argv[1], 0, UINT32_MAX, &error_str);
 	if (error_str != NULL) {
 		LOG("strtonum failed");
 		return 1;
 	}
 
-	upper_exc = strtonum(argv[2], 0, UINT32_MAX - 1, &error_str);
+	upper_exc = strtonum(argv[2], 0, UINT32_MAX, &error_str);
 	if (error_str != NULL) {
 		LOG("strtonum failed");
 		return 1;
 	}
 
-	num = strtonum(argv[3], 0, UINT32_MAX - 1, &error_str);
+	num =
+	    strtonum(argv[3], 0,
+		     UINT32_MAX >
+		     SIZE_MAX / sizeof(u_int32_t) ? SIZE_MAX /
+		     sizeof(u_int32_t) : UINT32_MAX, &error_str);
 	if (error_str != NULL) {
 		LOG("strtonum failed");
 		return 1;
@@ -55,11 +59,6 @@ int main(int argc, char **argv)
 
 	if (!num || upper_exc <= lower_inc || num > upper_exc - lower_inc) {
 		LOG("invalid input");
-		return 1;
-	}
-
-	if (UINT32_MAX > SIZE_MAX / sizeof(u_int32_t)) {
-		LOG("integer overflow");
 		return 1;
 	}
 
