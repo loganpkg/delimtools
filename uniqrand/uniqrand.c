@@ -47,11 +47,11 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	num =
-	    strtonum(argv[3], 0,
-		     UINT32_MAX >
-		     SIZE_MAX / sizeof(u_int32_t) ? SIZE_MAX /
-		     sizeof(u_int32_t) : UINT32_MAX, &error_str);
+	num = strtonum(argv[3], 0,
+		     UINT32_MAX > SIZE_MAX / sizeof(u_int32_t) ?
+		       SIZE_MAX / sizeof(u_int32_t) : UINT32_MAX,
+		       &error_str);
+
 	if (error_str != NULL) {
 		LOG("strtonum failed");
 		return 1;
@@ -67,7 +67,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	/* unique uniformly distributed random numbers */
+	/* Unique uniformly distributed random numbers */
 	needed = num;
 	window_s = upper_exc - lower_inc;
 	while (window_s) {
