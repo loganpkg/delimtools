@@ -124,7 +124,7 @@ int safeadd(size_t * res, int num_args, ...)
 	return 0;
 }
 
-struct buf *initbuf(void)
+struct buf *initbuf(size_t will_use)
 {
 	struct buf *b = NULL;
 	size_t s;
@@ -134,7 +134,7 @@ struct buf *initbuf(void)
 		return NULL;
 	}
 
-	if (safeadd(&s, 2, GAP, 1)) {
+	if (safeadd(&s, 3, GAP, 1, will_use)) {
 		LOG("safeadd failed");
 		return NULL;
 	}
@@ -146,7 +146,7 @@ struct buf *initbuf(void)
 	}
 
 	b->g = b->a;
-	*(b->c = b->a + GAP) = '~';
+	*(b->c = b->a + s - 1) = '~';
 	b->d = b->a;
 	b->s = s;
 
@@ -566,8 +566,8 @@ int filesize(size_t * fs, char *fn)
 {
 	struct stat st;
 
-	if (fn == NULL) {
-		LOG("NULL filename");
+	if (fn == NULL || !strlen(fn)) {
+		LOG("empty filename");
 		return -1;
 	}
 
@@ -577,12 +577,12 @@ int filesize(size_t * fs, char *fn)
 	}
 
 	if (!S_ISREG(st.st_mode)) {
-		LOG("Not regular file");
+		LOG("not regular file");
 		return -1;
 	}
 
 	if (st.st_size < 0) {
-		LOG("Negative file size");
+		LOG("negative file size");
 		return -1;
 	}
 
@@ -1212,7 +1212,7 @@ struct ed *inited(void)
 		return NULL;
 	}
 
-	if ((e->cl = initbuf()) == NULL) {
+	if ((e->cl = initbuf(0)) == NULL) {
 		free(e);
 		e = NULL;
 		return NULL;
@@ -1292,11 +1292,24 @@ int setfilename(struct buf *b, char *filename)
 
 int newbuf(struct ed *e, char *filename)
 {
+	size_t fs = 0;
+	int load_file = 0;
 	struct buf *new_buf = NULL;
 	struct buf **new_t = NULL;
-	size_t new_s, req_mem;
+	size_t new_s;
 
-	if ((new_buf = initbuf()) == NULL) {
+	if (filename != NULL && strlen(filename)) {
+		if (!access(filename, F_OK)) {
+			if (filesize(&fs, filename)) {
+				LOG("filesize failed");
+				return -1;
+			}
+			if (fs)
+				load_file = 1;
+		}
+	}
+
+	if ((new_buf = initbuf(fs)) == NULL) {
 		LOG("initbuf failed");
 		return -1;
 	}
@@ -1305,6 +1318,17 @@ int newbuf(struct ed *e, char *filename)
 		LOG("setfilename failed");
 		freebuf(new_buf);
 		return -1;
+	}
+
+	if (load_file) {
+		if (insertfile(new_buf, filename)) {
+			LOG("insertfile failed");
+			freebuf(new_buf);
+			return -1;
+		}
+
+		/* Existing file read so clear modification indicator */
+		new_buf->mod = 0;
 	}
 
 	if (safeadd(&new_s, 2, e->s, 1)) {
@@ -1318,9 +1342,8 @@ int newbuf(struct ed *e, char *filename)
 		freebuf(new_buf);
 		return -1;
 	}
-	req_mem = new_s * sizeof(struct buf *);
 
-	if ((new_t = realloc(e->t, req_mem)) == NULL) {
+	if ((new_t = realloc(e->t, new_s * sizeof(struct buf *))) == NULL) {
 		freebuf(new_buf);
 		return -1;
 	}
@@ -1331,26 +1354,6 @@ int newbuf(struct ed *e, char *filename)
 	/* Set active buffer to new buffer */
 	e->ab = e->s - 1;
 	e->t[e->ab] = new_buf;
-
-	return 0;
-}
-
-int newfile(struct ed *e, char *filename)
-{
-	if (newbuf(e, filename)) {
-		LOG("newbuf failed");
-		return -1;
-	}
-
-	if (!access(filename, F_OK)) {
-		if (insertfile(e->t[e->s - 1], filename)) {
-			LOG("insertfile failed");
-			return -1;
-		}
-
-		/* Existing file read so clear modification indicator */
-		e->t[e->s - 1]->mod = 0;
-	}
 
 	return 0;
 }
@@ -1478,7 +1481,7 @@ void keyn(struct ed *e)
 
 	switch (e->operation) {
 	case Cf:
-		e->in_ret = newfile(e, e->cl_str);
+		e->in_ret = newbuf(e, e->cl_str);
 		break;
 	case Cr:
 		e->in_ret = setfilename(b, e->cl_str);
@@ -1615,8 +1618,8 @@ int main(int argc, char **argv)
 		}
 	} else {
 		for (i = 1; i < argc; ++i) {
-			if (newfile(e, argv[i])) {
-				LOG("newfile failed");
+			if (newbuf(e, argv[i])) {
+				LOG("newbuf failed");
 				freeed(e);
 				return 1;
 			}
