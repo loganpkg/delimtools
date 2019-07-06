@@ -19,7 +19,11 @@
  * $ cc -ansi -O2 -g -Wall -Wextra -pedantic -o uniqrand uniqrand.c -lbsd
  */
 
+/*
 #include <bsd/stdlib.h>
+*/
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
