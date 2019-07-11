@@ -33,8 +33,6 @@
 /* Default gap size */
 #define GAP (BUFSIZ - 1)
 
-#define REGION_COLORS 1
-
 #define Cspc 0
 #define Ca 1
 #define Cb 2
@@ -854,24 +852,6 @@ int initnc(void)
 		goto clean_up;
 	}
 
-	if (has_colors() == FALSE) {
-		LOG("has_colors failed");
-		ret = -1;
-		goto clean_up;
-	}
-
-	if (start_color() == ERR) {
-		LOG("start_color failed");
-		ret = -1;
-		goto clean_up;
-	}
-
-	if (init_pair(REGION_COLORS, COLOR_YELLOW, COLOR_MAGENTA) == ERR) {
-		LOG("init_pair failed");
-		ret = -1;
-		goto clean_up;
-	}
-
  clean_up:
 	if (ret) {
 		if (endwin() == ERR)
@@ -958,7 +938,7 @@ void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx, int cursor_start)
 
 	hl_on = 0;
 	if (b->m_set && b->m < p) {
-		attron(COLOR_PAIR(REGION_COLORS));
+		attron(A_STANDOUT);
 		hl_on = 1;
 	}
 
@@ -966,10 +946,10 @@ void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx, int cursor_start)
 	while (p < b->g) {
 		if (b->m_set && p == b->m) {
 			if (hl_on) {
-				attroff(COLOR_PAIR(REGION_COLORS));
+				attroff(A_STANDOUT);
 				hl_on = 0;
 			} else {
-				attron(COLOR_PAIR(REGION_COLORS));
+				attron(A_STANDOUT);
 				hl_on = 1;
 			}
 		}
@@ -996,11 +976,11 @@ void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx, int cursor_start)
 	*cp_set = 1;
 
 	if (hl_on) {
-		attroff(COLOR_PAIR(REGION_COLORS));
+		attroff(A_STANDOUT);
 		hl_on = 0;
 	}
 	if (b->m_set && b->m > p) {
-		attron(COLOR_PAIR(REGION_COLORS));
+		attron(A_STANDOUT);
 		hl_on = 1;
 	}
 
@@ -1010,10 +990,10 @@ void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx, int cursor_start)
 	while (p <= end_of_buf) {
 		if (b->m_set && p == b->m) {
 			if (hl_on) {
-				attroff(COLOR_PAIR(REGION_COLORS));
+				attroff(A_STANDOUT);
 				hl_on = 0;
 			} else {
-				attron(COLOR_PAIR(REGION_COLORS));
+				attron(A_STANDOUT);
 				hl_on = 1;
 			}
 		}
