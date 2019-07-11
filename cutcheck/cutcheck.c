@@ -37,7 +37,7 @@
 				if (body) { \
 					if (count != first_count) { \
 						fprintf(stderr, \
-							"%s: %s: " \
+							"%s: %s: Error: " \
 						   "Inconsistent delimiter " \
 						     "at line %lu. Expected" \
 						  " %lu `%c' characters but" \
@@ -77,14 +77,17 @@ main(int argc, char **argv)
 		fprintf(stderr, "Usage: %s delimiter file\n", argv[0]);
 		return 1;
 	}
-	if (strlen(argv[1]) != 1) {
+	if (!strcmp(argv[1], "\\t")) {
+		delim = '\t';
+	} else if (strlen(argv[1]) == 1) {
+		delim = argv[1][0];
+	} else {
 		LOG("delimiter must be one character");
 		return 1;
 	}
-	delim = argv[1][0];
 
-	if (!isprint(delim) || delim == ' ') {
-		LOG("delimiter must be a printable non-space character");
+	if (!isprint(delim) && delim != '\t') {
+		LOG("delimiter must be a printable character or tab");
 		return 1;
 	}
 	if ((fp = fopen(argv[2], "r")) == NULL) {
@@ -116,6 +119,10 @@ main(int argc, char **argv)
 		/* Process last paritial chunk */
 		PROCESS();
 	}
+	if (!first_count)
+		fprintf(stderr, "%s: %s: Warning: No delimiter"
+		  "characters `%c' were found.\n", argv[0], argv[2], delim);
+
 clean_up:
 	if (fp != NULL) {
 		if (fclose(fp)) {
