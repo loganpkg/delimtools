@@ -61,6 +61,7 @@
 #define Cy 25
 #define Cz 26
 #define ESC 27
+#define Cqm 127
 
 #define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
 /* size_t addtion overflow test */
@@ -1523,6 +1524,7 @@ void key(struct ed *e)
 		}
 		break;
 	case Ch:
+	case Cqm:
 	case KEY_BACKSPACE:
 		e->in_ret = backspacech(b);
 		break;
