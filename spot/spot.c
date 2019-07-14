@@ -1098,9 +1098,11 @@ int drawscreen(struct ed *e)
 	/* Create status bar */
 	if (snprintf
 	    (sb, sb_s,
-	     "%lu%c%c:%s (%lu) [t:%lu di:%lu gi:%lu ci:%lu s:%lu m_set:%d mi:%lu]",
+	     "%lu%c%c:%s (%lu) %02X "
+	     "[t:%lu di:%lu gi:%lu ci:%lu s:%lu m_set:%d mi:%lu]",
 	     e->ab, b->mod ? '*' : ' ', e->in_ret == -1 ? 'F' : ' ', b->fn,
-	     b->r, b->t, b->d - b->a, b->g - b->a, b->c - b->a, b->s, b->m_set,
+	     b->r, (unsigned char) *b->c,
+	     b->t, b->d - b->a, b->g - b->a, b->c - b->a, b->s, b->m_set,
 	     b->m_set ? b->m - b->a : 0) < 0) {
 		LOG("snprintf failed");
 		free(sb);
