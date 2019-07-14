@@ -29,35 +29,33 @@
 
 #define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
 
-#define PROCESS() do { \
-		for (i = 0; i < num; ++i) { \
-			if (a[i] == delim) \
-				++count; \
-			if (a[i] == '\n') { \
-				if (body) { \
-					if (count != first_count) { \
-						fprintf(stderr, \
-							"%s: %s: Error: " \
-						   "Inconsistent delimiter " \
-						     "at line %lu. Expected" \
-						  " %lu `%c' characters but" \
-							" found %lu.\n", \
-						      argv[0], argv[2], row, \
-							first_count, delim, \
-							count); \
-						ret = 1; \
-						goto clean_up; \
-					} \
-				} else { \
-					first_count = count; \
-					body = 1; \
-				} \
-				++row; \
-				count = 0; \
-			} \
-		} \
+#define COMPARE() do {						\
+	if (count != first_count) {				\
+		fprintf(stderr, "%s:%s:%lu: error: "		\
+		"inconsistent delimiter, "			\
+		"expected %lu, found %lu\n",			\
+		argv[0], argv[2], row, first_count, count);	\
+		ret = 1;					\
+		goto clean_up;					\
+	}							\
 } while (0)
 
+#define PROCESS() do {					\
+	for (i = 0; i < num; ++i) {			\
+		if (a[i] == delim)			\
+			++count;			\
+		if (a[i] == '\n') {			\
+			if (body) {			\
+				COMPARE();		\
+			} else {			\
+				first_count = count;	\
+				body = 1;		\
+			}				\
+			++row;				\
+			count = 0;			\
+		}					\
+	}						\
+} while (0)
 
 int
 main(int argc, char **argv)
@@ -74,7 +72,7 @@ main(int argc, char **argv)
 	size_t 		i;
 
 	if (argc != 3) {
-		fprintf(stderr, "Usage: %s delimiter file\n", argv[0]);
+		fprintf(stderr, "usage: %s delimiter file\n", argv[0]);
 		return 1;
 	}
 	if (!strcmp(argv[1], "\\t")) {
@@ -111,7 +109,7 @@ main(int argc, char **argv)
 		goto clean_up;
 	}
 	if (!feof(fp)) {
-		LOG("End of file not reached");
+		LOG("end of file not reached");
 		ret = 1;
 		goto clean_up;
 	}
@@ -119,9 +117,13 @@ main(int argc, char **argv)
 		/* Process last paritial chunk */
 		PROCESS();
 	}
-	if (!first_count)
-		fprintf(stderr, "%s: %s: Warning: No delimiter"
-		  "characters `%c' were found.\n", argv[0], argv[2], delim);
+	if (a[num - 1] != '\n' && body) {
+		/* File has no final line feed and is not a single line */
+		COMPARE();
+	}
+	if (!count && !first_count)
+		fprintf(stderr, "%s:%s: warning: no delimiter "
+			"characters were found\n", argv[0], argv[2]);
 
 clean_up:
 	if (fp != NULL) {
