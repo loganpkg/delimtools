@@ -24,23 +24,12 @@ contains installation and printing information.
 
 ## Installation
 
-Some operating systems do not have ncurses installed for building.
-In Ubuntu this can be install with:
-
-    $ sudo apt install libncurses5-dev
-
-Clone and build:
+Clone and build. Set `PREFIX` to your installation directory:
 
     $ git clone https://github.com/loganpkg/spot.git
     $ cd spot
     $ make
     $ PREFIX="$HOME" make install
-
-If there is any problem, run `make clean` before trying to build again.
-
-Normally your `.profile` will be configured to add `~/bin` to your `PATH`
-once the directory exists on login. Hence, you may need to logout and login
-for this to take effect.
 
 ## Printing
 
