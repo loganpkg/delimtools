@@ -14,9 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*
- * utf8lib.c
- */
 
 #include <stdint.h>
 #include <stdio.h>

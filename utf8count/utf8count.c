@@ -16,16 +16,15 @@
 
 #define _GNU_SOURCE
 #include <sys/stat.h>
-#include <ctype.h>
-#include <limits.h>
-#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "utf8.h"
 
+#define INIT_BUF_SIZE BUFSIZ
 
-#define INIT_BUF_SIZE 1024
+/* Error message with source file and line number */
+#define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
 
 int main(int argc, char **argv)
 {
@@ -35,23 +34,8 @@ int main(int argc, char **argv)
 	char *buf = NULL;
 	size_t buf_size;
 	ssize_t line_len;
-	size_t *freq = NULL;
-	ssize_t i;
+	size_t *count = NULL;
 	uint32_t j;
-
-	/* Set to the environment locale */
-	if (setlocale(LC_CTYPE, "") == NULL) {
-		LOGERR("setlocale failed");
-		return 1;
-	}
-
-	/* This should be 4 for UTF-8 */
-	if (MB_CUR_MAX != 1 && MB_CUR_MAX != 4) {
-		if (setlocale(LC_CTYPE, "C") == NULL) {
-			LOGERR("setlocale failed");
-			return 1;
-		}
-	}
 
 	if (argc != 1 && argc != 2) {
 		fprintf(stderr, "Usage: %s: [file]\n", argv[0]);
@@ -63,17 +47,17 @@ int main(int argc, char **argv)
 	} else {
 
 		if (stat(argv[1], &st)) {
-			LOGERR("stat failed");
+			LOG("stat failed");
 			return 1;
 		}
 
 		if (!S_ISREG(st.st_mode)) {
-			LOGERR("not a regular file");
+			LOG("not a regular file");
 			return 1;
 		}
 
 		if (st.st_size < 0) {
-			LOGERR("negative file size");
+			LOG("negative file size");
 			return 1;
 		}
 
@@ -82,29 +66,19 @@ int main(int argc, char **argv)
 		}
 
 		if ((fp = fopen(argv[1], "r")) == NULL) {
-			LOGERR("fopen failed");
+			LOG("fopen failed");
 			return 1;
 		}
 	}
 
-	if (MULTOF(NUMCP, sizeof(size_t))) {
-		LOGERR("multiplication overflow");
+	if ((count = calloc(NUMCP, sizeof(size_t))) == NULL) {
+		LOG("calloc failed");
 		ret = 1;
 		goto clean_up;
 	}
 
-	freq = calloc(NUMCP, sizeof(size_t));
-
-	if (freq == NULL) {
-		LOGERR("calloc failed");
-		ret = 1;
-		goto clean_up;
-	}
-
-	buf = malloc(INIT_BUF_SIZE);
-
-	if (buf == NULL) {
-		LOGERR("malloc failed");
+	if ((buf = malloc(INIT_BUF_SIZE)) == NULL) {
+		LOG("malloc failed");
 		ret = 1;
 		goto clean_up;
 	}
@@ -112,64 +86,47 @@ int main(int argc, char **argv)
 	buf_size = INIT_BUF_SIZE;
 
 	while ((line_len = getline(&buf, &buf_size, fp)) > 0) {
-
-		if (MB_CUR_MAX == 4) {
-			if (ufreq(buf, line_len, freq)) {
-				ret = 1;
-				goto clean_up;
-			}
-		} else {
-			for (i = 0; i < line_len; ++i) {
-				++freq[(unsigned char)buf[i]];
-			}
+		if (ufreq(buf, line_len, count)) {
+			ret = 1;
+			goto clean_up;
 		}
 	}
 
-	if (MB_CUR_MAX == 4) {
-		for (j = 0; j < NUMCP; ++j) {
-			if (freq[j]) {
-				printf("%u\t", j);
+	for (j = 0; j < NUMCP; ++j) {
+		if (count[j]) {
+			printf("%u\t", j);
 
-				if (j == 9) {
-					printf("\\t");
-				} else if (j == 10) {
-					printf("\\n");
-				} else if (uprintcp(j)) {
+			switch (j) {
+			case 9:
+				printf("\\t");
+				break;
+			case 10:
+				printf("\\n");
+				break;
+			case 13:
+				printf("\\r");
+				break;
+			default:
+				if (uprintcp(j)) {
 					ret = 1;
 					goto clean_up;
 				}
-
-				printf("\t%lu\n", freq[j]);
 			}
-		}
-	} else {
-		for (j = 0; j <= UCHAR_MAX; ++j) {
-			if (freq[j]) {
-				printf("%u\t", j);
 
-				if (j == 9) {
-					printf("\\t");
-				} else if (j == 10) {
-					printf("\\n");
-				} else {
-					printf("%c", (char)j);
-				}
-
-				printf("\t%lu\n", freq[j]);
-			}
+			printf("\t%lu\n", count[j]);
 		}
 	}
 
  clean_up:
 	if (fp != NULL && fp != stdin) {
 		if (fclose(fp)) {
-			LOGERR("fclose failed");
+			LOG("fclose failed");
 			ret = 1;
 		}
 	}
 
-	if (freq != NULL) {
-		free(freq);
+	if (count != NULL) {
+		free(count);
 	}
 
 	if (buf != NULL) {

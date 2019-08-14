@@ -14,24 +14,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*
- * utf8lib.h
- */
 
-#ifndef UTF8LIB_H_
-#define UTF8LIB_H_
+#ifndef UTF8_H_
+#define UTF8_H_
 
 #include <stdint.h>
-
-/* Error message with source file and line number */
-#define LOGERR(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
-
-/* size_t addtion overflow test */
-#define ADDOF(a, b) ((a) > SIZE_MAX - (b))
-
-/* size_t multiplication overflow test */
-#define MULTOF(a, b) ((a) && (b) > SIZE_MAX / (a))
-
 
 #define ISASCII(u) ((u) < 0x80)
 
