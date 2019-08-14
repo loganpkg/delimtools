@@ -14,9 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <stdint.h>
 #include <stdio.h>
-
 #include "utf8.h"
 
 int ufreq(char *line, size_t len, size_t * cp_freq)
