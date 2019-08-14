@@ -22,28 +22,13 @@ RM = rm -f
 cp = cp
 mkdir = mkdir -p
 
-all: delim delf freq
-
-delim: delim.c
-	${CC} ${CFLAGS} -o delim delim.c
-
-delf: delf.c
-	${CC} ${CFLAGS} -o delf delf.c utf8.c
-
-freq: freq.c
-	${CC} ${CFLAGS} -o freq freq.c utf8.c
+utf8count: utf8count.c utf8.c utf8.h
+	${CC} ${CFLAGS} -o utf8count utf8count.c utf8.c
 
 .PHONY: clean
 clean:
-	${RM} delim delf freq
+	${RM} utf8count
 
 .PHONY: install
 install:
 	${mkdir} ${PREFIX}/bin
-	${mkdir} ${PREFIX}/man/man1
-	${cp} delim ${PREFIX}/bin/
-	${cp} delf ${PREFIX}/bin/
-	${cp} freq ${PREFIX}/bin/
-	${cp} delim.1 ${PREFIX}/man/man1/
-	${cp} delf.1 ${PREFIX}/man/man1/
-	${cp} freq.1 ${PREFIX}/man/man1/
