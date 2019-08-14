@@ -15,7 +15,6 @@
  */
 
 #define _GNU_SOURCE
-#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,7 +29,6 @@ int main(int argc, char **argv)
 {
 	int ret = 0;
 	FILE *fp = NULL;
-	struct stat st;
 	char *buf = NULL;
 	size_t buf_size;
 	ssize_t line_len;
@@ -45,26 +43,6 @@ int main(int argc, char **argv)
 	if (argc == 1 || !strcmp(argv[1], "-")) {
 		fp = stdin;
 	} else {
-
-		if (stat(argv[1], &st)) {
-			LOG("stat failed");
-			return 1;
-		}
-
-		if (!S_ISREG(st.st_mode)) {
-			LOG("not a regular file");
-			return 1;
-		}
-
-		if (st.st_size < 0) {
-			LOG("negative file size");
-			return 1;
-		}
-
-		if (st.st_size == 0) {
-			return 1;
-		}
-
 		if ((fp = fopen(argv[1], "r")) == NULL) {
 			LOG("fopen failed");
 			return 1;
