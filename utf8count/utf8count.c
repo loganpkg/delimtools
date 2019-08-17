@@ -40,7 +40,7 @@ int main(int argc, char **argv)
 	char utf8chstr[5] = {0};
 
 	if (argc != 1 && argc != 2) {
-		fprintf(stderr, "Usage: %s: [file]\n", argv[0]);
+		fprintf(stderr, "usage: %s: [file]\n", argv[0]);
 		return 1;
 	}
 
@@ -69,7 +69,7 @@ int main(int argc, char **argv)
 
 	while ((line_len = getline(&buf, &buf_size, fp)) > 0) {
 		if (ucount(buf, line_len, count)) {
-			LOG("Invalid UTF-8 encountered");
+			LOG("invalid UTF-8 encountered");
 			ret = 1;
 			goto clean_up;
 		}
