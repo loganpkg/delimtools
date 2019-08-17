@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* utf8count -- counts UTF8 characters */
+/* utf8count -- counts UTF-8 characters */
 
 #define _GNU_SOURCE
 #include <ctype.h>
@@ -69,6 +69,7 @@ int main(int argc, char **argv)
 
 	while ((line_len = getline(&buf, &buf_size, fp)) > 0) {
 		if (ucount(buf, line_len, count)) {
+			LOG("Invalid UTF-8 encountered");
 			ret = 1;
 			goto clean_up;
 		}
@@ -95,13 +96,11 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (count != NULL) {
+	if (count != NULL)
 		free(count);
-	}
 
-	if (buf != NULL) {
+	if (buf != NULL)
 		free(buf);
-	}
 
 	return ret;
 }

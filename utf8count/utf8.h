@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* UTF8 header */
+/* UTF-8 header */
 
 #ifndef UTF8_H_
 #define UTF8_H_
