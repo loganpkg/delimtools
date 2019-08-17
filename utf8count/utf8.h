@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/* UTF8 header */
+
 #ifndef UTF8_H_
 #define UTF8_H_
 
@@ -36,7 +38,7 @@
 #define ISSIZE3(cp) ((cp) >= 0x800 && (cp) < 0x10000)
 #define ISSIZE4(cp) ((cp) >= 0x10000 && (cp) < NUMCP)
 
-int ufreq(char *line, size_t len, size_t * cp_freq);
-int uprintcp(uint32_t cp);
+int ucount(char *line, size_t len, size_t * cp_count);
+int ucptostr(uint32_t cp, char *utf8chstr);
 
 #endif

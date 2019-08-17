@@ -14,7 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/* utf8count -- counts UTF8 characters */
+
 #define _GNU_SOURCE
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,6 +37,7 @@ int main(int argc, char **argv)
 	ssize_t line_len;
 	size_t *count = NULL;
 	uint32_t j;
+	char utf8chstr[5] = {0};
 
 	if (argc != 1 && argc != 2) {
 		fprintf(stderr, "Usage: %s: [file]\n", argv[0]);
@@ -64,7 +68,7 @@ int main(int argc, char **argv)
 	buf_size = INIT_BUF_SIZE;
 
 	while ((line_len = getline(&buf, &buf_size, fp)) > 0) {
-		if (ufreq(buf, line_len, count)) {
+		if (ucount(buf, line_len, count)) {
 			ret = 1;
 			goto clean_up;
 		}
@@ -72,26 +76,14 @@ int main(int argc, char **argv)
 
 	for (j = 0; j < NUMCP; ++j) {
 		if (count[j]) {
-			printf("%u\t", j);
-
-			switch (j) {
-			case 9:
-				printf("\\t");
-				break;
-			case 10:
-				printf("\\n");
-				break;
-			case 13:
-				printf("\\r");
-				break;
-			default:
-				if (uprintcp(j)) {
-					ret = 1;
-					goto clean_up;
-				}
+			if (ucptostr(j, utf8chstr)) {
+				ret = 1;
+				goto clean_up;
 			}
-
-			printf("\t%lu\n", count[j]);
+			if (iscntrl(utf8chstr[0]))
+				printf("%u\t%02X\t%lu\n", j, utf8chstr[0], count[j]);
+			else
+				printf("%u\t%s\t%lu\n", j, utf8chstr, count[j]);
 		}
 	}
 
