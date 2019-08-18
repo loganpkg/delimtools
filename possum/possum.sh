@@ -16,7 +16,8 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-# possum -- stores pictures and movies based on their creation date
+# possum -- stores pictures and movies based on their creation date.
+# For my loving esposinha with her beautiful possum eyes.
 
 set -e
 
