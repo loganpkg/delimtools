@@ -28,9 +28,14 @@ fi
 searchdir="$1"
 storedir="$2"
 
-# rename and move files
+# rename and move files with exif date
 exiftool -r '-FileName<CreateDate' \
 -d "$storedir"'/%Y/%m/%Y_%m_%d_%H_%M_%S%%-c.%%ue' \
+-ext jpg -ext mov -ext mp4 "$searchdir"
+
+# rename and move files without exif date
+exiftool -r '-FileName<FileModifyDate' \
+-d "$storedir"'/noexifdate/%Y_%m_%d_%H_%M_%S%%-c.%%ue' \
 -ext jpg -ext mov -ext mp4 "$searchdir"
 
 # delete junk files
