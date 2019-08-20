@@ -47,4 +47,4 @@ find "$searchdir" \
 find "$searchdir" -type d -empty -delete
 
 # remove duplicates
-fdupes -rdN "$storedir"
+jdupes --recurse --delete --noprompt "$storedir"
