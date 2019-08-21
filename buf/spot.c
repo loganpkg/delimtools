@@ -342,12 +342,12 @@ void last(struct buf *b)
 	}
 }
 
-void up(struct buf *b)
+int up(struct buf *b)
 {
 	size_t count;
 
 	if (!b->r)
-		return;
+		return -1;
 
 	count = home(b);
 
@@ -356,7 +356,7 @@ void up(struct buf *b)
 	home(b);
 
 	if (*b->c == '\n')
-		return;
+		return *b->c;
 
 	while (count) {
 		if (rightch(b) == '\n')
@@ -364,9 +364,10 @@ void up(struct buf *b)
 
 		--count;
 	}
+	return *b->c;
 }
 
-void down(struct buf *b)
+int down(struct buf *b)
 {
 	size_t count;
 	int x;
@@ -377,10 +378,11 @@ void down(struct buf *b)
 
 	if (rightch(b) == -1) {
 		home(b);
+		return -1;
 	}
 
 	if (*b->c == '\n')
-		return;
+		return *b->c;
 
 	while (count) {
 		x = rightch(b);
@@ -389,6 +391,7 @@ void down(struct buf *b)
 
 		--count;
 	}
+	return *b->c;
 }
 
 int search(struct buf *b, char *str)
@@ -1101,7 +1104,7 @@ int drawscreen(struct ed *e)
 	     "%lu%c%c:%s (%lu) %02X "
 	     "[t:%lu di:%lu gi:%lu ci:%lu s:%lu m_set:%d mi:%lu]",
 	     e->ab, b->mod ? '*' : ' ', e->in_ret == -1 ? 'F' : ' ', b->fn,
-	     b->r, (unsigned char) *b->c,
+	     b->r, (unsigned char)*b->c,
 	     b->t, b->d - b->a, b->g - b->a, b->c - b->a, b->s, b->m_set,
 	     b->m_set ? b->m - b->a : 0) < 0) {
 		LOG("snprintf failed");
@@ -1538,11 +1541,11 @@ void key(struct ed *e)
 		break;
 	case Cn:
 	case KEY_DOWN:
-		down(b);
+		e->in_ret = down(b);
 		break;
 	case Cp:
 	case KEY_UP:
-		up(b);
+		e->in_ret = up(b);
 		break;
 	case Cq:
 		e->in_ret = inserthex(b);
