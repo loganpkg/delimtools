@@ -394,6 +394,34 @@ int down(struct buf *b)
 	return *b->c;
 }
 
+void pageup(struct buf *b)
+{
+	int h, th;
+	h = getmaxy(stdscr);
+	if (h < 3)
+		return;
+
+	/* Height of text portion of the screen */
+	th = h - 2;
+
+	while (th && up(b) != -1)
+		--th;
+}
+
+void pagedown(struct buf *b)
+{
+	int h, th;
+	h = getmaxy(stdscr);
+	if (h < 3)
+		return;
+
+	/* Height of text portion of the screen */
+	th = h - 2;
+
+	while (th && down(b) != -1)
+		--th;
+}
+
 int search(struct buf *b, char *str)
 {
 	char *p = NULL;
@@ -1432,6 +1460,9 @@ void keyesc(struct ed *e)
 	case 't':
 		trimwhitespace(b);
 		break;
+	case 'v':
+		pageup(b);
+		break;
 	case 'w':
 		e->in_ret = killregion(b, &e->k, &e->ks, &e->kn, 0);
 		break;
@@ -1556,6 +1587,13 @@ void key(struct ed *e)
 		break;
 	case Cu:
 		e->in_ret = uproot(b, &e->k, &e->ks, &e->kn);
+		break;
+	case Cv:
+	case KEY_NPAGE:
+		pagedown(b);
+		break;
+	case KEY_PPAGE:
+		pageup(b);
 		break;
 	case Cw:
 		e->in_ret = killregion(b, &e->k, &e->ks, &e->kn, 1);
