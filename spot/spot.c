@@ -337,7 +337,7 @@ int drawscreen(struct ed *e)
 	}
 
 	/* If need to centre */
-	if (b->v || b->r < b->t || b->r >= b->t + th || CI(b) < b->d || b->d - CI(b) > th * w)
+	if (b->v || b->r < b->t || b->r >= b->t + th || CI(b) < b->d || b->d - CI(b) > (size_t)(th * w))
 		centre(b, th);
 
 	/* 1st attempt: from t line */
@@ -386,7 +386,7 @@ int drawscreen(struct ed *e)
 	/* Create status bar */
 	if (snprintf
 	    (sb, sb_s,
-	     "%lu%c%c:%s (%lu) %02X"
+	     "%lu%c%c:%s (%lu) %02X",
 	     e->ab, b->mod ? '*' : ' ', e->in_ret == -1 ? 'F' : ' ', b->fn,
 	     b->r, (unsigned char)*b->c) < 0) {
 		LOG("snprintf failed");
