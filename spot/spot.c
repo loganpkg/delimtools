@@ -77,7 +77,6 @@ struct ed {
 	int running;		/* Editor is running */
 };
 
-
 void pageup(struct buf *b)
 {
 	int h, th;
@@ -105,7 +104,6 @@ void pagedown(struct buf *b)
 	while (th && down(b) != -1)
 		--th;
 }
-
 
 int hexnum(int *h, int x)
 {
@@ -244,25 +242,26 @@ void centre(struct buf *b, int th)
 
 void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx, int cursor_start)
 {
-	char *p, *end_of_buf;
+	size_t i;
+	char ch;
 	int hl_on;		/* If region highlighting is on */
 
 	if (cursor_start)
-		p = b->g;
+		i = CI(b);
 	else
-		p = b->d;
+		i = b->d;
 
 	*cp_set = 0;
 
 	hl_on = 0;
-	if (b->m_set && b->m < p) {
+	if (b->m_set && b->m < i) {
 		attron(A_STANDOUT);
 		hl_on = 1;
 	}
 
-	/* Before the gap */
-	while (p < b->g) {
-		if (b->m_set && p == b->m) {
+	while (i <= EI(b)) {
+		/* Highlighting */
+		if (b->m_set && i == b->m) {
 			if (hl_on) {
 				attroff(A_STANDOUT);
 				hl_on = 0;
@@ -271,10 +270,26 @@ void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx, int cursor_start)
 				hl_on = 1;
 			}
 		}
+		if (i == CI(b)) {
+			/* Record cursor screen position */
+			getyx(stdscr, *cy, *cx);
+			*cp_set = 1;
 
-		if (isprint(*p) || *p == '\t' || *p == '\n') {
+			if (hl_on) {
+				attroff(A_STANDOUT);
+				hl_on = 0;
+			}
+			if (b->m_set && b->m > i) {
+				attron(A_STANDOUT);
+				hl_on = 1;
+			}
+		}
+
+		/* Print character */
+		ch = READ(b, i);
+		if (isprint(ch) || ch == '\t' || ch == '\n') {
 			/* If printing is off screen */
-			if (addch(*p) == ERR) {
+			if (addch(ch) == ERR) {
 				return;
 			}
 		} else {
@@ -286,51 +301,7 @@ void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx, int cursor_start)
 				return;
 			}
 		}
-		++p;
-	}
-
-	/* In the gap: record cursor screen position */
-	getyx(stdscr, *cy, *cx);
-	*cp_set = 1;
-
-	if (hl_on) {
-		attroff(A_STANDOUT);
-		hl_on = 0;
-	}
-	if (b->m_set && b->m > p) {
-		attron(A_STANDOUT);
-		hl_on = 1;
-	}
-
-	/* After the gap */
-	p = b->c;
-	end_of_buf = b->a + b->s - 1;
-	while (p <= end_of_buf) {
-		if (b->m_set && p == b->m) {
-			if (hl_on) {
-				attroff(A_STANDOUT);
-				hl_on = 0;
-			} else {
-				attron(A_STANDOUT);
-				hl_on = 1;
-			}
-		}
-
-		if (isprint(*p) || *p == '\t' || *p == '\n') {
-			/* If printing is off screen */
-			if (addch(*p) == ERR) {
-				return;
-			}
-		} else {
-			/*
-			 * Unprintable character.
-			 * If printing is off screen.
-			 */
-			if (addch('?') == ERR) {
-				return;
-			}
-		}
-		++p;
+		++i;
 	}
 }
 
