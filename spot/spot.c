@@ -216,17 +216,17 @@ void centre(struct buf *b, int th)
 		b->t = b->r - t_zero_range;
 	}
 
-	if (!b->t || b->g == b->a) {
-		b->d = b->a;
+	if (!b->t || !CI(b)) {
+	  b->d = 0;
 		b->v = 0;
 		return;
 	}
 
 	/* Search backwards to find the start of row t */
-	b->d = b->g - 1;
+	b->d = CI(b) - 1;
 	row = b->r;
-	while (b->d != b->a) {
-		if (*b->d == '\n') {
+	while (b->d) {
+	  if (READ(b, b->d) == '\n') {
 			--row;
 			if (row == b->t - 1) {
 				++b->d;
@@ -337,7 +337,7 @@ int drawscreen(struct ed *e)
 	}
 
 	/* If need to centre */
-	if (b->v || b->r < b->t || b->r >= b->t + th || b->g - b->d > th * w)
+	if (b->v || b->r < b->t || b->r >= b->t + th || CI(b) < b->d || b->d - CI(b) > th * w)
 		centre(b, th);
 
 	/* 1st attempt: from t line */
@@ -386,12 +386,9 @@ int drawscreen(struct ed *e)
 	/* Create status bar */
 	if (snprintf
 	    (sb, sb_s,
-	     "%lu%c%c:%s (%lu) %02X "
-	     "[t:%lu di:%lu gi:%lu ci:%lu s:%lu m_set:%d mi:%lu]",
+	     "%lu%c%c:%s (%lu) %02X"
 	     e->ab, b->mod ? '*' : ' ', e->in_ret == -1 ? 'F' : ' ', b->fn,
-	     b->r, (unsigned char)*b->c,
-	     b->t, b->d - b->a, b->g - b->a, b->c - b->a, b->s, b->m_set,
-	     b->m_set ? b->m - b->a : 0) < 0) {
+	     b->r, (unsigned char)*b->c) < 0) {
 		LOG("snprintf failed");
 		free(sb);
 		sb = NULL;
