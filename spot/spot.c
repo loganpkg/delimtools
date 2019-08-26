@@ -1001,7 +1001,11 @@ void centre(struct buf *b, int th)
 		return;
 	}
 
-	/* Search backwards to find the start of row t */
+	/*
+	 * Set draw start index by
+	 * searching backwards to find the start of row t.
+	 * CI was checked for zero above.
+	 */
 	b->d = CI(b) - 1;
 	row = b->r;
 	while (b->d) {
@@ -1115,7 +1119,14 @@ int drawscreen(struct ed *e)
 		return -1;
 	}
 
-	/* If need to centre */
+	/*
+	 * Test if need to centre.
+	 * The draw start index will eventually be set so that the
+	 * cursor is on the screen before editing resumes.
+	 * Hence, draw start is always less than or equal to the cursor index.
+	 * This is why draw start does not need to be updated by inserts
+	 * and deletes, as they cannot happen before it.
+	 */
 	if (b->v ||
 	    b->r < b->t ||
 	    b->r >= b->t + th ||
