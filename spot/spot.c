@@ -34,11 +34,19 @@
 /* Default gap size */
 #define GAP (BUFSIZ - 1)
 
-/* Index to pointer */
-#define ITOP(b, i)   (i < (size_t) (b->g - b->a) ? b->a + i : b->c + i - (b->g - b->a))
-/* Pointer to index */
-#define PTOI(b, p)   (p < b->g ? p - b->a : p - b->a - (b->c - b->g))
+/* Error message */
+#define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
+/* size_t addtion overflow test */
+#define ADDOF(a, b)  ((a) > SIZE_MAX - (b))
+/* size_t multiplication overflow test */
+#define MULTOF(a, b) ((a) && (b) > SIZE_MAX / (a))
 
+/* Index to pointer */
+#define ITOP(b, i) (i < (size_t) (b->g - b->a) ? b->a + i : b->c + i - (b->g - b->a))
+/* Pointer to index */
+#define PTOI(b, p) (p < b->g ? p - b->a : p - b->a - (b->c - b->g))
+
+/* Buffer */
 struct buf {
 	char *fn;		/* Filename */
 	char *a;		/* Array */
@@ -66,13 +74,6 @@ struct buf {
  *                                            CI             EI
  */
 
-/* Error message */
-#define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
-/* size_t addtion overflow test */
-#define ADDOF(a, b)  ((a) > SIZE_MAX - (b))
-/* size_t multiplication overflow test */
-#define MULTOF(a, b) ((a) && (b) > SIZE_MAX / (a))
-
 /* Read a character */
 #define READ(b, i) (*ITOP(b, i))
 /* Cursor index */
@@ -80,6 +81,7 @@ struct buf {
 /* End index */
 #define EI(b) (b->s - 1 - (b->c - b->g))
 
+/* Control characters */
 #define Cspc 0
 #define Ca 1
 #define Cb 2
@@ -110,6 +112,7 @@ struct buf {
 #define ESC 27
 #define Cqm 127
 
+/* Editor */
 struct ed {
 	struct buf **t;		/* Array of text buffers */
 	size_t s;		/* Size of the text buffer array */
@@ -1100,10 +1103,13 @@ int drawscreen(struct ed *e)
 	}
 
 	/* If need to centre */
-	/*      if (b->v || b->r < b->t || b->r >= b->t + th || CI(b) < b->d || b->d - CI(b) > (size_t)(th * w))
+	if (b->v ||
+	    b->r < b->t ||
+	    b->r >= b->t + th ||
+	    CI(b) < b->d ||
+	    CI(b) - b->d > (size_t)(th * w))
 	   centre(b, th);
-	 */
-
+	
 	/* 1st attempt: from t line */
 	if (erase() == ERR) {
 		LOG("erase failed");
@@ -1149,10 +1155,10 @@ int drawscreen(struct ed *e)
 
 	/* Create status bar */
 	if (snprintf(sb, sb_s,
-		     "%lu%c%c:%s (%lu) %02X [g:%lu, c:%lu, s:%lu, CI:%lu, m:%lu, d:%lu]",
+		     "%lu%c%c:%s (%lu) %02X [g:%lu, c:%lu, s:%lu, CI:%lu, mset:%d, m:%lu, d:%lu, t:%lu, v:%d]",
 		     e->ab, b->mod ? '*' : ' ', e->in_ret == -1 ? 'F' : ' ',
 		     b->fn, b->r, (unsigned char)*b->c, (size_t) (b->g - b->a),
-		     (size_t) (b->c - b->a), b->s, CI(b), b->m, b->d) < 0) {
+		     (size_t) (b->c - b->a), b->s, CI(b), b->m_set, b->m, b->d, b->t, b->v) < 0) {
 		LOG("snprintf failed");
 		free(sb);
 		sb = NULL;
