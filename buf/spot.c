@@ -768,7 +768,10 @@ void trimwhitespace(struct buf *b)
 	int x;
 	int line_feed;
 	int end_of_line;
+	size_t loc_index;
+	size_t del_count = 0;
 
+	loc_index = CI(b);
 	last(b);
 
 	/* Trim end of buffer */
@@ -779,9 +782,11 @@ void trimwhitespace(struct buf *b)
 				line_feed = 1;
 			} else {
 				deletech(b);
+				if (CI(b) <= loc_index) ++del_count;
 			}
 		} else if (x == ' ' || x == '\t') {
 			deletech(b);
+			if (CI(b) <= loc_index) ++del_count;
 		} else {
 			break;
 		}
@@ -798,11 +803,19 @@ void trimwhitespace(struct buf *b)
 		case '\t':
 			if (end_of_line) {
 				deletech(b);
+				if(CI(b) <= loc_index) ++del_count;
 			}
 			break;
 		default:
 			end_of_line = 0;
 		}
+	}
+
+	/* Move back to original location */
+	loc_index -= del_count;
+
+	while(rightch(b) != -1) {
+	  if (CI(b) == loc_index) break;
 	}
 }
 
@@ -1109,7 +1122,7 @@ int drawscreen(struct ed *e)
 	    CI(b) < b->d ||
 	    CI(b) - b->d > (size_t)(th * w))
 	   centre(b, th);
-	
+
 	/* 1st attempt: from t line */
 	if (erase() == ERR) {
 		LOG("erase failed");
