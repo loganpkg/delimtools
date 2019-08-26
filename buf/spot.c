@@ -782,11 +782,13 @@ void trimwhitespace(struct buf *b)
 				line_feed = 1;
 			} else {
 				deletech(b);
-				if (CI(b) <= loc_index) ++del_count;
+				if (CI(b) <= loc_index)
+					++del_count;
 			}
 		} else if (x == ' ' || x == '\t') {
 			deletech(b);
-			if (CI(b) <= loc_index) ++del_count;
+			if (CI(b) <= loc_index)
+				++del_count;
 		} else {
 			break;
 		}
@@ -803,7 +805,8 @@ void trimwhitespace(struct buf *b)
 		case '\t':
 			if (end_of_line) {
 				deletech(b);
-				if(CI(b) <= loc_index) ++del_count;
+				if (CI(b) <= loc_index)
+					++del_count;
 			}
 			break;
 		default:
@@ -814,8 +817,9 @@ void trimwhitespace(struct buf *b)
 	/* Move back to original location */
 	loc_index -= del_count;
 
-	while(rightch(b) != -1) {
-	  if (CI(b) == loc_index) break;
+	while (rightch(b) != -1) {
+		if (CI(b) == loc_index)
+			break;
 	}
 }
 
@@ -1130,9 +1134,8 @@ int drawscreen(struct ed *e)
 	if (b->v ||
 	    b->r < b->t ||
 	    b->r >= b->t + th ||
-	    CI(b) < b->d ||
-	    CI(b) - b->d > (size_t)(th * w))
-	   centre(b, th);
+	    CI(b) < b->d || CI(b) - b->d > (size_t) (th * w))
+		centre(b, th);
 
 	/* 1st attempt: from t line */
 	if (erase() == ERR) {
@@ -1182,7 +1185,8 @@ int drawscreen(struct ed *e)
 		     "%lu%c%c:%s (%lu) %02X [g:%lu, c:%lu, s:%lu, CI:%lu, mset:%d, m:%lu, d:%lu, t:%lu, v:%d]",
 		     e->ab, b->mod ? '*' : ' ', e->in_ret == -1 ? 'F' : ' ',
 		     b->fn, b->r, (unsigned char)*b->c, (size_t) (b->g - b->a),
-		     (size_t) (b->c - b->a), b->s, CI(b), b->m_set, b->m, b->d, b->t, b->v) < 0) {
+		     (size_t) (b->c - b->a), b->s, CI(b), b->m_set, b->m, b->d,
+		     b->t, b->v) < 0) {
 		LOG("snprintf failed");
 		free(sb);
 		sb = NULL;
