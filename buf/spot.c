@@ -1035,6 +1035,12 @@ void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx, int cursor_start)
 	char ch;
 	int hl_on;		/* If region highlighting is on */
 
+	/*
+	 * The graphics do not rely on the gap buffer structure,
+	 * so that the buffer method could be changed without
+	 * rewriting the graphics.
+	 */
+
 	if (cursor_start)
 		i = CI(b);
 	else
