@@ -16,7 +16,7 @@
 
 
 CC = cc
-CFLAGS = -ansi -O2 -g -Wall -Wextra -pedantic
+CFLAGS = -ansi -g -Wall -Wextra -pedantic
 RM = rm -f
 
 include_path = -I${PREFIX}/include
