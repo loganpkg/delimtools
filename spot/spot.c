@@ -31,6 +31,8 @@
 #include <string.h>
 #include <unistd.h>
 
+
+
 #define Cspc 0
 #define Ca 1
 #define Cb 2
@@ -337,9 +339,11 @@ int drawscreen(struct ed *e)
 	}
 
 	/* If need to centre */
-	if (b->v || b->r < b->t || b->r >= b->t + th || CI(b) < b->d || b->d - CI(b) > (size_t)(th * w))
+	/*	if (b->v || b->r < b->t || b->r >= b->t + th || CI(b) < b->d || b->d - CI(b) > (size_t)(th * w))
 		centre(b, th);
+	*/
 
+	
 	/* 1st attempt: from t line */
 	if (erase() == ERR) {
 		LOG("erase failed");
@@ -384,11 +388,17 @@ int drawscreen(struct ed *e)
 	}
 
 	/* Create status bar */
-	if (snprintf
-	    (sb, sb_s,
-	     "%lu%c%c:%s (%lu) %02X",
+	if (snprintf(sb, sb_s,
+	     "%lu%c%c:%s (%lu) %02X [g:%lu, c:%lu, s:%lu, CI:%lu, m:%lu, d:%lu]",
 	     e->ab, b->mod ? '*' : ' ', e->in_ret == -1 ? 'F' : ' ', b->fn,
-	     b->r, (unsigned char)*b->c) < 0) {
+	     b->r, (unsigned char)*b->c,
+	     (size_t) (b->g - b->a),
+	     (size_t) (b->c - b->a),
+		     b->s,
+		     CI(b),
+		     b->m,
+		     b->d
+	     ) < 0) {
 		LOG("snprintf failed");
 		free(sb);
 		sb = NULL;
