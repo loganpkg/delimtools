@@ -782,12 +782,12 @@ void trimwhitespace(struct buf *b)
 				line_feed = 1;
 			} else {
 				deletech(b);
-				if (CI(b) <= loc_index)
+				if (CI(b) < loc_index)
 					++del_count;
 			}
 		} else if (x == ' ' || x == '\t') {
 			deletech(b);
-			if (CI(b) <= loc_index)
+			if (CI(b) < loc_index)
 				++del_count;
 		} else {
 			break;
@@ -805,7 +805,7 @@ void trimwhitespace(struct buf *b)
 		case '\t':
 			if (end_of_line) {
 				deletech(b);
-				if (CI(b) <= loc_index)
+				if (CI(b) < loc_index)
 					++del_count;
 			}
 			break;
@@ -817,9 +817,11 @@ void trimwhitespace(struct buf *b)
 	/* Move back to original location */
 	loc_index -= del_count;
 
-	while (rightch(b) != -1) {
-		if (CI(b) == loc_index)
-			break;
+	if (loc_index) {
+		while (rightch(b) != -1) {
+			if (CI(b) == loc_index)
+				break;
+		}
 	}
 }
 
