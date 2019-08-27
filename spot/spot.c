@@ -403,6 +403,33 @@ int down(struct buf *b)
 	return *b->c;
 }
 
+void forwardword(struct buf *b)
+{
+
+	while (!isalnum(*b->c))
+		if (rightch(b) == -1)
+			break;
+
+	while (isalnum(*b->c))
+		if (rightch(b) == -1)
+			break;
+}
+
+void backword(struct buf *b)
+{
+
+	while (leftch(b) != -1)
+		if (isalnum(*b->c))
+			break;
+
+	while (leftch(b) != -1)
+		if (!isalnum(*b->c))
+			break;
+
+	if (b->g != b->a)
+		rightch(b);
+}
+
 void uppercaseword(struct buf *b)
 {
 
@@ -1505,6 +1532,12 @@ void keyesc(struct ed *e)
 		break;
 	case '>':
 		last(b);
+		break;
+	case 'b':
+		backword(b);
+		break;
+	case 'f':
+		forwardword(b);
 		break;
 	case 'l':
 		lowercaseword(b);
