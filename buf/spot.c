@@ -464,7 +464,7 @@ void lowercaseword(struct buf *b)
 
 void forwardpara(struct buf *b)
 {
-	while (*b->c == '\n')
+	while (isspace(*b->c))
 		if (rightch(b) == -1)
 			break;
 
@@ -480,7 +480,7 @@ void forwardpara(struct buf *b)
 
 void backwardpara(struct buf *b)
 {
-	while (*b->c == '\n')
+	while (isspace(*b->c))
 		if (leftch(b) == -1)
 			break;
 
@@ -495,6 +495,21 @@ void backwardpara(struct buf *b)
 
 	if (b->g != b->a)
 		rightch(b);
+}
+
+void forwardsent(struct buf *b)
+{
+	forwardpara(b);
+	leftch(b);
+}
+
+void backwardsent(struct buf *b)
+{
+	leftch(b);
+	backwardpara(b);
+	while (isspace(*b->c))
+		if (rightch(b) == -1)
+			break;
 }
 
 int search(struct buf *b, char *str)
@@ -1574,8 +1589,14 @@ void keyesc(struct ed *e)
 	case '}':
 		forwardpara(b);
 		break;
+	case 'a':
+		backwardsent(b);
+		break;
 	case 'b':
 		backwardword(b);
+		break;
+	case 'e':
+		forwardsent(b);
 		break;
 	case 'f':
 		forwardword(b);
