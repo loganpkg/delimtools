@@ -403,6 +403,38 @@ int down(struct buf *b)
 	return *b->c;
 }
 
+void uppercaseword(struct buf *b)
+{
+
+	/* Advance to start of next word */
+	while (!isalpha(*b->c))
+		if (rightch(b) == -1)
+			break;
+
+	/* Swap letters to uppercase */
+	while (isalpha(*b->c)) {
+		*b->c = toupper(*b->c);
+		if (rightch(b) == -1)
+			break;
+	}
+}
+
+void lowercaseword(struct buf *b)
+{
+
+	/* Advance to start of next word */
+	while (!isalpha(*b->c))
+		if (rightch(b) == -1)
+			break;
+
+	/* Swap letters to lowercase */
+	while (isalpha(*b->c)) {
+		*b->c = tolower(*b->c);
+		if (rightch(b) == -1)
+			break;
+	}
+}
+
 int search(struct buf *b, char *str)
 {
 	char *p = NULL;
@@ -1474,6 +1506,9 @@ void keyesc(struct ed *e)
 	case '>':
 		last(b);
 		break;
+	case 'l':
+		lowercaseword(b);
+		break;
 	case 'm':
 		e->in_ret = matchbrace(b);
 		break;
@@ -1482,6 +1517,9 @@ void keyesc(struct ed *e)
 		break;
 	case 't':
 		trimwhitespace(b);
+		break;
+	case 'u':
+		uppercaseword(b);
 		break;
 	case 'v':
 		pageup(b);
