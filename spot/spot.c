@@ -42,7 +42,8 @@
 #define MULTOF(a, b) ((a) && (b) > SIZE_MAX / (a))
 
 /* Index to pointer */
-#define ITOP(b, i) (i < (size_t) (b->g - b->a) ? b->a + i : b->c + i - (b->g - b->a))
+#define ITOP(b, i) (i < (size_t) (b->g - b->a) ? \
+		b->a + i : b->c + i - (b->g - b->a))
 /* Pointer to index */
 #define PTOI(b, p) (p < b->g ? p - b->a : p - b->a - (b->c - b->g))
 
@@ -54,13 +55,13 @@ struct buf {
 	char *c;		/* Cursor */
 	size_t s;		/* Size of array */
 	size_t r;		/* Cursor row number */
-	size_t t;		/* Top of screen row number (text editor) */
-	size_t d;		/* Draw start index (text editor) */
+	size_t t;		/* Top of screen row number */
+	size_t d;		/* Draw start index */
 	size_t m;		/* Mark index */
 	size_t mr;		/* Mark row number */
 	int m_set;		/* Mark set */
 	int mod;		/* Modified buffer */
-	int v;			/* Veritcal centring requested (text editor) */
+	int v;			/* Veritcal centring requested */
 };
 
 /*
@@ -124,7 +125,7 @@ struct ed {
 	char *cl_str;		/* Command line string */
 	char *search_str;	/* Search string */
 	int cl_active;		/* Editing is in the command line */
-	int operation;		/* Operation that requires the command line */
+	int operation;		/* Operation that requires command line */
 	int in_ret;		/* Return value of internal operation */
 	int running;		/* Editor is running */
 };
@@ -1093,7 +1094,10 @@ void centre(struct buf *b, int th)
 {
 	size_t row;
 
-	/* Max row index where centring will result in t being set to zero */
+	/*
+	 * Max row index where centring will result in t
+	 * being set to zero.
+	 */
 	size_t t_zero_range;
 
 	/* If text portion screen height is odd */
@@ -1244,9 +1248,9 @@ int drawscreen(struct ed *e)
 	 * Test if need to centre.
 	 * The draw start index will eventually be set so that the
 	 * cursor is on the screen before editing resumes.
-	 * Hence, draw start is always less than or equal to the cursor index.
-	 * This is why draw start does not need to be updated by inserts
-	 * and deletes, as they cannot happen before it.
+	 * Hence, draw start is always less than or equal to the cursor
+	 * index. This is why draw start does not need to be updated by
+	 * inserts and deletes, as they cannot happen before it.
 	 */
 	if (b->v ||
 	    b->r < b->t ||
@@ -1299,11 +1303,18 @@ int drawscreen(struct ed *e)
 
 	/* Create status bar */
 	if (snprintf(sb, sb_s,
-		     "%lu%c%c:%s (%lu) %02X [g:%lu, c:%lu, s:%lu, CI:%lu, mset:%d, m:%lu, d:%lu, t:%lu, v:%d]",
-		     e->ab, b->mod ? '*' : ' ', e->in_ret == -1 ? 'F' : ' ',
-		     b->fn, b->r, (unsigned char)*b->c, (size_t) (b->g - b->a),
-		     (size_t) (b->c - b->a), b->s, CI(b), b->m_set, b->m, b->d,
-		     b->t, b->v) < 0) {
+		     "%lu%c%c:%s (%lu) %02X "
+		     "[go:%lu, co:%lu, s:%lu, CI:%lu, "
+		     "mset:%d, m:%lu, d:%lu, t:%lu, v:%d]",
+		     e->ab,
+		     b->mod ? '*' : ' ',
+		     e->in_ret == -1 ? 'F' : ' ',
+		     b->fn, b->r,
+		     (unsigned char)*b->c,
+		     (size_t) (b->g - b->a),
+		     (size_t) (b->c - b->a),
+		     b->s, CI(b), b->m_set, b->m,
+		     b->d, b->t, b->v) < 0) {
 		LOG("snprintf failed");
 		free(sb);
 		sb = NULL;
