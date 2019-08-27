@@ -34,7 +34,7 @@ buffer sizes and number of buffers only limited by random access memory,
 efficient file reading and writing,
 and efficient killregion and yank functions,
 .It
-atomic navigation with row number and mark updating,
+atomic navigation with row number updating,
 .It
 intelligent gap increases,
 .It
@@ -42,7 +42,9 @@ integer overflow protection,
 .It
 region highlighting,
 .It
-and full editing available in the command line.
+full editing available in the command line,
+.It
+and gap buffer independent graphics.
 .El
 .Pp
 .Nm spot
@@ -62,7 +64,7 @@ Move cursor to the end of the line.
 .It C-f
 Move cursor forward one character.
 .It C-b
-Move cursor back one character.
+Move cursor backward one character.
 .It C-p
 Move cursor to the previous line.
 .It C-n
@@ -71,8 +73,28 @@ Move cursor to the next line.
 Move cursor to the start of the buffer.
 .It M->
 Move cursor to the end of the buffer.
+.It M-v
+Move cursor down one page.
+.It C-v
+Move cursor up one page.
+.It M-f
+Move cursor forward one word.
+.It M-b
+Move cursor backward one word.
+.It M-}
+Move cursor forward one paragraph.
+.It M-{
+Move cursor backward one paragraph.
+.It M-a
+Move cursor forward one sentence.
+.It M-e
+Move cursor backward one sentence.
 .It M-m
 Move cursor to the matching brace.
+.It M-u
+Uppercase word.
+.It M-l
+Lowercase word.
 .It C-d
 Delete the character under the cursor.
 .It C-h
