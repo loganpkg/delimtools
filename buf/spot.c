@@ -22,8 +22,8 @@
 #define _GNU_SOURCE
 
 #include <sys/stat.h>
-#include <curses.h>
 #include <ctype.h>
+#include <curses.h>
 #include <limits.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -36,7 +36,7 @@
 
 /* Error message */
 #define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
-/* size_t addtion overflow test */
+/* size_t addition overflow test */
 #define ADDOF(a, b)  ((a) > SIZE_MAX - (b))
 /* size_t multiplication overflow test */
 #define MULTOF(a, b) ((a) && (b) > SIZE_MAX / (a))
@@ -66,7 +66,7 @@ struct buf {
 
 /*
  * Gap buffer structure
- *    a                       g               c              s-1
+ *    a                       g               c
  * p 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147
  *  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
  *  | s | n | a | g | _ | r | X | X | X | X | o | c | k | s | ~ | s = 15
@@ -116,7 +116,7 @@ struct buf {
 /* Editor */
 struct ed {
 	struct buf **t;		/* Array of text buffers */
-	size_t s;		/* Size of the text buffer array */
+	size_t s;		/* Size of text buffer array */
 	size_t ab;		/* Active text buffer */
 	char *k;		/* Kill array */
 	size_t ks;		/* Size of kill array */
@@ -124,7 +124,7 @@ struct ed {
 	struct buf *cl;		/* Command line buffer */
 	char *cl_str;		/* Command line string */
 	char *search_str;	/* Search string */
-	int cl_active;		/* Editing is in the command line */
+	int cl_active;		/* Editing in command line */
 	int operation;		/* Operation that requires command line */
 	int in_ret;		/* Return value of internal operation */
 	int running;		/* Editor is running */
@@ -225,6 +225,8 @@ static int growgap(struct buf *b, size_t will_use)
 	b->g = new_a + g_offset;
 	b->c = new_a + c_offset + s_increase;
 	b->s = new_s;
+
+	/* Indexes do not need updating */
 
 	return 0;
 }
@@ -517,15 +519,12 @@ int search(struct buf *b, char *str)
 {
 	char *p = NULL;
 
-	if (str == NULL || b->c == b->a + b->s - 1) {
+	if (str == NULL || b->c == b->a + b->s - 1)
 		return -1;
-	}
 
-	if ((p =
-	     memmem(b->c + 1, b->s - 1 - (b->c - b->a + 1), str,
-		    strlen(str))) == NULL) {
+	if ((p = memmem(b->c + 1, b->s - 1 - (b->c - b->a + 1), str,
+		    strlen(str))) == NULL)
 		return -1;
-	}
 
 	while (b->c != p)
 		rightch(b);
@@ -579,6 +578,11 @@ int buftostr(struct buf *b, char **str)
 
 void setmark(struct buf *b)
 {
+	/*
+	 * The mark index does not need to be updated for inserts
+	 * and deletes as the mark is unset if these occur.
+	 */
+
 	b->m_set = 1;
 	b->m = CI(b);
 	b->mr = b->r;
@@ -979,7 +983,10 @@ void pageup(struct buf *b)
 	if (h < 3)
 		return;
 
-	/* Height of text portion of the screen */
+	/*
+	 * Height of text portion of the screen.
+	 * No adjustment is made for line wrapping.
+	 */
 	th = h - 2;
 
 	while (th && up(b) != -1)
@@ -993,7 +1000,10 @@ void pagedown(struct buf *b)
 	if (h < 3)
 		return;
 
-	/* Height of text portion of the screen */
+	/*
+	 * Height of text portion of the screen.
+	 * No adjustment is made for line wrapping.
+	 */
 	th = h - 2;
 
 	while (th && down(b) != -1)
@@ -1092,6 +1102,14 @@ void level(struct buf *b)
 
 void centre(struct buf *b, int th)
 {
+	/*
+	 * This function sets the draw start row, t,  so that the cursor
+	 * will be in the middle of the text portion of the screen
+	 * (assuming there are no long lines creating line wrapping).
+	 * It then does a reverse scan to set the draw start index, b->d,
+	 * to the start of row t.
+	 */
+
 	size_t row;
 
 	/*
@@ -1142,7 +1160,7 @@ void centre(struct buf *b, int th)
 	b->v = 0;
 }
 
-void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx, int cursor_start)
+void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx)
 {
 	size_t i;
 	char ch;
@@ -1154,11 +1172,9 @@ void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx, int cursor_start)
 	 * rewriting the graphics.
 	 */
 
-	if (cursor_start)
-		i = CI(b);
-	else
-		i = b->d;
+	i = b->d;
 
+	/* Cursor position not set */
 	*cp_set = 0;
 
 	hl_on = 0;
@@ -1221,10 +1237,10 @@ int drawscreen(struct ed *e)
 	int w;			/* Width of screen */
 	int th;			/* Height of text portion of the screen */
 	int cp_set;		/* If the cursor position has been set */
-	int cy;			/* Text buffer cursor y index */
-	int cx;			/* Text buffer cursor x index */
-	int cl_cy;		/* Command line cursor y index */
-	int cl_cx;		/* Command line cursor x index */
+	int cy;			/* Text buffer cursor y position on screen */
+	int cx;			/* Text buffer cursor x position on screen */
+	int cl_cy;		/* Command line cursor y position on screen */
+	int cl_cx;		/* Command line cursor x position on screen */
 	char *sb = NULL;	/* Status bar */
 	size_t sb_s;		/* Size of the status bar */
 
@@ -1258,36 +1274,41 @@ int drawscreen(struct ed *e)
 	    CI(b) < b->d || CI(b) - b->d > (size_t) (th * w))
 		centre(b, th);
 
-	/* 1st attempt: from t line */
+
+	/* Cleanup graphics */
 	if (erase() == ERR) {
 		LOG("erase failed");
 		return -1;
 	}
 	cy = 0;
 	cx = 0;
-	drawbuf(b, &cp_set, &cy, &cx, 0);
 
-	/* 2nd attempt: draw from start of cursor's line */
+	/*
+	 * 1st attempt:
+	 * This could fail if there are long lines pushing
+	 * the cursor off the text portion of the screen.
+	 */
+	drawbuf(b, &cp_set, &cy, &cx);
+
+	/* If cursor is off text portion of screen */
 	if (!cp_set || cy >= th) {
+		/* Cleanup graphics */
 		if (erase() == ERR) {
 			LOG("erase failed");
 			return -1;
 		}
-		b->t = b->r;
 		cy = 0;
 		cx = 0;
-		drawbuf(b, &cp_set, &cy, &cx, 0);
 
-		/* 3rd attempt: draw from the cursor */
-		if (!cp_set || cy >= th) {
-			if (erase() == ERR) {
-				LOG("erase failed");
-				return -1;
-			}
-			cy = 0;
-			cx = 0;
-			drawbuf(b, &cp_set, &cy, &cx, 1);
-		}
+		/* Set draw start index to cursor index */
+		b->d = CI(b);
+		/* Set draw start row number to cursor row number */
+		b->t = b->r;
+		/*
+		 * 2nd attempt:
+		 * This will succeed as it is commencing from the cursor.
+		 */
+		drawbuf(b, &cp_set, &cy, &cx);
 	}
 
 	/* Status bar */
@@ -1348,7 +1369,7 @@ int drawscreen(struct ed *e)
 		return -1;
 	}
 
-	/* First draw command line attempt */
+	/* Clear command line */
 	if (move(h - 1, 0) == ERR) {
 		LOG("move failed");
 		return -1;
@@ -1359,10 +1380,17 @@ int drawscreen(struct ed *e)
 	}
 	cl_cy = h - 1;
 	cl_cx = 0;
-	drawbuf(cl, &cp_set, &cl_cy, &cl_cx, 0);
 
-	/* Second draw command line */
+	/*
+	 * 1st attempt:
+	 * This could fail if the cursor is too far along a line,
+	 * pushing the cursor off the screen.
+	 */
+	drawbuf(cl, &cp_set, &cl_cy, &cl_cx);
+
+	/* If cursor is off the screen */
 	if (!cp_set || cl_cx >= w) {
+		/* Clear command line */
 		if (move(h - 1, 0) == ERR) {
 			LOG("move failed");
 			return -1;
@@ -1373,7 +1401,16 @@ int drawscreen(struct ed *e)
 		}
 		cl_cy = h - 1;
 		cl_cx = 0;
-		drawbuf(cl, &cp_set, &cl_cy, &cl_cx, 1);
+
+		/* Set draw start index to cursor index */
+		cl->d = CI(cl);
+		/* Set draw start row number to cursor row number */
+		cl->t = cl->r;
+		/*
+		 * 2nd attempt:
+		 * This will succeed as it is commencing from the cursor.
+		 */
+		drawbuf(cl, &cp_set, &cl_cy, &cl_cx);
 	}
 
 	/* Set cursor */
