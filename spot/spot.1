@@ -51,88 +51,88 @@ and gap buffer independent graphics.
 is released under the ISC licence (OpenBSD style).
 .Sh KEY BINDINGS
 C-f means press the Control key and the f key simultaneously.
-M-n means press the Meta key (or the Alt Key) and the n key simultaneously,
-or press the ESC key followed by the n key. The mark is a location saved in
-the buffer. The region is the text between the mark and the cursor.
+M-f means press the Meta key (or the Alt Key) and the f key simultaneously,
+or press the ESC key followed by the f key. The region is the text between
+the mark and the cursor. The mark is a location remembered in the buffer.
 .Bl -tag -width 10n
 .It C-g
-Quit from region highlighting or from the command line.
-.It C-a
-Move cursor to the start of the line.
-.It C-e
-Move cursor to the end of the line.
+Quit from region highlighting or from the command line
 .It C-f
-Move cursor forward one character.
+Forward character
 .It C-b
-Move cursor backward one character.
+Backward character
 .It C-p
-Move cursor to the previous line.
+Previous line
 .It C-n
-Move cursor to the next line.
+Next line
+.It C-a
+Start of line
+.It C-e
+End of line
 .It M-<
-Move cursor to the start of the buffer.
+Start of buffer
 .It M->
-Move cursor to the end of the buffer.
-.It M-v
-Move cursor down one page.
-.It C-v
-Move cursor up one page.
+End of buffer
 .It M-f
-Move cursor forward one word.
+Forward word
 .It M-b
-Move cursor backward one word.
+Backward word
 .It M-}
-Move cursor forward one paragraph.
+Forward paragraph
 .It M-{
-Move cursor backward one paragraph.
+Backward paragraph
 .It M-a
-Move cursor forward one sentence.
+Forward sentence
 .It M-e
-Move cursor backward one sentence.
-.It M-m
-Move cursor to the matching brace.
+Backward sentence
+.It C-v
+Page up
+.It M-v
+Page down
 .It M-u
-Uppercase word.
+Uppercase word
 .It M-l
-Lowercase word.
+Lowercase word
+.It M-m
+Match brace
 .It C-d
-Delete the character under the cursor.
+Delete
 .It C-h
-Backspace.
+Backspace
 .It M-t
-Trim trailing whitespace.
+Trim trailing whitespace
 .It C-q
-Quote a two digit hexadecimal value.
+Quote a two digit hexadecimal value
 .It C-s
-Forward search.
+Forward search
 .It M-n
-Repeat last forward search.
+Repeat last forward search
 .It C-spc
-Set the mark at the cursor's location.
+Set mark
 .It C-k
-Kill to the end of the line.
+Kill to end of line
 .It C-u
-Uproot (kill to the start of the line).
+Uproot (kill to start of line)
 .It C-w
-Wipe (kill region).
+Wipe (kill region)
 .It M-w
-Soft wipe (copy region).
+Copy region
 .It C-y
-Yank (paste) the last killed or copied text.
+Yank (paste) the last killed or copied text
 .It C-x i
-Insert file at cursor.
+Insert file
 .It C-x C-r
-Rename the buffer.
+Rename buffer
 .It C-x C-s
-Save the buffer.
+Save buffer
 .It C-x C-f
-Open file into a new buffer.
+Open file in new buffer
 .It C-x LEFT
-Change to previous buffer.
+Previous buffer
 .It C-x RIGHT
-Change to next buffer.
+Next buffer
 .It C-x C-c
-Close the editor. Unsaved modifications will be lost from all buffers.
+Close editor (unsaved modifications will be lost from all buffers)
 .El
 .Sh EXIT STATUS
 .Ex -std spot
