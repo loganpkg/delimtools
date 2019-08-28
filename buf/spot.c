@@ -1554,20 +1554,18 @@ int newbuf(struct ed *e, char *filename)
 
 void nextbuf(struct ed *e)
 {
-	if (e->ab == e->s - 1) {
+	if (e->ab == e->s - 1)
 		e->ab = 0;
-	} else {
+	else
 		++e->ab;
-	}
 }
 
 void previousbuf(struct ed *e)
 {
-	if (!e->ab) {
+	if (!e->ab)
 		e->ab = e->s - 1;
-	} else {
+	else
 		--e->ab;
-	}
 }
 
 void keycx(struct ed *e)
@@ -1812,11 +1810,10 @@ void key(struct ed *e)
 		keyesc(e);
 		break;
 	case '\n':
-		if (e->cl_active) {
+		if (e->cl_active)
 			keyn(e);
-		} else {
+		else
 			e->in_ret = insertch(b, x);
-		}
 		break;
 	default:
 		if (isprint(x) || x == '\t')
