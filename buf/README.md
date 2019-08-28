@@ -19,6 +19,19 @@
 spot is a minimalistic text editor that uses the gap buffer method and the
 ncurses library.
 
+It has many advanced features:
+* buffer sizes and number of buffers only limited by random access memory,
+* efficient file reading and writing,
+and efficient killregion and yank functions,
+* automatic row number updating,
+* intelligent gap increases,
+* integer overflow protection,
+* region highlighting,
+* full editing available in the command line,
+* and gap buffer independent graphics.
+
+spot is released under the ISC licence (OpenBSD style).
+
 Please see the man page for documentation. This README only
 contains installation and printing information.
 
