@@ -15,16 +15,18 @@
  */
 
 /*
- * uniqrand - unique uniformly distributed random numbers in a random order
- * $ cc -ansi -O2 -g -Wall -Wextra -pedantic -o uniqrand uniqrand.c -lbsd
+ * uniqrand - generates unique uniformly distributed random numbers
+ * in a random order.
  */
 
-/*
-#include <bsd/stdlib.h>
-*/
+#if defined(__linux__)
+	#include <bsd/stdlib.h>
+#elif
+	#include <stdlib.h>
+#endif
+
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
 
