@@ -57,22 +57,21 @@
 	}						\
 } while (0)
 
-int
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
-	int 		ret = 0;
-	FILE           *fp = NULL;
-	char           *a = NULL;
-	char 		delim;
-	size_t 		num = 0;
-	int 		body = 0;
-	size_t 		count = 0;
-	size_t 		first_count = 0;
-	size_t 		row = 1;
-	size_t 		i;
+	int ret = 0;
+	FILE *fp = NULL;
+	char *a = NULL;
+	char delim;
+	size_t num = 0;
+	int body = 0;
+	size_t count = 0;
+	size_t first_count = 0;
+	size_t row = 1;
+	size_t i;
 
-	if (argc != 3) {
-		fprintf(stderr, "usage: %s delimiter file\n", argv[0]);
+	if (argc != 2 && argc != 3) {
+		fprintf(stderr, "usage: %s delimiter [file]\n", argv[0]);
 		return 1;
 	}
 	if (!strcmp(argv[1], "\\t")) {
@@ -86,10 +85,13 @@ main(int argc, char **argv)
 		return 1;
 	}
 
-	if ((fp = fopen(argv[2], "r")) == NULL) {
+	if (argc == 2 || !strcmp(argv[2], "--")) {
+		fp = stdin;
+	} else if ((fp = fopen(argv[2], "r")) == NULL) {
 		LOG("fopen failed");
 		return 1;
 	}
+
 	if ((a = malloc(CHUNKSIZE)) == NULL) {
 		LOG("malloc failed");
 		ret = 1;
@@ -120,17 +122,16 @@ main(int argc, char **argv)
 		COMPARE();
 	}
 	if (!count && !first_count)
-		fprintf(stderr, "%s:%s: warning: no delimiter "
+		fprintf(stderr,
+			"%s:%s: warning: no delimiter "
 			"characters were found\n", argv[0], argv[2]);
-
-clean_up:
-	if (fp != NULL) {
+ clean_up:
+	if (fp != NULL && fp != stdin) {
 		if (fclose(fp)) {
 			LOG("fclose failed");
 			ret = 1;
 		}
 	}
 	free(a);
-
 	return ret;
 }
