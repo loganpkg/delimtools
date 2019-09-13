@@ -77,6 +77,8 @@ main(int argc, char **argv)
 	}
 	if (!strcmp(argv[1], "\\t")) {
 		delim = '\t';
+	} else if (!strcmp(argv[1], "\\0")) {
+		delim = '\0';
 	} else if (strlen(argv[1]) == 1) {
 		delim = argv[1][0];
 	} else {
@@ -84,10 +86,6 @@ main(int argc, char **argv)
 		return 1;
 	}
 
-	if (!isprint(delim) && delim != '\t') {
-		LOG("delimiter must be a printable character or tab");
-		return 1;
-	}
 	if ((fp = fopen(argv[2], "r")) == NULL) {
 		LOG("fopen failed");
 		return 1;
