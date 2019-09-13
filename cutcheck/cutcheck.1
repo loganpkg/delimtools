@@ -1,0 +1,51 @@
+.\"
+.\" Copyright (c) 2019 Logan Ryan McLintock
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd September 13, 2019
+.Dt CUTCHECK 1
+.Os
+.Sh NAME
+.Nm cutcheck
+.Nd checks the delimiter of a file for use with cut
+.Sh SYNOPSIS
+.Nm cutcheck
+.Ar delimiter
+.Op Ar file
+.Sh DESCRIPTION
+The
+.Nm
+utility checks that
+.Ar delimiter
+appears the same number of times in each line. If no
+.Ar file
+is given
+or
+.Ar file
+is a single dash
+.Pq Sq -
+then
+.Nm
+will read from the standard input.
+There is no quote interpretation.
+.Nm
+is released under the ISC licence (OpenBSD style).
+.Sh EXIT STATUS
+.Ex -std cutcheck
+.Sh EXAMPLES
+.Dl $ cutcheck ',' myfile
+.Sh AUTHORS
+.Nm
+was written by
+.An "Logan Ryan McLintock".

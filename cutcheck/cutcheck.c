@@ -125,6 +125,7 @@ int main(int argc, char **argv)
 		fprintf(stderr,
 			"%s:%s: warning: no delimiter "
 			"characters were found\n", argv[0], argv[2]);
+
  clean_up:
 	if (fp != NULL && fp != stdin) {
 		if (fclose(fp)) {
@@ -132,6 +133,8 @@ int main(int argc, char **argv)
 			ret = 1;
 		}
 	}
+
 	free(a);
+
 	return ret;
 }
