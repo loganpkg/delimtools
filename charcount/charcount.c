@@ -23,6 +23,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define CHUNKSIZE BUFSIZ
 
@@ -34,23 +35,23 @@
 		} \
 } while (0)
 
-
-int
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
-	int 		ret = 0;
-	FILE           *fp = NULL;
-	char           *a = NULL;
-	size_t 		count  [UCHAR_MAX] = {0};
-	size_t 		num = 0;
-	size_t 		i;
-	int 		j;
+	int ret = 0;
+	FILE *fp = NULL;
+	char *a = NULL;
+	size_t count[UCHAR_MAX] = { 0 };
+	size_t num = 0;
+	size_t i;
+	int j;
 
-	if (argc != 2) {
-		fprintf(stderr, "Usage: %s file\n", argv[0]);
+	if (argc != 1 && argc != 2) {
+		fprintf(stderr, "Usage: %s [file]\n", argv[0]);
 		return 1;
 	}
-	if ((fp = fopen(argv[1], "r")) == NULL) {
+	if (argc == 1 || !strcmp(argv[1], "-")) {
+		fp = stdin;
+	} else if ((fp = fopen(argv[1], "r")) == NULL) {
 		LOG("fopen failed");
 		return 1;
 	}
@@ -88,13 +89,14 @@ main(int argc, char **argv)
 		}
 	}
 
-clean_up:
-	if (fp != NULL) {
+ clean_up:
+	if (fp != NULL && fp != stdin) {
 		if (fclose(fp)) {
 			LOG("fclose failed");
 			ret = 1;
 		}
 	}
+
 	free(a);
 
 	return ret;
