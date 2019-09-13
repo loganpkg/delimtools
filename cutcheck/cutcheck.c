@@ -16,7 +16,6 @@
 
 /*
  * cutcheck -- checks the delimiter of a file for use with cut
- * $ cc -ansi -O2 -g -Wall -Wextra -pedantic -o cutcheck cutcheck.c
  */
 
 #include <ctype.h>
@@ -85,7 +84,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (argc == 2 || !strcmp(argv[2], "--")) {
+	if (argc == 2 || !strcmp(argv[2], "-")) {
 		fp = stdin;
 	} else if ((fp = fopen(argv[2], "r")) == NULL) {
 		LOG("fopen failed");
