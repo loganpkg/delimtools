@@ -73,14 +73,46 @@ int main(int argc, char **argv)
 		fprintf(stderr, "usage: %s delimiter [file]\n", argv[0]);
 		return 1;
 	}
-	if (!strcmp(argv[1], "\\t")) {
-		delim = '\t';
-	} else if (!strcmp(argv[1], "\\0")) {
-		delim = '\0';
+
+	if (strlen(argv[1]) == 2 && argv[1][0] == '\\') {
+		switch (argv[1][1]) {
+		case '0':
+			delim = '\0';
+			break;
+		case 'a':
+			delim = '\a';
+			break;
+		case 'b':
+			delim = '\b';
+			break;
+		case 't':
+			delim = '\t';
+			break;
+		case 'n':
+			delim = '\n';
+			break;
+		case 'v':
+			delim = '\v';
+			break;
+		case 'f':
+			delim = '\f';
+			break;
+		case 'r':
+			delim = '\r';
+			break;
+		default:
+			LOG("unrecognised escape sequence");
+			return 1;
+		}
 	} else if (strlen(argv[1]) == 1) {
 		delim = argv[1][0];
 	} else {
 		LOG("delimiter must be one character");
+		return 1;
+	}
+
+	if (delim == '\n') {
+		LOG("delimiter cannot be a line feed");
 		return 1;
 	}
 
