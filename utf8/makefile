@@ -32,4 +32,6 @@ clean:
 .PHONY: install
 install:
 	${mkdir} ${PREFIX}/bin
+	${mkdir} ${PREFIX}/man/man1
 	${cp} utf8count ${PREFIX}/bin/
+	${cp} utf8count.1 ${PREFIX}/man/man1/
