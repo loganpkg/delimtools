@@ -23,10 +23,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "strtochar.h"
 
 #define CHUNKSIZE BUFSIZ
-
-#define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
 
 #define COMPARE() do {						\
 	if (count != first_count) {				\
@@ -74,40 +73,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (strlen(argv[1]) == 2 && argv[1][0] == '\\') {
-		switch (argv[1][1]) {
-		case '0':
-			delim = '\0';
-			break;
-		case 'a':
-			delim = '\a';
-			break;
-		case 'b':
-			delim = '\b';
-			break;
-		case 't':
-			delim = '\t';
-			break;
-		case 'n':
-			delim = '\n';
-			break;
-		case 'v':
-			delim = '\v';
-			break;
-		case 'f':
-			delim = '\f';
-			break;
-		case 'r':
-			delim = '\r';
-			break;
-		default:
-			LOG("unrecognised escape sequence");
-			return 1;
-		}
-	} else if (strlen(argv[1]) == 1) {
-		delim = argv[1][0];
-	} else {
-		LOG("delimiter must be one character");
+	if (strtochar(argv[1], &delim)) {
+		LOG("invalid delimiter string");
 		return 1;
 	}
 

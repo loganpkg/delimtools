@@ -23,8 +23,8 @@ RM = rm -f
 cp = cp
 mkdir = mkdir -p
 
-cutcheck: cutcheck.c
-	${CC} ${CFLAGS} -o cutcheck cutcheck.c
+cutcheck: cutcheck.c strtochar.c strtochar.h
+	${CC} ${CFLAGS} -o cutcheck cutcheck.c strtochar.c
 
 .PHONY: clean
 clean:

@@ -39,6 +39,17 @@ then
 .Nm
 will read from the standard input.
 There is no quote interpretation.
+.Pp
+.Ar delimiter
+cannot be a line feed.
+.Ar delimiter
+can be entered as a single char, e.g.
+.Pq Sq = ,
+a C single character escape sequence, e.g.
+.Pq Sq \et ,
+or a C two digit hexadecimal escape sequence, e.g.
+.Pq Sq \ex1F .
+.Pp
 .Nm
 is released under the ISC licence (OpenBSD style).
 .Sh EXIT STATUS
