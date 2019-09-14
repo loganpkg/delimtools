@@ -16,7 +16,6 @@
 
 /*
  * charcount -- counts chars
- * $ cc -ansi -O2 -g -Wall -Wextra -pedantic -o charcount charcount.c
  */
 
 #include <ctype.h>
