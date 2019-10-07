@@ -19,6 +19,3 @@
  */
 
 #define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
-
-int hextonum(char h, int *num);
-int strtochar(char *str, char *ch);
