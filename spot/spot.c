@@ -34,13 +34,6 @@
 /* Default gap size */
 #define GAP (BUFSIZ - 1)
 
-/* Error message */
-#define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
-/* size_t addition overflow test */
-#define ADDOF(a, b)  ((a) > SIZE_MAX - (b))
-/* size_t multiplication overflow test */
-#define MULTOF(a, b) ((a) && (b) > SIZE_MAX / (a))
-
 /* Index to pointer */
 #define ITOP(b, i) (i < (size_t) (b->g - b->a) ? \
 		b->a + i : b->c + i - (b->g - b->a))
@@ -82,37 +75,6 @@ struct buf {
 /* End index */
 #define EI(b) (b->s - 1 - (b->c - b->g))
 
-/* Control characters */
-#define Cspc 0
-#define Ca 1
-#define Cb 2
-#define Cc 3
-#define Cd 4
-#define Ce 5
-#define Cf 6
-#define Cg 7
-#define Ch 8
-#define Ci 9
-#define Cj 10
-#define Ck 11
-#define Cl 12
-#define Cm 13
-#define Cn 14
-#define Co 15
-#define Cp 16
-#define Cq 17
-#define Cr 18
-#define Cs 19
-#define Ct 20
-#define Cu 21
-#define Cv 22
-#define Cw 23
-#define Cx 24
-#define Cy 25
-#define Cz 26
-#define ESC 27
-#define Cqm 127
-
 /* Editor */
 struct ed {
 	struct buf **t;		/* Array of text buffers */
@@ -129,28 +91,6 @@ struct ed {
 	int in_ret;		/* Return value of internal operation */
 	int running;		/* Editor is running */
 };
-
-int safeadd(size_t * res, int num_args, ...)
-{
-	va_list ap;
-	int i;
-	size_t total = 0;
-	size_t arg_val = 0;
-
-	va_start(ap, num_args);
-	for (i = 0; i < num_args; ++i) {
-		arg_val = va_arg(ap, size_t);
-		if (ADDOF(total, arg_val)) {
-			LOG("integer overflow");
-			va_end(ap);
-			return -1;
-		}
-		total += arg_val;
-	}
-	va_end(ap);
-	*res = total;
-	return 0;
-}
 
 struct buf *initbuf(size_t will_use)
 {
@@ -687,34 +627,6 @@ int yank(struct buf *b, char *k, size_t ks, size_t kn)
 	b->m = 0;
 	b->mod = 1;
 
-	return 0;
-}
-
-int filesize(size_t * fs, char *fn)
-{
-	struct stat st;
-
-	if (fn == NULL || !strlen(fn)) {
-		LOG("empty filename");
-		return -1;
-	}
-
-	if (stat(fn, &st)) {
-		LOG("stat failed");
-		return -1;
-	}
-
-	if (!S_ISREG(st.st_mode)) {
-		LOG("not regular file");
-		return -1;
-	}
-
-	if (st.st_size < 0) {
-		LOG("negative file size");
-		return -1;
-	}
-
-	*fs = (size_t) st.st_size;
 	return 0;
 }
 
