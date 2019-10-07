@@ -16,23 +16,30 @@
 
 
 CC = cc
-CFLAGS = -ansi -g -O2 -Wall -Wextra -pedantic
+CFLAGS = -c -ansi -g -O2 -Wall -Wextra -pedantic -fpic
 RM = rm -f
 
-libs = -lncurses
-cp = cp
+include_path = -I${PREFIX}/include
+link_path = -L${PREFIX}/lib
+linker_opts = -shared
+libs = -lgen
 mkdir = mkdir -p
+cp = cp
 
-spot: spot.c
-	${CC} ${CFLAGS} -o spot spot.c ${libs}
+libbuf.so: buf.o
+	${CC} ${linker_opts} -o libbuf.so buf.o
+
+buf.o: buf.h buf.c
+	${CC} ${CFLAGS} ${include_path} ${link_path} buf.c ${libs}
 
 .PHONY: clean
 clean:
-	${RM} spot
+	${RM} buf.o libbuf.so
 
 .PHONY: install
 install:
-	${mkdir} ${PREFIX}/bin
-	${mkdir} ${PREFIX}/man/man1
-	${cp} spot ${PREFIX}/bin/
-	${cp} spot.1 ${PREFIX}/man/man1/
+	${mkdir} ${PREFIX}/include
+	${mkdir} ${PREFIX}/lib
+	$(mkdir) $(PREFIX)/man/man3
+	$(cp) buf.h ${PREFIX}/include/
+	$(cp) libbuf.so ${PREFIX}/lib/

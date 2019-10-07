@@ -23,56 +23,14 @@
 #include <sys/stat.h>
 #include <ctype.h>
 #include <curses.h>
+#include <gen.h>
 #include <limits.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-/* Default gap size */
-#define GAP (BUFSIZ - 1)
-
-/* Index to pointer */
-#define ITOP(b, i) (i < (size_t) (b->g - b->a) ? \
-		b->a + i : b->c + i - (b->g - b->a))
-/* Pointer to index */
-#define PTOI(b, p) (p < b->g ? p - b->a : p - b->a - (b->c - b->g))
-
-/* Buffer */
-struct buf {
-	char *fn;		/* Filename */
-	char *a;		/* Array */
-	char *g;		/* Start of gap */
-	char *c;		/* Cursor */
-	size_t s;		/* Size of array */
-	size_t r;		/* Cursor row number */
-	size_t t;		/* Top of screen row number */
-	size_t d;		/* Draw start index */
-	size_t m;		/* Mark index */
-	size_t mr;		/* Mark row number */
-	int m_set;		/* Mark set */
-	int mod;		/* Modified buffer */
-	int v;			/* Veritcal centring requested */
-};
-
-/*
- * Gap buffer structure
- *    a                       g               c
- * p 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147
- *  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
- *  | b | u | f | _ | r | o | X | X | X | X | c | k | s | ! | ~ | s = 15
- *  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
- * i  0   1   2   3   4   5                   6   7   8   9  10
- *                                            CI             EI
- */
-
-/* Read a character */
-#define READ(b, i) (*ITOP(b, i))
-/* Cursor index */
-#define CI(b) ((size_t) (b->g - b->a))
-/* End index */
-#define EI(b) (b->s - 1 - (b->c - b->g))
+#include "buf.h"
 
 struct buf *initbuf(size_t will_use)
 {
