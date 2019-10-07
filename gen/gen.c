@@ -67,3 +67,247 @@ int filesize(size_t * fs, char *fn)
 	*fs = (size_t) st.st_size;
 	return 0;
 }
+
+int ucount(char *line, size_t len, size_t * cp_count)
+{
+	unsigned char uc;
+	uint32_t cp = 0;
+	int contin;
+	size_t i;
+
+	contin = 0;
+	for (i = 0; i < len; ++i) {
+		uc = (unsigned char)line[i];
+
+		if (ISASCII(uc)) {
+			if (contin)
+				return 1;
+
+			cp = uc;
+
+		} else if (ISLEAD2(uc)) {
+			if (contin)
+				return 1;
+
+			cp = uc & 0x1F;
+			contin = 1;
+
+		} else if (ISLEAD3(uc)) {
+			if (contin)
+				return 1;
+
+			cp = uc & 0x0F;
+			contin = 2;
+
+		} else if (ISLEAD4(uc)) {
+			if (contin)
+				return 1;
+
+			cp = uc & 0x07;
+			contin = 3;
+
+		} else if (ISCONTIN(uc)) {
+			switch (contin) {
+			case 3:
+			case 2:
+			case 1:
+				cp = cp << 6 | (uc & 0x3F);
+				break;
+			default:
+				return 1;
+			}
+			--contin;
+
+		} else {
+			return 1;
+		}
+
+		if (cp > MAXCP)
+			return 1;
+
+		if (!contin)
+			++cp_count[cp];
+
+	}
+
+	if (contin)
+		return 1;
+
+	return 0;
+}
+
+int ucptostr(uint32_t cp, char *utf8chstr)
+{
+	if (ISASCII(cp)) {
+		utf8chstr[0] = cp;
+		utf8chstr[1] = '\0';
+
+	} else if (ISSIZE2(cp)) {
+		utf8chstr[0] = (cp >>  6 & 0x1F) | 0xC0;
+		utf8chstr[1] = (cp       & 0x3F) | 0x80;
+		utf8chstr[2] = '\0';
+
+	} else if (ISSIZE3(cp)) {
+		utf8chstr[0] = (cp >> 12 & 0x0F) | 0xE0;
+		utf8chstr[1] = (cp >>  6 & 0x3F) | 0x80;
+		utf8chstr[2] = (cp       & 0x3F) | 0x80;
+		utf8chstr[3] = '\0';
+
+	} else if (ISSIZE4(cp)) {
+		utf8chstr[0] = (cp >> 18 & 0x07) | 0xF0;
+		utf8chstr[1] = (cp >> 12 & 0x3F) | 0x80;
+		utf8chstr[2] = (cp >>  6 & 0x3F) | 0x80;
+		utf8chstr[3] = (cp       & 0x3F) | 0x80;
+		utf8chstr[4] = '\0';
+
+	} else {
+		return 1;
+	}
+
+	return 0;
+}
+
+int hextonum(char h, int *num)
+{
+	switch (h) {
+	case '0':
+		*num = 0;
+		break;
+	case '1':
+		*num = 1;
+		break;
+	case '2':
+		*num = 2;
+		break;
+	case '3':
+		*num = 3;
+		break;
+	case '4':
+		*num = 4;
+		break;
+	case '5':
+		*num = 5;
+		break;
+	case '6':
+		*num = 6;
+		break;
+	case '7':
+		*num = 7;
+		break;
+	case '8':
+		*num = 8;
+		break;
+	case '9':
+		*num = 9;
+		break;
+	case 'a':
+	case 'A':
+		*num = 10;
+		break;
+	case 'b':
+	case 'B':
+		*num = 11;
+		break;
+	case 'c':
+	case 'C':
+		*num = 12;
+		break;
+	case 'd':
+	case 'D':
+		*num = 13;
+		break;
+	case 'e':
+	case 'E':
+		*num = 14;
+		break;
+	case 'f':
+	case 'F':
+		*num = 15;
+		break;
+	default:
+		return 1;
+	}
+
+	return 0;
+}
+
+int strtochar(char *str, char *ch)
+{
+	size_t len;
+	int h0, h1;
+
+	if (str == NULL)
+		return 1;
+
+	len = strlen(str);
+
+	/* C hexadecimal escape sequence */
+	if (len == 4 && str[0] == '\\' && str[1] == 'x') {
+		if (hextonum(str[2], &h0) || hextonum(str[3], &h1)) {
+			LOG("invalid hexadecimal digit");
+			return 1;
+		}
+
+		*ch = 16 * h0 + h1;
+		return 0;
+	}
+
+	/* C single character escape sequence */
+	if (len == 2 && str[0] == '\\') {
+		switch (str[1]) {
+		case '0':
+			*ch = '\0';
+			break;
+		case 'a':
+			*ch = '\a';
+			break;
+		case 'b':
+			*ch = '\b';
+			break;
+		case 't':
+			*ch = '\t';
+			break;
+		case 'n':
+			*ch = '\n';
+			break;
+		case 'v':
+			*ch = '\v';
+			break;
+		case 'f':
+			*ch = '\f';
+			break;
+		case 'r':
+			*ch = '\r';
+			break;
+		case 'e':
+			/* Not standard C */
+			*ch = 27;
+			break;
+		case '\\':
+			*ch = '\\';
+			break;
+		case '\'':
+			*ch = '\'';
+			break;
+		case '"':
+			*ch = '"';
+			break;
+		case '?':
+			*ch = '?';
+			break;
+		default:
+			LOG("unrecognised C single character escape sequence");
+			return 1;
+		}
+		return 0;
+	}
+
+	/* Single char */
+	if (len == 1) {
+		*ch = str[0];
+		return 0;
+	}
+
+	LOG("unrecognised string");
+	return 1;
+}
