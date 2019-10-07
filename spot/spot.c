@@ -48,31 +48,16 @@ struct ed {
 	int running;		/* Editor is running */
 };
 
-int hexnum(int *h, int x)
-{
-	if (!isxdigit(x))
-		return -1;
-
-	if (isdigit(x))
-		*h = x - '0';
-	else if (islower(x))
-		*h = x - 'a' + 10;
-	else
-		*h = x - 'A' + 10;
-
-	return 0;
-}
-
 int inserthex(struct buf *b)
 {
 	int x0, x1, h0, h1;
 
 	x0 = getch();
-	if (hexnum(&h0, x0))
+	if (hextonum(x0, &h0))
 		return -1;
 
 	x1 = getch();
-	if (hexnum(&h1, x1))
+	if (hextonum(x1, &h1))
 		return -1;
 
 	if (insertch(b, h0 * 16 + h1)) {
