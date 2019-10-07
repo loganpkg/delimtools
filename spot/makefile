@@ -19,12 +19,14 @@ CC = cc
 CFLAGS = -ansi -g -O2 -Wall -Wextra -pedantic
 RM = rm -f
 
-libs = -lncurses
-cp = cp
+include_path = -I${PREFIX}/include
+link_path = -L${PREFIX}/lib
+libs = -lgen -lbuf -lncurses
 mkdir = mkdir -p
+cp = cp
 
 spot: spot.c
-	${CC} ${CFLAGS} -o spot spot.c ${libs}
+	${CC} ${CFLAGS} ${include_path} ${link_path} -o spot spot.c ${libs}
 
 .PHONY: clean
 clean:

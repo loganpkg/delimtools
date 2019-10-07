@@ -21,11 +21,11 @@
 
 #define _GNU_SOURCE
 
-#include <sys/stat.h>
+#include <buf.h>
+#include <gen.h>
 #include <ctype.h>
 #include <curses.h>
 #include <limits.h>
-#include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
