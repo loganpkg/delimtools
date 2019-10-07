@@ -18,6 +18,13 @@
  * Generic C library.
  */
 
+
+#include <sys/stat.h>
+#include <ctype.h>
+#include <string.h>
+#include "gen.h"
+
+
 int safeadd(size_t * res, int num_args, ...)
 {
 	va_list ap;
@@ -174,7 +181,7 @@ int hextonum(int h, int *num)
 
 	if (isdigit(h))
 		*num = h - '0';
-	else if (islower(x))
+	else if (islower(h))
 		*num = h - 'a' + 10;
 	else
 		*num = h - 'A' + 10;

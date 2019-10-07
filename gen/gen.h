@@ -21,6 +21,10 @@
 #ifndef GEN_H_
 #define GEN_H_
 
+#include <stdio.h>
+#include <stdint.h>
+#include <stdarg.h>
+
 /* Error message */
 #define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
 /* size_t addition overflow test */
@@ -80,7 +84,7 @@ int safeadd(size_t * res, int num_args, ...);
 int filesize(size_t * fs, char *fn);
 int ucount(char *line, size_t len, size_t * cp_count);
 int ucptostr(uint32_t cp, char *utf8chstr);
-int hextonum(char h, int *num);
+int hextonum(int h, int *num);
 int strtochar(char *str, char *ch);
 
 #endif
