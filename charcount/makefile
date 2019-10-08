@@ -20,11 +20,12 @@ CC = cc
 CFLAGS = -ansi -g -O2 -Wall -Wextra -pedantic
 RM = rm -f
 
+include_path = -I${PREFIX}/include
 cp = cp
 mkdir = mkdir -p
 
 charcount: charcount.c
-	${CC} ${CFLAGS} -o charcount charcount.c
+	${CC} ${CFLAGS} ${include_path} -o charcount charcount.c
 
 .PHONY: clean
 clean:

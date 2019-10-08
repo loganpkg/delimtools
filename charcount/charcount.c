@@ -19,14 +19,13 @@
  */
 
 #include <ctype.h>
+#include <gen.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define CHUNKSIZE BUFSIZ
-
-#define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
 
 #define PROCESS() do { \
 		for (i = 0; i < num; ++i) { \
