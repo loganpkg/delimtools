@@ -20,11 +20,14 @@ CC = cc
 CFLAGS = -ansi -g -O2 -Wall -Wextra -pedantic
 RM = rm -f
 
-cp = cp
+include_path = -I${PREFIX}/include
+link_path = -L${PREFIX}/lib
+libs = -lgen
 mkdir = mkdir -p
+cp = cp
 
-cutcheck: cutcheck.c strtochar.c strtochar.h
-	${CC} ${CFLAGS} -o cutcheck cutcheck.c strtochar.c
+cutcheck: cutcheck.c
+	${CC} ${CFLAGS} ${include_path} ${link_path} -o cutcheck cutcheck.c ${libs}
 
 .PHONY: clean
 clean:
