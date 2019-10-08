@@ -15,7 +15,7 @@
  */
 
 /*
- * buf library.
+ * buf library (gap buffer).
  */
 
 #ifndef BUF_H_

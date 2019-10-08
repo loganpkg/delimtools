@@ -15,7 +15,7 @@
  */
 
 /*
- * buf library.
+ * buf library (gap buffer).
  */
 
 #define _GNU_SOURCE
