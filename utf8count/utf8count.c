@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "utf8.h"
+#include <sutf8.h>
 
 #define INIT_BUF_SIZE BUFSIZ
 

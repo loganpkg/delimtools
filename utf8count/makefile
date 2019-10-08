@@ -19,11 +19,14 @@ CC = cc
 CFLAGS = -ansi -O2 -g -Wall -Wextra -pedantic
 RM = rm -f
 
-cp = cp
+include_path = -I${PREFIX}/include
+link_path = -L${PREFIX}/lib
+libs = -lsutf8
 mkdir = mkdir -p
+cp = cp
 
-utf8count: utf8count.c utf8.c utf8.h
-	${CC} ${CFLAGS} -o utf8count utf8count.c utf8.c
+utf8count: utf8count.c
+	${CC} ${CFLAGS} ${include_path} ${link_path} -o utf8count utf8count.c ${libs}
 
 .PHONY: clean
 clean:
