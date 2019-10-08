@@ -40,6 +40,5 @@ clean:
 install:
 	${mkdir} ${PREFIX}/include
 	${mkdir} ${PREFIX}/lib
-	$(mkdir) $(PREFIX)/man/man3
 	$(cp) buf.h ${PREFIX}/include/
 	$(cp) libbuf.so ${PREFIX}/lib/

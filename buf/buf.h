@@ -18,6 +18,9 @@
  * buf library.
  */
 
+#ifndef BUF_H_
+#define BUF_H_
+
 #include <stddef.h>
 
 /* Default gap size */
@@ -30,7 +33,7 @@
 #define PTOI(b, p) (p < b->g ? p - b->a : p - b->a - (b->c - b->g))
 
 /* Buffer */
-struct buf {
+struct buffer {
 	char *fn;		/* Filename */
 	char *a;		/* Array */
 	char *g;		/* Start of gap */
@@ -45,6 +48,8 @@ struct buf {
 	int mod;		/* Modified buffer */
 	int v;			/* Veritcal centring requested */
 };
+
+typedef struct buffer buf;
 
 /*
  * Gap buffer structure
@@ -63,40 +68,61 @@ struct buf {
 #define CI(b) ((size_t) (b->g - b->a))
 /* End index */
 #define EI(b) (b->s - 1 - (b->c - b->g))
+/* Cursor char */
+#define CCH(b) (*b->c)
 
-struct buf *initbuf(size_t will_use);
-void freebuf(struct buf *b);
-int insertch(struct buf *b, char ch);
-int deletech(struct buf *b);
-int leftch(struct buf *b);
-int rightch(struct buf *b);
-int backspacech(struct buf *b);
-size_t home(struct buf * b);
-void end(struct buf *b);
-void first(struct buf *b);
-void last(struct buf *b);
-int up(struct buf *b);
-int down(struct buf *b);
-void forwardword(struct buf *b);
-void backwardword(struct buf *b);
-void uppercaseword(struct buf *b);
-void lowercaseword(struct buf *b);
-void forwardpara(struct buf *b);
-void backwardpara(struct buf *b);
-void forwardsent(struct buf *b);
-void backwardsent(struct buf *b);
-int search(struct buf *b, char *str);
-void deletebuf(struct buf *b);
-int buftostr(struct buf *b, char **str);
-void setmark(struct buf *b);
-int killregion(struct buf *b, char **k, size_t * ks, size_t * kn, int del);
-int killfwdline(struct buf *b, char **k, size_t * ks, size_t * kn);
-int uproot(struct buf *b, char **k, size_t * ks, size_t * kn);
-int yank(struct buf *b, char *k, size_t ks, size_t kn);
-int insertfile(struct buf *b, char *fn);
-int save(struct buf *b);
-int matchbrace(struct buf *b);
-void trimwhitespace(struct buf *b);
-int setfilename(struct buf *b, char *filename);
-void pageup(struct buf *b);
-void pagedown(struct buf *b);
+/* Filename */
+#define FN(b) (b->fn)
+/* Cursor row number */
+#define CRN(b) (b->r)
+/* Top of screen row number */
+#define TSRN(b) (b->t)
+/* Draw start index */
+#define DSI(b) (b->d)
+/* Mark index */
+#define MI(b) (b->m)
+/* Mark set */
+#define MSET(b) (b->m_set)
+/* Modified buffer */
+#define BMOD(b) (b->mod)
+/* Veritcal centring requested */
+#define VCR(b) (b->v)
+
+buf *initbuf(size_t will_use);
+void freebuf(buf *b);
+int insertch(buf *b, char ch);
+int deletech(buf *b);
+int leftch(buf *b);
+int rightch(buf *b);
+int backspacech(buf *b);
+size_t homeofline(buf * b);
+void endofline(buf *b);
+void first(buf *b);
+void last(buf *b);
+int up(buf *b);
+int down(buf *b);
+void forwardword(buf *b);
+void backwardword(buf *b);
+void uppercaseword(buf *b);
+void lowercaseword(buf *b);
+void forwardpara(buf *b);
+void backwardpara(buf *b);
+void forwardsent(buf *b);
+void backwardsent(buf *b);
+int search(buf *b, char *str);
+void deletebuf(buf *b);
+int buftostr(buf *b, char **str);
+void setmark(buf *b);
+int killregion(buf *b, char **k, size_t * ks, size_t * kn, int del);
+int killfwdline(buf *b, char **k, size_t * ks, size_t * kn);
+int uproot(buf *b, char **k, size_t * ks, size_t * kn);
+int yank(buf *b, char *k, size_t ks, size_t kn);
+int insertfile(buf *b, char *fn);
+int save(buf *b);
+int matchbrace(buf *b);
+void trimwhitespace(buf *b);
+int setfilename(buf *b, char *filename);
+void pageup(buf *b);
+void pagedown(buf *b);
+
+#endif

@@ -32,12 +32,12 @@
 #include <unistd.h>
 #include "buf.h"
 
-struct buf *initbuf(size_t will_use)
+buf *initbuf(size_t will_use)
 {
-	struct buf *b = NULL;
+	buf *b = NULL;
 	size_t s;
 
-	if ((b = calloc(1, sizeof(struct buf))) == NULL) {
+	if ((b = calloc(1, sizeof(buf))) == NULL) {
 		LOG("calloc failed");
 		return NULL;
 	}
@@ -60,7 +60,7 @@ struct buf *initbuf(size_t will_use)
 	return b;
 }
 
-void freebuf(struct buf *b)
+void freebuf(buf *b)
 {
 	if (b != NULL) {
 		free(b->fn);
@@ -72,7 +72,7 @@ void freebuf(struct buf *b)
 	}
 }
 
-static int growgap(struct buf *b, size_t will_use)
+static int growgap(buf *b, size_t will_use)
 {
 	char *new_a = NULL;
 	size_t new_s, gap_s, non_gap_s, s_increase;
@@ -111,7 +111,7 @@ static int growgap(struct buf *b, size_t will_use)
 	return 0;
 }
 
-int insertch(struct buf *b, char ch)
+int insertch(buf *b, char ch)
 {
 	if (b->g == b->c) {
 		if (growgap(b, 1)) {
@@ -130,7 +130,7 @@ int insertch(struct buf *b, char ch)
 	return 0;
 }
 
-int deletech(struct buf *b)
+int deletech(buf *b)
 {
 	if (b->c == b->a + b->s - 1)
 		return -1;
@@ -141,7 +141,7 @@ int deletech(struct buf *b)
 	return *(b->c++);
 }
 
-int leftch(struct buf *b)
+int leftch(buf *b)
 {
 	if (b->g == b->a)
 		return -1;
@@ -154,7 +154,7 @@ int leftch(struct buf *b)
 	return *b->c;
 }
 
-int rightch(struct buf *b)
+int rightch(buf *b)
 {
 	if (b->c == b->a + b->s - 1)
 		return -1;
@@ -166,7 +166,7 @@ int rightch(struct buf *b)
 	return *b->c;
 }
 
-int backspacech(struct buf *b)
+int backspacech(buf *b)
 {
 	if (leftch(b) == -1)
 		return -1;
@@ -174,7 +174,7 @@ int backspacech(struct buf *b)
 	return deletech(b);
 }
 
-size_t home(struct buf * b)
+size_t homeofline(buf * b)
 {
 	size_t count = 0;
 	int x;
@@ -189,7 +189,7 @@ size_t home(struct buf * b)
 	return count;
 }
 
-void end(struct buf *b)
+void endofline(buf *b)
 {
 	int x;
 
@@ -202,7 +202,7 @@ void end(struct buf *b)
 	}
 }
 
-void first(struct buf *b)
+void first(buf *b)
 {
 	size_t gap_s;
 
@@ -219,14 +219,14 @@ void first(struct buf *b)
 	b->c = b->a + gap_s;
 }
 
-void last(struct buf *b)
+void last(buf *b)
 {
-	char *end_of_buf = b->a + b->s - 1;
+  char *eobuf = b->a + b->s - 1; /* End of buffer */
 
-	if (b->c == end_of_buf)
+	if (b->c == eobuf)
 		return;
 
-	while (b->c != end_of_buf) {
+	while (b->c != eobuf) {
 		if (*b->c == '\n')
 			++b->r;
 
@@ -234,18 +234,18 @@ void last(struct buf *b)
 	}
 }
 
-int up(struct buf *b)
+int up(buf *b)
 {
 	size_t count;
 
 	if (!b->r)
 		return -1;
 
-	count = home(b);
+	count = homeofline(b);
 
 	leftch(b);
 
-	home(b);
+	homeofline(b);
 
 	if (*b->c == '\n')
 		return *b->c;
@@ -259,17 +259,17 @@ int up(struct buf *b)
 	return *b->c;
 }
 
-int down(struct buf *b)
+int down(buf *b)
 {
 	size_t count;
 	int x;
 
-	count = home(b);
+	count = homeofline(b);
 
-	end(b);
+	endofline(b);
 
 	if (rightch(b) == -1) {
-		home(b);
+		homeofline(b);
 		return -1;
 	}
 
@@ -286,7 +286,7 @@ int down(struct buf *b)
 	return *b->c;
 }
 
-void forwardword(struct buf *b)
+void forwardword(buf *b)
 {
 
 	while (!isalnum(*b->c))
@@ -298,7 +298,7 @@ void forwardword(struct buf *b)
 			break;
 }
 
-void backwardword(struct buf *b)
+void backwardword(buf *b)
 {
 
 	while (leftch(b) != -1)
@@ -313,7 +313,7 @@ void backwardword(struct buf *b)
 		rightch(b);
 }
 
-void uppercaseword(struct buf *b)
+void uppercaseword(buf *b)
 {
 
 	/* Advance to start of next word */
@@ -329,7 +329,7 @@ void uppercaseword(struct buf *b)
 	}
 }
 
-void lowercaseword(struct buf *b)
+void lowercaseword(buf *b)
 {
 
 	/* Advance to start of next word */
@@ -345,7 +345,7 @@ void lowercaseword(struct buf *b)
 	}
 }
 
-void forwardpara(struct buf *b)
+void forwardpara(buf *b)
 {
 	while (isspace(*b->c))
 		if (rightch(b) == -1)
@@ -361,7 +361,7 @@ void forwardpara(struct buf *b)
 	}
 }
 
-void backwardpara(struct buf *b)
+void backwardpara(buf *b)
 {
 	while (isspace(*b->c))
 		if (leftch(b) == -1)
@@ -380,13 +380,13 @@ void backwardpara(struct buf *b)
 		rightch(b);
 }
 
-void forwardsent(struct buf *b)
+void forwardsent(buf *b)
 {
 	forwardpara(b);
 	leftch(b);
 }
 
-void backwardsent(struct buf *b)
+void backwardsent(buf *b)
 {
 	leftch(b);
 	backwardpara(b);
@@ -395,7 +395,7 @@ void backwardsent(struct buf *b)
 			break;
 }
 
-int search(struct buf *b, char *str)
+int search(buf *b, char *str)
 {
 	char *p = NULL;
 
@@ -412,7 +412,7 @@ int search(struct buf *b, char *str)
 	return 0;
 }
 
-void deletebuf(struct buf *b)
+void deletebuf(buf *b)
 {
 	b->g = b->a;
 	b->c = b->a + b->s - 1;
@@ -426,7 +426,7 @@ void deletebuf(struct buf *b)
 	b->v = 0;
 }
 
-int buftostr(struct buf *b, char **str)
+int buftostr(buf *b, char **str)
 {
 	char *p, *q;
 	free(*str);
@@ -456,7 +456,7 @@ int buftostr(struct buf *b, char **str)
 	return 0;
 }
 
-void setmark(struct buf *b)
+void setmark(buf *b)
 {
 	/*
 	 * The mark index does not need to be updated for inserts
@@ -468,7 +468,7 @@ void setmark(struct buf *b)
 	b->mr = b->r;
 }
 
-int killregion(struct buf *b, char **k, size_t * ks, size_t * kn, int del)
+int killregion(buf *b, char **k, size_t * ks, size_t * kn, int del)
 {
 	if (!b->m_set || CI(b) == b->m) {
 		b->m_set = 0;
@@ -520,7 +520,7 @@ int killregion(struct buf *b, char **k, size_t * ks, size_t * kn, int del)
 	return 0;
 }
 
-int killfwdline(struct buf *b, char **k, size_t * ks, size_t * kn)
+int killfwdline(buf *b, char **k, size_t * ks, size_t * kn)
 {
 	if (*b->c == '\n') {
 		deletech(b);
@@ -528,7 +528,7 @@ int killfwdline(struct buf *b, char **k, size_t * ks, size_t * kn)
 	}
 
 	setmark(b);
-	end(b);
+	endofline(b);
 
 	if (killregion(b, k, ks, kn, 1)) {
 		LOG("killregion failed");
@@ -538,10 +538,10 @@ int killfwdline(struct buf *b, char **k, size_t * ks, size_t * kn)
 	return 0;
 }
 
-int uproot(struct buf *b, char **k, size_t * ks, size_t * kn)
+int uproot(buf *b, char **k, size_t * ks, size_t * kn)
 {
 	setmark(b);
-	home(b);
+	homeofline(b);
 
 	if (killregion(b, k, ks, kn, 1)) {
 		LOG("killregion failed");
@@ -551,7 +551,7 @@ int uproot(struct buf *b, char **k, size_t * ks, size_t * kn)
 	return 0;
 }
 
-int yank(struct buf *b, char *k, size_t ks, size_t kn)
+int yank(buf *b, char *k, size_t ks, size_t kn)
 {
 	if (growgap(b, ks)) {
 		LOG("growgap failed");
@@ -570,7 +570,7 @@ int yank(struct buf *b, char *k, size_t ks, size_t kn)
 	return 0;
 }
 
-int insertfile(struct buf *b, char *fn)
+int insertfile(buf *b, char *fn)
 {
 	int ret = 0;
 	size_t fs;
@@ -620,7 +620,7 @@ int insertfile(struct buf *b, char *fn)
 	return ret;
 }
 
-int save(struct buf *b)
+int save(buf *b)
 {
 	int ret = 0;
 	FILE *fp = NULL;
@@ -665,9 +665,9 @@ int save(struct buf *b)
 	return ret;
 }
 
-int matchbrace(struct buf *b)
+int matchbrace(buf *b)
 {
-	int (*move) (struct buf *);
+	int (*move) (buf *);
 	char original;
 	char target;
 	int fwd;
@@ -729,11 +729,11 @@ int matchbrace(struct buf *b)
 		return 0;
 }
 
-void trimwhitespace(struct buf *b)
+void trimwhitespace(buf *b)
 {
 	int x;
 	int line_feed;
-	int end_of_line;
+	int eoline; /* End of line */
 	size_t loc_index;
 	size_t del_count = 0;
 
@@ -761,22 +761,22 @@ void trimwhitespace(struct buf *b)
 	}
 
 	/* Trim body */
-	end_of_line = 0;
+	eoline = 0;
 	while ((x = leftch(b)) != -1) {
 		switch (x) {
 		case '\n':
-			end_of_line = 1;
+			eoline = 1;
 			break;
 		case ' ':
 		case '\t':
-			if (end_of_line) {
+			if (eoline) {
 				deletech(b);
 				if (CI(b) < loc_index)
 					++del_count;
 			}
 			break;
 		default:
-			end_of_line = 0;
+			eoline = 0;
 		}
 	}
 
@@ -791,7 +791,7 @@ void trimwhitespace(struct buf *b)
 	}
 }
 
-int setfilename(struct buf *b, char *filename)
+int setfilename(buf *b, char *filename)
 {
 	char *new_fn = NULL;
 	size_t len, res;
@@ -828,7 +828,7 @@ int setfilename(struct buf *b, char *filename)
 	return 0;
 }
 
-void pageup(struct buf *b)
+void pageup(buf *b)
 {
 	int h, th;
 	h = getmaxy(stdscr);
@@ -845,7 +845,7 @@ void pageup(struct buf *b)
 		--th;
 }
 
-void pagedown(struct buf *b)
+void pagedown(buf *b)
 {
 	int h, th;
 	h = getmaxy(stdscr);
