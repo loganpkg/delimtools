@@ -33,13 +33,13 @@
 
 /* Editor */
 struct ed {
-	struct buf **t;		/* Array of text buffers */
+	buf **t;		/* Array of text buffers */
 	size_t s;		/* Size of text buffer array */
 	size_t ab;		/* Active text buffer */
 	char *k;		/* Kill array */
 	size_t ks;		/* Size of kill array */
 	size_t kn;		/* Number of \n characters in kill array */
-	struct buf *cl;		/* Command line buffer */
+	buf *cl;		/* Command line buffer */
 	char *cl_str;		/* Command line string */
 	char *search_str;	/* Search string */
 	int cl_active;		/* Editing in command line */
@@ -48,7 +48,7 @@ struct ed {
 	int running;		/* Editor is running */
 };
 
-int inserthex(struct buf *b)
+int inserthex(buf *b)
 {
 	int x0, x1, h0, h1;
 
@@ -115,28 +115,29 @@ int freenc(void)
 	return 0;
 }
 
-void level(struct buf *b)
+void level(buf *b)
 {
 	if (clear() == ERR)
 		LOG("clear failed");
 
-	b->v = 1;
+	VCR(b) = 1;
 }
 
-void centre(struct buf *b, int th)
+void centre(buf *b, int th)
 {
 	/*
-	 * This function sets the draw start row, t,  so that the cursor
-	 * will be in the middle of the text portion of the screen
-	 * (assuming there are no long lines creating line wrapping).
-	 * It then does a reverse scan to set the draw start index, b->d,
-	 * to the start of row t.
+	 * This function sets the top of screen row number, TSRN(b),
+	 * so that the cursor will be in the middle of the text portion
+	 * of the screen (assuming there are no long lines creating
+	 * line wrapping).
+	 * It then does a reverse scan to set the draw start index, DSI(b),
+	 * to the start of the TSRN(b) line.
 	 */
 
 	size_t row;
 
 	/*
-	 * Max row index where centring will result in t
+	 * Max row index where centring will result in TSRN(b)
 	 * being set to zero.
 	 */
 	size_t t_zero_range;
@@ -149,41 +150,41 @@ void centre(struct buf *b, int th)
 	}
 
 	/* If near top of buffer */
-	if (b->r <= t_zero_range) {
-		b->t = 0;
+	if (CRN(b) <= t_zero_range) {
+	  TSRN(b) = 0;
 	} else {
-		b->t = b->r - t_zero_range;
+	  TSRN(b) = CRN(b) - t_zero_range;
 	}
 
-	if (!b->t || !CI(b)) {
-		b->d = 0;
-		b->v = 0;
+	if (!TSRN(b) || !CI(b)) {
+	  DSI(b) = 0;
+	  VCR(b) = 0;
 		return;
 	}
 
 	/*
 	 * Set draw start index by
-	 * searching backwards to find the start of row t.
+	 * searching backwards to find the start of the TSRN(b) line.
 	 * CI was checked for zero above.
 	 */
-	b->d = CI(b) - 1;
-	row = b->r;
-	while (b->d) {
-		if (READ(b, b->d) == '\n') {
+	DSI(b) = CI(b) - 1;
+	row = CRN(b);
+	while (DSI(b)) {
+	  if (READ(b, DSI(b)) == '\n') {
 			--row;
-			if (row == b->t - 1) {
-				++b->d;
+			if (row == TSRN(b) - 1) {
+			  ++DSI(b);
 				break;
 			}
 		}
 
-		--b->d;
+	  --DSI(b);
 	}
 
-	b->v = 0;
+	VCR(b) = 0;
 }
 
-void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx)
+void drawbuf(buf *b, int *cp_set, int *cy, int *cx)
 {
 	size_t i;
 	char ch;
@@ -195,20 +196,20 @@ void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx)
 	 * rewriting the graphics.
 	 */
 
-	i = b->d;
+	i = DSI(b);
 
 	/* Cursor position not set */
 	*cp_set = 0;
 
 	hl_on = 0;
-	if (b->m_set && b->m < i) {
+	if (MSET(b) && MI(b) < i) {
 		attron(A_STANDOUT);
 		hl_on = 1;
 	}
 
 	while (i <= EI(b)) {
 		/* Highlighting */
-		if (b->m_set && i == b->m) {
+	  if (MSET(b) && i == MI(b)) {
 			if (hl_on) {
 				attroff(A_STANDOUT);
 				hl_on = 0;
@@ -226,7 +227,7 @@ void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx)
 				attroff(A_STANDOUT);
 				hl_on = 0;
 			}
-			if (b->m_set && b->m > i) {
+			if (MSET(b) && MI(b) > i) {
 				attron(A_STANDOUT);
 				hl_on = 1;
 			}
@@ -254,8 +255,8 @@ void drawbuf(struct buf *b, int *cp_set, int *cy, int *cx)
 
 int drawscreen(struct ed *e)
 {
-	struct buf *b = e->t[e->ab];	/* Active text buffer pointer */
-	struct buf *cl = e->cl;	/* Command line buffer pointer */
+	buf *b = e->t[e->ab];	/* Active text buffer pointer */
+	buf *cl = e->cl;	/* Command line buffer pointer */
 	int h;			/* Height of screen */
 	int w;			/* Width of screen */
 	int th;			/* Height of text portion of the screen */
@@ -291,10 +292,10 @@ int drawscreen(struct ed *e)
 	 * index. This is why draw start does not need to be updated by
 	 * inserts and deletes, as they cannot happen before it.
 	 */
-	if (b->v ||
-	    b->r < b->t ||
-	    b->r >= b->t + th ||
-	    CI(b) < b->d || CI(b) - b->d > (size_t) (th * w))
+	if (VCR(b) ||
+	    CRN(b) < TSRN(b) ||
+	    CRN(b) >= TSRN(b) + th ||
+	    CI(b) < DSI(b) || CI(b) - DSI(b) > (size_t) (th * w))
 		centre(b, th);
 
 
@@ -324,9 +325,9 @@ int drawscreen(struct ed *e)
 		cx = 0;
 
 		/* Set draw start index to cursor index */
-		b->d = CI(b);
-		/* Set draw start row number to cursor row number */
-		b->t = b->r;
+		DSI(b) = CI(b);
+		/* Set top of screen row number to cursor row number */
+		TSRN(b) = CRN(b);
 		/*
 		 * 2nd attempt:
 		 * This will succeed as it is commencing from the cursor.
@@ -347,18 +348,13 @@ int drawscreen(struct ed *e)
 
 	/* Create status bar */
 	if (snprintf(sb, sb_s,
-		     "%lu%c%c:%s (%lu) %02X "
-		     "[go:%lu, co:%lu, s:%lu, CI:%lu, "
-		     "mset:%d, m:%lu, d:%lu, t:%lu, v:%d]",
+		     "%lu%c%c:%s (%lu) %02X",
 		     e->ab,
-		     b->mod ? '*' : ' ',
+		     BMOD(b) ? '*' : ' ',
 		     e->in_ret == -1 ? 'F' : ' ',
-		     b->fn, b->r,
-		     (unsigned char)*b->c,
-		     (size_t) (b->g - b->a),
-		     (size_t) (b->c - b->a),
-		     b->s, CI(b), b->m_set, b->m,
-		     b->d, b->t, b->v) < 0) {
+		     FN(b),
+		     CRN(b),
+		     (unsigned char)CCH(b)) < 0) {
 		LOG("snprintf failed");
 		free(sb);
 		sb = NULL;
@@ -426,9 +422,9 @@ int drawscreen(struct ed *e)
 		cl_cx = 0;
 
 		/* Set draw start index to cursor index */
-		cl->d = CI(cl);
-		/* Set draw start row number to cursor row number */
-		cl->t = cl->r;
+		DSI(cl) = CI(cl);
+		/* Set top of screen row number to cursor row number */
+		TSRN(cl) = CRN(cl);
 		/*
 		 * 2nd attempt:
 		 * This will succeed as it is commencing from the cursor.
@@ -511,8 +507,8 @@ int newbuf(struct ed *e, char *filename)
 {
 	size_t fs = 0;
 	int load_file = 0;
-	struct buf *new_buf = NULL;
-	struct buf **new_t = NULL;
+	buf *new_buf = NULL;
+	buf **new_t = NULL;
 	size_t new_s;
 
 	if (filename != NULL && strlen(filename)) {
@@ -554,13 +550,13 @@ int newbuf(struct ed *e, char *filename)
 		return -1;
 	}
 
-	if (MULTOF(new_s, sizeof(struct buf *))) {
+	if (MULTOF(new_s, sizeof(buf *))) {
 		LOG("integer overflow");
 		freebuf(new_buf);
 		return -1;
 	}
 
-	if ((new_t = realloc(e->t, new_s * sizeof(struct buf *))) == NULL) {
+	if ((new_t = realloc(e->t, new_s * sizeof(buf *))) == NULL) {
 		freebuf(new_buf);
 		return -1;
 	}
@@ -593,7 +589,7 @@ void previousbuf(struct ed *e)
 
 void keycx(struct ed *e)
 {
-	struct buf *b = NULL;
+	buf *b = NULL;
 	int x;
 
 	if (e->cl_active)
@@ -634,7 +630,7 @@ void keycx(struct ed *e)
 
 void keyesc(struct ed *e)
 {
-	struct buf *b = NULL;
+	buf *b = NULL;
 	int x;
 
 	if (e->cl_active)
@@ -700,7 +696,7 @@ void keyesc(struct ed *e)
 
 void keyn(struct ed *e)
 {
-	struct buf *b = NULL;
+	buf *b = NULL;
 	char **dst = NULL;
 
 	if (e->operation == Cs)
@@ -742,7 +738,7 @@ void keyn(struct ed *e)
 
 void key(struct ed *e)
 {
-	struct buf *b = NULL;
+	buf *b = NULL;
 	int x;
 
 	if (e->cl_active)
@@ -758,7 +754,7 @@ void key(struct ed *e)
 		break;
 	case Ca:
 	case KEY_HOME:
-		home(b);
+		homeofline(b);
 		break;
 	case Cb:
 	case KEY_LEFT:
@@ -770,15 +766,15 @@ void key(struct ed *e)
 		break;
 	case Ce:
 	case KEY_END:
-		end(b);
+		endofline(b);
 		break;
 	case Cf:
 	case KEY_RIGHT:
 		e->in_ret = rightch(b);
 		break;
 	case Cg:
-		if (b->m_set) {
-			b->m_set = 0;
+	  if (MSET(b)) {
+	    MSET(b) = 0;
 		} else if (e->cl_active) {
 			e->cl_active = 0;
 			e->operation = -1;
