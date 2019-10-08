@@ -14,7 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* UTF-8 header */
+/*
+ * Simple UTF-8 library.
+ */
 
 #ifndef UTF8_H_
 #define UTF8_H_

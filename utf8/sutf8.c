@@ -14,7 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* UTF-8 functions */
+/*
+ * Simple UTF-8 library.
+ */
 
 #include <stddef.h>
 #include "sutf8.h"
