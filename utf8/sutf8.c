@@ -17,7 +17,7 @@
 /* UTF-8 functions */
 
 #include <stddef.h>
-#include "utf8.h"
+#include "sutf8.h"
 
 int ucount(char *line, size_t len, size_t * cp_count)
 {

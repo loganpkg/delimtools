@@ -16,22 +16,26 @@
 
 
 CC = cc
-CFLAGS = -ansi -O2 -g -Wall -Wextra -pedantic
+CFLAGS = -c -ansi -g -O2 -Wall -Wextra -pedantic -fpic
 RM = rm -f
 
-cp = cp
+linker_opts = -shared
 mkdir = mkdir -p
+cp = cp
 
-utf8count: utf8count.c utf8.c utf8.h
-	${CC} ${CFLAGS} -o utf8count utf8count.c utf8.c
+libsutf8.so: sutf8.o
+	${CC} ${linker_opts} -o libsutf8.so sutf8.o
+
+sutf8.o: sutf8.h sutf8.c
+	${CC} ${CFLAGS} sutf8.c
 
 .PHONY: clean
 clean:
-	${RM} utf8count
+	${RM} sutf8.o libsutf8.so
 
 .PHONY: install
 install:
-	${mkdir} ${PREFIX}/bin
-	${mkdir} ${PREFIX}/man/man1
-	${cp} utf8count ${PREFIX}/bin/
-	${cp} utf8count.1 ${PREFIX}/man/man1/
+	${mkdir} ${PREFIX}/include
+	${mkdir} ${PREFIX}/lib
+	$(cp) sutf8.h ${PREFIX}/include/
+	$(cp) libsutf8.so ${PREFIX}/lib/
