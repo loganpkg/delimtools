@@ -25,10 +25,9 @@
 	#include <stdlib.h>
 #endif
 
+#include <gen.h>
 #include <stdint.h>
 #include <stdio.h>
-
-#define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
 
 int main(int argc, char **argv)
 {

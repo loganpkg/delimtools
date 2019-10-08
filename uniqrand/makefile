@@ -20,6 +20,7 @@ CC = cc
 CFLAGS = -ansi -g -O2 -Wall -Wextra -pedantic
 RM = rm -f
 
+include_path = -I${PREFIX}/include
 linuxlibs = -lbsd
 cp = cp
 mkdir = mkdir -p
@@ -27,9 +28,9 @@ ostype != uname -s
 
 uniqrand: uniqrand.c
 .if "${ostype}" == "Linux"
-	${CC} ${CFLAGS} -o uniqrand uniqrand.c ${linuxlibs}
+	${CC} ${CFLAGS} ${include_path} -o uniqrand uniqrand.c ${linuxlibs}
 .else
-	${CC} ${CFLAGS} -o uniqrand uniqrand.c
+	${CC} ${CFLAGS} ${include_path} -o uniqrand uniqrand.c
 .endif
 
 .PHONY: clean
