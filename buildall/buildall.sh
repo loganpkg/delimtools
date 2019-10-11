@@ -16,30 +16,60 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+set -x
+
 changequote(`[', `]')
 
-dnl m4 sh script to build and install all.
-dnl $ m4 buildall.sh | sh
-dnl I use BSD make. On GNU/Linux this is called bmake.
 
-dnl unix is defined in BSD m4
-define([mk], ifdef([unix], make, bmake))
+define([installdir], ["$HOME"])
 
-dnl Set target directory
-define([targetdir], [$HOME])
+define([os], esyscmd(uname -s | tr -d '\n'))
 
-define([pref], [PREFIX=targetdir])
+define([std_cc_flags], [-ansi -g -O2 -Wall -Wextra -pedantic])
 
-define([bi], [cd ../$1
-mk clean
-pref mk
-pref mk install
+define([get], [git clone https://github.com/loganpkg/$1.git])
+
+
+cd ..
+
+get(gen)
+get(utf8)
+get(buf)
+get(spot)
+get(cutcheck)
+get(charcount)
+get(utf8count)
+get(uniqrand)
+
+cd buildall
+
+define([bilib], [cd ../$1
+cc -c std_cc_flags -fpic -I installdir/include -L installdir/lib $1.c $2
+cc -shared -o lib$1.so $1.o
+mkdir -p installdir/include
+mkdir -p installdir/lib
+cp $1.h installdir/include/
+mv lib$1.so installdir/lib/
+rm -rf $1.o
+cd ../buildall
 ])
 
-bi(buf)
-bi(sutf8)
-bi(spot)
-bi(charcount)
-bi(utf8count)
-bi(cutcheck)
-bi(uniqrand)
+define([biutil], [cd ../$1
+cc std_cc_flags -I installdir/include -L installdir/lib -o $1 $1.c $2
+mkdir -p installdir/bin
+mkdir -p installdir/man/man1
+mv $1 installdir/bin/
+cp $1.1 installdir/man/man1/
+cd ../buildall
+])
+
+
+bilib(gen)
+bilib(utf8)
+bilib(buf, -lgen)
+biutil(spot, -lgen -lbuf -lncurses)
+biutil(cutcheck, -lgen)
+biutil(charcount)
+biutil(utf8count, -lutf8)
+
+ifelse(os, Linux, biutil(uniqrand, -lbsd), biutil(uniqrand))
