@@ -24,8 +24,8 @@
 .Op Ar
 .Sh DESCRIPTION
 .Nm
-is a minimalistic text editor that uses the gap buffer method and the
-ncurses library.
+is a minimalistic text editor that uses the gen, buf and ncurses
+libraries.
 It has many advanced features:
 .Bl -bullet -offset indent
 .It
@@ -34,7 +34,7 @@ buffer sizes and number of buffers only limited by random access memory,
 efficient file reading and writing,
 and efficient killregion and yank functions,
 .It
-atomic navigation with row number updating,
+automatic row number updating,
 .It
 intelligent gap increases,
 .It
