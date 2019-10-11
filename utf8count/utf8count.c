@@ -18,15 +18,13 @@
 
 #define _GNU_SOURCE
 #include <ctype.h>
+#include <gen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sutf8.h>
+#include <utf8.h>
 
 #define INIT_BUF_SIZE BUFSIZ
-
-/* Error message with source file and line number */
-#define LOG(m) fprintf(stderr, "%s:%d: error: " m "\n", __FILE__, __LINE__)
 
 int main(int argc, char **argv)
 {
