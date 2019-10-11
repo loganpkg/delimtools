@@ -30,8 +30,7 @@ define([std_cc_flags], [-ansi -g -O2 -Wall -Wextra -pedantic])
 define([get], [git clone https://github.com/loganpkg/$1.git])
 
 
-cd ..
-
+define([getall], [cd ..
 get(gen)
 get(utf8)
 get(buf)
@@ -40,8 +39,12 @@ get(cutcheck)
 get(charcount)
 get(utf8count)
 get(uniqrand)
-
 cd buildall
+])
+
+
+dnl getall
+
 
 define([bilib], [cd ../$1
 cc -c std_cc_flags -fpic -I installdir/include -L installdir/lib $1.c $2
