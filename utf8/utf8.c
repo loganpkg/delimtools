@@ -15,7 +15,7 @@
  */
 
 /*
- * Simple UTF-8 library.
+ * UTF-8 library.
  */
 
 #include <stddef.h>
