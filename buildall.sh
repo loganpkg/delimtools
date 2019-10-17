@@ -27,26 +27,7 @@ define([os], esyscmd(uname -s | tr -d '\n'))
 
 define([std_cc_flags], [-ansi -g -O2 -Wall -Wextra -pedantic])
 
-define([get], [git clone https://github.com/loganpkg/$1.git])
-
-
-define([getall], [cd ..
-get(gen)
-get(utf8)
-get(buf)
-get(spot)
-get(cutcheck)
-get(charcount)
-get(utf8count)
-get(uniqrand)
-cd buildall
-])
-
-
-dnl getall
-
-
-define([bilib], [cd ../$1
+define([bilib], [cd $1
 cc -c std_cc_flags -fpic -I installdir/include -L installdir/lib $1.c $2
 cc -shared -o lib$1.so $1.o
 mkdir -p installdir/include
@@ -54,16 +35,16 @@ mkdir -p installdir/lib
 cp $1.h installdir/include/
 mv lib$1.so installdir/lib/
 rm -rf $1.o
-cd ../buildall
+cd ..
 ])
 
-define([biutil], [cd ../$1
+define([biutil], [cd $1
 cc std_cc_flags -I installdir/include -L installdir/lib -o $1 $1.c $2
 mkdir -p installdir/bin
 mkdir -p installdir/man/man1
 mv $1 installdir/bin/
 cp $1.1 installdir/man/man1/
-cd ../buildall
+cd ..
 ])
 
 
