@@ -8,3 +8,10 @@ share the same repository to make it easy to share code
 between them.
 
 ## Installation
+
+    $ git clone https://github.com/loganpkg/loganutils.git
+
+Set `installdir` in the `buildall.sh` file, the default is
+the `$HOME` directory.
+
+    $ m4 buildall.sh | sh
