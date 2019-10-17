@@ -47,6 +47,10 @@ cp $1.1 installdir/man/man1/
 cd ..
 ])
 
+define([iscript], [cd $1
+cp $1.sh installdir/bin/$1
+cd ..
+])
 
 bilib(gen)
 bilib(utf8)
@@ -57,3 +61,5 @@ biutil(charcount)
 biutil(utf8count, -lutf8)
 
 ifelse(os, Linux, biutil(uniqrand, -lbsd), biutil(uniqrand))
+
+iscript(possum)
