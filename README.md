@@ -67,7 +67,7 @@ for each code point value encountered.
 ## uniqrand
 
 The `uniqrand` utility generates a given number of unique uniformly
-distributed random between a lower and upper bound.
+distributed random numbers between a lower and upper bound.
 
 ## possum
 
