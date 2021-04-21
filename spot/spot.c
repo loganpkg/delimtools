@@ -21,9 +21,16 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
 
 /* Initial buffer size */
 #define INIT_BUF_SIZE BUFSIZ
+
+/* size_t Addition OverFlow test */
+#define AOF(a, b) a > SIZE_MAX - b
+/* size_t Multiplication OverFlow test */
+#define MOF(a, b) a && b > SIZE_MAX / a
 
 /* No bound or gap size checks are performed */
 #define INSERTCH(b, x) *b->g++ = x; if (x == '\n') ++b->r
@@ -68,9 +75,36 @@ struct buf *init_buf(void)
 
 void free_buf(struct buf *b)
 {
-  /* Frees a buffer */
+    /* Frees a buffer */
     if (b != NULL) {
         free(b->a);
         free(b);
     }
+}
+
+int grow_gap(struct buf *b, size_t will_use)
+{
+    /* Grows the gap size of a buffer */
+    char *t;
+    size_t buf_size = b->e - b->a + 1;
+    if (MOF(buf_size, 2))
+        return 1;
+    buf_size *= 2;
+    if (AOF(buf_size, will_use))
+        return 1;
+    buf_size += will_use;
+    if ((t = malloc(buf_size)) == NULL)
+        return 1;
+    /* Copy text before the gap */
+    memcpy(t, b->a, b->g - b->a);
+    /* Copy text after the gap */
+    memcpy(t + buf_size - 1 - (b->e - b->c + 1), b->c, b->e - b->c + 1);
+    /* Update pointers, indices do not need to be changed */
+    b->g = t + (b->g - b->a);
+    b->c = t + buf_size - 1 - (b->e - b->c + 1);
+    b->e = t + buf_size - 1;
+    /* Free old memory */
+    free(b->a);
+    b->a = t;
+    return 0;
 }
