@@ -19,6 +19,7 @@
  * Dedicated to my son who was only a 4mm "spot" in his first ultrasound.
  */
 
+#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -132,5 +133,111 @@ int delete_ch(struct buf *b, size_t mult)
     while (mult--)
         DELETECH(b);
     BUFMOD;
+    return 0;
+}
+
+int backspace_ch(struct buf *b, size_t mult)
+{
+    /* Backspaces mult chars in a buffer */
+    if (mult > (size_t) (b->g - b->a))
+        return 1;
+    while (mult--)
+        BACKSPACECH(b);
+    BUFMOD;
+    return 0;
+}
+
+int left_ch(struct buf *b, size_t mult)
+{
+    /* Move the cursor left mult positions */
+    if (mult > (size_t) (b->g - b->a))
+        return 1;
+    while (mult--)
+        LEFTCH(b);
+    return 0;
+}
+
+int right_ch(struct buf *b, size_t mult)
+{
+    /* Move the cursor right mult positions */
+    if (mult > (size_t) (b->e - b->c))
+        return 1;
+    while (mult--)
+        RIGHTCH(b);
+    return 0;
+}
+
+int filesize(char *fn, size_t * fs)
+{
+    /* Gets the filesize of a filename */
+    struct stat st;
+    if (stat(fn, &st))
+        return 1;
+    if (!S_ISREG(st.st_mode))
+        return 1;
+    if (st.st_size < 0)
+        return 1;
+    *fs = st.st_size;
+    return 0;
+}
+
+int insert_file(struct buf *b, char *fn)
+{
+    /* Inserts a file into the righthand side of the gap */
+    size_t fs;
+    FILE *fp;
+    if (filesize(fn, &fs))
+        return 1;
+    if (fs > (size_t) (b->c - b->g))
+        if (grow_gap(b, fs))
+            return 1;
+    if ((fp = fopen(fn, "r")) == NULL)
+        return 1;
+    if (fread(b->c - fs, 1, fs, fp) != fs) {
+        fclose(fp);
+        return 1;
+    }
+    b->c -= fs;
+    BUFMOD;
+    return 0;
+}
+
+int write_file(struct buf *b)
+{
+    /* Writes a buffer to file */
+    char *tmp_fn;
+    FILE *fp;
+    size_t n;
+
+    if (asprintf(&tmp_fn, "%s~", b->fn) == -1)
+        return 1;
+    if ((fp = fopen(tmp_fn, "w")) == NULL) {
+        free(tmp_fn);
+        return 1;
+    }
+    /* Before gap */
+    n = b->g - b->a;
+    if (fwrite(b->a, 1, n, fp) != n) {
+        free(tmp_fn);
+        fclose(fp);
+        return 1;
+    }
+    /* After gap, excluding the last character */
+    n = b->e - b->c;
+    if (fwrite(b->c, 1, n, fp) != n) {
+        free(tmp_fn);
+        fclose(fp);
+        return 1;
+    }
+    if (fclose(fp)) {
+        free(tmp_fn);
+        return 1;
+    }
+    if (rename(tmp_fn, b->fn)) {
+        free(tmp_fn);
+        return 1;
+    }
+    free(tmp_fn);
+    b->mod = 0;
     return 0;
 }
