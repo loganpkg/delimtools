@@ -19,6 +19,12 @@
  * Dedicated to my son who was only a 4mm "spot" in his first ultrasound.
  */
 
+#include <stdio.h>
+#include <stdlib.h>
+
+/* Initial buffer size */
+#define INIT_BUF_SIZE BUFSIZ
+
 /* No bound or gap size checks are performed */
 #define INSERTCH(b, x) *b->g++ = x; if (x == '\n') ++b->r
 #define DELETECH(b) ++b->c
@@ -39,3 +45,32 @@ struct buf {
     int m_set;                  /* Mark is set */
     int mod;                    /* Buffer text has been modified */
 };
+
+struct buf *init_buf(void)
+{
+    /* Initialises a buffer */
+    struct buf *b;
+    if ((b = malloc(sizeof(struct buf))) == NULL)
+        return NULL;
+    if ((b->a = malloc(INIT_BUF_SIZE)) == NULL)
+        return NULL;
+    b->e = b->a + INIT_BUF_SIZE - 1;
+    b->g = b->a;
+    b->c = b->e;
+    *b->e = '~';                /* End of buffer char. Cannot be deleted. */
+    b->r = 1;
+    b->d = 0;
+    b->m = 0;
+    b->m_set = 0;
+    b->mod = 0;
+    return b;
+}
+
+void free_buf(struct buf *b)
+{
+  /* Frees a buffer */
+    if (b != NULL) {
+        free(b->a);
+        free(b);
+    }
+}
