@@ -39,6 +39,9 @@
 #define LEFTCH(b) *--b->c = *--b->g; if (*b->c == '\n') --b->r
 #define RIGHTCH(b) if (*b->c == '\n') ++b->r; *b->g++ = *b->c++
 
+/* Update settings when a buffer is modified */
+#define BUFMOD b->m = 0; b->m_set = 0; b->mod = 1
+
 /* gap buffer */
 struct buf {
     char *fn;                   /* Filename */
@@ -106,5 +109,28 @@ int grow_gap(struct buf *b, size_t will_use)
     /* Free old memory */
     free(b->a);
     b->a = t;
+    return 0;
+}
+
+int insert_ch(struct buf *b, char c, size_t mult)
+{
+    /* Inserts a char mult times into the buffer */
+    if ((size_t) (b->c - b->g) < mult)
+        if (grow_gap(b, mult))
+            return 1;
+    while (mult--)
+        INSERTCH(b, c);
+    BUFMOD;
+    return 0;
+}
+
+int delete_ch(struct buf *b, size_t mult)
+{
+    /* Deletes mult chars in a buffer */
+    if (mult > (size_t) (b->e - b->c))
+        return 1;
+    while (mult--)
+        DELETECH(b);
+    BUFMOD;
     return 0;
 }
