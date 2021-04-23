@@ -36,6 +36,13 @@
 /* Converts a lowercase letter to it's control value */
 #define CTRL(l) l - 'a' + 1
 
+/* Control spacebar or control @ */
+#define CTRL_SPC 0
+
+/* Converts an index to a pointer */
+#define INDEX_TO_POINTER(b, i) (b->a + b->i < b->g ? b->a + b->i \
+                                  : b->c + b->i - (b->g - b->a))
+
 /* No bound or gap size checks are performed */
 #define INSERTCH(b, x) *b->g++ = x; if (x == '\n') ++b->r
 #define DELETECH(b) ++b->c
@@ -274,17 +281,44 @@ int draw_screen(struct buf *b)
     int cy, cx;
     if (erase() == ERR)
         return 1;
+    /* Commence from draw start */
+    q = b->d + b->a;
+    /* Start highlighting if mark is before draw start */
+    if (b->m_set && b->m < b->d)
+        if (standout() == ERR)
+            return 1;
+
     /* Before gap */
-    q = b->a;
     while (q != b->g) {
+        /* Mark is on screen before cursor */
+        if (b->m_set && q == INDEX_TO_POINTER(b, m))
+            if (standout() == ERR)
+                return 1;
         addch(*q);
         ++q;
     }
+
+    /* Don't highlight the cursor itself */
+    if (b->m_set) {
+        if (INDEX_TO_POINTER(b, m) > b->c) {
+            if (standout() == ERR)
+                return 1;
+        } else {
+            /* Stop highlighting */
+            if (standend() == ERR)
+                return 1;
+        }
+    }
+
     /* Record cursor position */
     getyx(stdscr, cy, cx);
     /* After gap */
     q = b->c;
     while (q <= b->e) {
+        /* Mark is after cursor */
+        if (b->m_set && q == INDEX_TO_POINTER(b, m))
+            if (standend() == ERR)
+                return 1;
         addch(*q);
         ++q;
     }
@@ -294,6 +328,18 @@ int draw_screen(struct buf *b)
     if (refresh() == ERR)
         return 1;
     return 0;
+}
+
+void set_mark(struct buf *b)
+{
+    b->m = b->g - b->a;
+    b->m_set = 1;
+}
+
+void clear_mark(struct buf *b)
+{
+    b->m = 0;
+    b->m_set = 0;
 }
 
 int main(int argc, char **argv)
@@ -319,10 +365,14 @@ int main(int argc, char **argv)
         x = getch();
 
         switch (x) {
-        case CTRL('c'):
-            running = 0;
+        case CTRL_SPC:
+            set_mark(b);
+            break;
+        case CTRL('g'):
+            clear_mark(b);
             break;
         case CTRL('h'):
+        case KEY_BACKSPACE:
             backspace_ch(b, 1);
             break;
         case KEY_LEFT:
@@ -332,8 +382,15 @@ int main(int argc, char **argv)
             right_ch(b, 1);
             break;
         case CTRL('d'):
+        case KEY_DC:
             delete_ch(b, 1);
             break;
+        case CTRL('x'):
+            switch (x = getch()) {
+            case CTRL('c'):
+                running = 0;
+                break;
+            }
         default:
             insert_ch(b, x, 1);
             break;
