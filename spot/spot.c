@@ -20,7 +20,7 @@
  */
 
 #include <sys/stat.h>
-#include <stdio.h>
+#include <curses.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -32,6 +32,9 @@
 #define AOF(a, b) a > SIZE_MAX - b
 /* size_t Multiplication OverFlow test */
 #define MOF(a, b) a && b > SIZE_MAX / a
+
+/* Converts a lowercase letter to it's control value */
+#define CTRL(l) l - 'a' + 1
 
 /* No bound or gap size checks are performed */
 #define INSERTCH(b, x) *b->g++ = x; if (x == '\n') ++b->r
@@ -208,7 +211,9 @@ int write_file(struct buf *b)
     char *tmp_fn;
     FILE *fp;
     size_t n;
-
+    /* No filename */
+    if (b->fn == NULL || !strlen(b->fn))
+        return 1;
     if (asprintf(&tmp_fn, "%s~", b->fn) == -1)
         return 1;
     if ((fp = fopen(tmp_fn, "w")) == NULL) {
@@ -233,6 +238,7 @@ int write_file(struct buf *b)
         free(tmp_fn);
         return 1;
     }
+    /* Atomic */
     if (rename(tmp_fn, b->fn)) {
         free(tmp_fn);
         return 1;
@@ -240,4 +246,105 @@ int write_file(struct buf *b)
     free(tmp_fn);
     b->mod = 0;
     return 0;
+}
+
+int init_ncurses(void)
+{
+    /* Starts ncurses */
+    if (initscr() == NULL)
+        return 1;
+    if (raw() == ERR) {
+        endwin();
+        return 1;
+    }
+    if (noecho() == ERR) {
+        endwin();
+        return 1;
+    }
+    if (keypad(stdscr, TRUE) == ERR) {
+        endwin();
+        return 1;
+    }
+    return 0;
+}
+
+int draw_screen(struct buf *b)
+{
+    char *q;
+    int cy, cx;
+    if (erase() == ERR)
+        return 1;
+    /* Before gap */
+    q = b->a;
+    while (q != b->g) {
+        addch(*q);
+        ++q;
+    }
+    /* Record cursor position */
+    getyx(stdscr, cy, cx);
+    /* After gap */
+    q = b->c;
+    while (q <= b->e) {
+        addch(*q);
+        ++q;
+    }
+    /* Position cursor */
+    if (move(cy, cx) == ERR)
+        return 1;
+    if (refresh() == ERR)
+        return 1;
+    return 0;
+}
+
+int main(int argc, char **argv)
+{
+    int ret = 0;                /* Return value of text editor */
+    int running = 1;            /* Text editor is on */
+    int x;                      /* Read char */
+    struct buf *b;
+
+    if ((b = init_buf()) == NULL) {
+        ret = 1;
+        goto clean_up;
+    }
+
+    if (init_ncurses()) {
+        ret = 1;
+        goto clean_up;
+    }
+
+    while (running) {
+        draw_screen(b);
+
+        x = getch();
+
+        switch (x) {
+        case CTRL('c'):
+            running = 0;
+            break;
+        case CTRL('h'):
+            backspace_ch(b, 1);
+            break;
+        case KEY_LEFT:
+            left_ch(b, 1);
+            break;
+        case KEY_RIGHT:
+            right_ch(b, 1);
+            break;
+        case CTRL('d'):
+            delete_ch(b, 1);
+            break;
+        default:
+            insert_ch(b, x, 1);
+            break;
+        }
+    }
+
+  clean_up:
+    free_buf(b);
+    if (stdscr != NULL)
+        if (endwin() == ERR)
+            ret = 1;
+
+    return ret;
 }
