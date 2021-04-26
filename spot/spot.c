@@ -275,12 +275,53 @@ int init_ncurses(void)
     return 0;
 }
 
-int draw_screen(struct buf *b)
+void centre_cursor(struct buf *b)
 {
+    /* Sets draw start so that the cursor might be in the middle of the screen */
+    int height, width;
     char *q;
-    int cy, cx;
+    int up;
+    getmaxyx(stdscr, height, width);
+    up = (height - 2) / 2;
+    if (b->g == b->a) {
+        b->d = 0;
+        return;
+    }
+    q = b->g - 1;
+    while (q != b->a && up) {
+        if (*q == '\n')
+            --up;
+        --q;
+    }
+
+/* Move to start of line */
+    if (q != b->a)
+        ++q;
+
+    b->d = q - b->a;
+}
+
+int draw_screen(struct buf *b, struct buf *cl, int cl_active)
+{
+    /* Draws a buffer to the screen, including the command line buffer */
+    char *q;
+    int height, width;          /* Screen size */
+    int cy, cx;                 /* Final cursor position */
+    int y, x;                   /* Changing cursor position */
+    int centred = 0;
+
+    getmaxyx(stdscr, height, width);
+
+    /* Cursor is above the screen */
+    if (b->c < INDEX_TO_POINTER(b, d)) {
+        centre_cursor(b);
+        centred = 1;
+    }
+
+  draw_start:
     if (erase() == ERR)
         return 1;
+
     /* Commence from draw start */
     q = b->d + b->a;
     /* Start highlighting if mark is before draw start */
@@ -295,6 +336,19 @@ int draw_screen(struct buf *b)
             if (standout() == ERR)
                 return 1;
         addch(*q);
+        getyx(stdscr, y, x);
+        if (y >= height - 2) {
+            /* Cursor out of text portion of the screen */
+            if (!centred) {
+                centre_cursor(b);
+                centred = 1;
+                goto draw_start;
+            } else {
+                /* Draw from the cursor */
+                b->d = b->g - b->a;
+                goto draw_start;
+            }
+        }
         ++q;
     }
 
@@ -311,7 +365,8 @@ int draw_screen(struct buf *b)
     }
 
     /* Record cursor position */
-    getyx(stdscr, cy, cx);
+    if (!cl_active)
+        getyx(stdscr, cy, cx);
     /* After gap */
     q = b->c;
     while (q <= b->e) {
@@ -319,9 +374,17 @@ int draw_screen(struct buf *b)
         if (b->m_set && q == INDEX_TO_POINTER(b, m))
             if (standend() == ERR)
                 return 1;
-        addch(*q);
+        if (addch(*q) == ERR)
+            break;
         ++q;
     }
+
+    /* Status bar */
+
+
+    /* Command line buffer */
+
+
     /* Position cursor */
     if (move(cy, cx) == ERR)
         return 1;
@@ -347,9 +410,15 @@ int main(int argc, char **argv)
     int ret = 0;                /* Return value of text editor */
     int running = 1;            /* Text editor is on */
     int x;                      /* Read char */
-    struct buf *b;
+    struct buf *b = NULL;
+    struct buf *cl = NULL;      /* Command line buffer */
 
     if ((b = init_buf()) == NULL) {
+        ret = 1;
+        goto clean_up;
+    }
+
+    if ((cl = init_buf()) == NULL) {
         ret = 1;
         goto clean_up;
     }
@@ -360,7 +429,10 @@ int main(int argc, char **argv)
     }
 
     while (running) {
-        draw_screen(b);
+        if (draw_screen(b, cl, 0)) {
+            ret = 1;
+            goto clean_up;
+        }
 
         x = getch();
 
@@ -399,6 +471,7 @@ int main(int argc, char **argv)
 
   clean_up:
     free_buf(b);
+    free_buf(cl);
     if (stdscr != NULL)
         if (endwin() == ERR)
             ret = 1;
