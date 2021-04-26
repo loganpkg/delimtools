@@ -275,14 +275,17 @@ int init_ncurses(void)
     return 0;
 }
 
-void centre_cursor(struct buf *b)
+void centre_cursor(struct buf *b, int text_height)
 {
-    /* Sets draw start so that the cursor might be in the middle of the screen */
-    int height, width;
+    /*
+     * Sets draw start so that the cursor might be in the middle
+     * of the screen. Does not handle long lines.
+     */
     char *q;
     int up;
-    getmaxyx(stdscr, height, width);
-    up = (height - 2) / 2;
+    up = text_height / 2;
+    if (!up)
+        up = 1;
     if (b->g == b->a) {
         b->d = 0;
         return;
@@ -294,7 +297,7 @@ void centre_cursor(struct buf *b)
         --q;
     }
 
-/* Move to start of line */
+    /* Move to start of line */
     if (q != b->a)
         ++q;
 
@@ -309,12 +312,14 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active)
     int cy, cx;                 /* Final cursor position */
     int y, x;                   /* Changing cursor position */
     int centred = 0;
+    int rv = 0;                 /* Return value of addch */
+    char *sb;                   /* Status bar */
 
     getmaxyx(stdscr, height, width);
 
     /* Cursor is above the screen */
     if (b->c < INDEX_TO_POINTER(b, d)) {
-        centre_cursor(b);
+        centre_cursor(b, height >= 3 ? height - 2 : height);
         centred = 1;
     }
 
@@ -335,12 +340,12 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active)
         if (b->m_set && q == INDEX_TO_POINTER(b, m))
             if (standout() == ERR)
                 return 1;
-        addch(*q);
+        rv = addch(*q);
         getyx(stdscr, y, x);
-        if (y >= height - 2) {
+        if ((height >= 3 && y >= height - 2) || rv == ERR) {
             /* Cursor out of text portion of the screen */
             if (!centred) {
-                centre_cursor(b);
+                centre_cursor(b, height >= 3 ? height - 2 : height);
                 centred = 1;
                 goto draw_start;
             } else {
@@ -374,16 +379,89 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active)
         if (b->m_set && q == INDEX_TO_POINTER(b, m))
             if (standend() == ERR)
                 return 1;
-        if (addch(*q) == ERR)
+        rv = addch(*q);
+        getyx(stdscr, y, x);
+        if ((height >= 3 && y >= height - 2) || rv == ERR)
             break;
         ++q;
     }
 
-    /* Status bar */
 
+    if (height >= 3) {
+        /* Status bar */
+        if (move(height - 2, 0) == ERR)
+            return 1;
+        /* Clear the line */
+        /* if (clrtoeol() == ERR) return 1; */
+        if (asprintf
+            (&sb, "%c %s (%lu) %02X", b->mod ? '*' : ' ', b->fn, b->r,
+             (unsigned char) *b->c) == -1)
+            return 1;
+        if (addnstr(sb, width) == ERR) {
+            free(sb);
+            return 1;
+        }
+        free(sb);
+        /* Highlight status bar */
+        if (mvchgat(height - 2, 0, width, A_STANDOUT, 0, NULL) == ERR)
+            return 1;
 
-    /* Command line buffer */
+        /* Command line buffer */
+        if (move(height - 1, 0) == ERR)
+            return 1;
 
+      cl_draw_start:
+        if (clrtobot() == ERR)
+            return 1;
+
+        /* Commence from draw start */
+        q = cl->d + cl->a;
+        /* Start highlighting if mark is before draw start */
+        if (cl->m_set && cl->m < cl->d)
+            if (standout() == ERR)
+                return 1;
+
+        /* Before gap */
+        while (q != cl->g) {
+            /* Mark is on screen before cursor */
+            if (cl->m_set && q == INDEX_TO_POINTER(cl, m))
+                if (standout() == ERR)
+                    return 1;
+            if (addch(*q) == ERR) {
+                /* Draw from the cursor */
+                cl->d = cl->g - cl->a;
+                goto cl_draw_start;
+            }
+            ++q;
+        }
+
+        /* Don't highlight the cursor itself */
+        if (cl->m_set) {
+            if (INDEX_TO_POINTER(cl, m) > cl->c) {
+                if (standout() == ERR)
+                    return 1;
+            } else {
+                /* Stop highlighting */
+                if (standend() == ERR)
+                    return 1;
+            }
+        }
+
+        /* Record cursor position */
+        if (cl_active)
+            getyx(stdscr, cy, cx);
+        /* After gap */
+        q = cl->c;
+        while (q <= cl->e) {
+            /* Mark is after cursor */
+            if (cl->m_set && q == INDEX_TO_POINTER(cl, m))
+                if (standend() == ERR)
+                    return 1;
+            if (addch(*q) == ERR)
+                break;
+            ++q;
+        }
+    }
 
     /* Position cursor */
     if (move(cy, cx) == ERR)
