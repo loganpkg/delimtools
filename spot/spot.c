@@ -39,6 +39,9 @@
 /* Control spacebar or control @ */
 #define CTRL_SPC 0
 
+/* Escape key */
+#define ESC 27
+
 /* Converts an index to a pointer */
 #define INDEX_TO_POINTER(b, i) (b->a + b->i < b->g ? b->a + b->i \
                                   : b->c + b->i - (b->g - b->a))
@@ -304,28 +307,35 @@ void centre_cursor(struct buf *b, int text_height)
     b->d = q - b->a;
 }
 
-int draw_screen(struct buf *b, struct buf *cl, int cl_active)
+int draw_screen(struct buf *b, struct buf *cl, int cl_active, int rv,
+                int req_centre, int req_clear)
 {
     /* Draws a buffer to the screen, including the command line buffer */
     char *q;
     int height, width;          /* Screen size */
     int cy, cx;                 /* Final cursor position */
     int y, x;                   /* Changing cursor position */
-    int centred = 0;
-    int rv = 0;                 /* Return value of addch */
+    int centred = 0;            /* Indicates if centreing has occurred */
+    int rv_a = 0;               /* Return value of addch */
     char *sb;                   /* Status bar */
 
     getmaxyx(stdscr, height, width);
 
     /* Cursor is above the screen */
-    if (b->c < INDEX_TO_POINTER(b, d)) {
+    if (req_centre || b->c < INDEX_TO_POINTER(b, d)) {
         centre_cursor(b, height >= 3 ? height - 2 : height);
         centred = 1;
     }
 
   draw_start:
-    if (erase() == ERR)
-        return 1;
+    if (req_clear) {
+        if (clear() == ERR)
+            return 1;
+        req_clear = 0;
+    } else {
+        if (erase() == ERR)
+            return 1;
+    }
 
     /* Commence from draw start */
     q = b->d + b->a;
@@ -340,9 +350,9 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active)
         if (b->m_set && q == INDEX_TO_POINTER(b, m))
             if (standout() == ERR)
                 return 1;
-        rv = addch(*q);
+        rv_a = addch(*q);
         getyx(stdscr, y, x);
-        if ((height >= 3 && y >= height - 2) || rv == ERR) {
+        if ((height >= 3 && y >= height - 2) || rv_a == ERR) {
             /* Cursor out of text portion of the screen */
             if (!centred) {
                 centre_cursor(b, height >= 3 ? height - 2 : height);
@@ -379,9 +389,9 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active)
         if (b->m_set && q == INDEX_TO_POINTER(b, m))
             if (standend() == ERR)
                 return 1;
-        rv = addch(*q);
+        rv_a = addch(*q);
         getyx(stdscr, y, x);
-        if ((height >= 3 && y >= height - 2) || rv == ERR)
+        if ((height >= 3 && y >= height - 2) || rv_a == ERR)
             break;
         ++q;
     }
@@ -394,8 +404,8 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active)
         /* Clear the line */
         /* if (clrtoeol() == ERR) return 1; */
         if (asprintf
-            (&sb, "%c %s (%lu) %02X", b->mod ? '*' : ' ', b->fn, b->r,
-             (unsigned char) *b->c) == -1)
+            (&sb, "%c%c %s (%lu) %02X", rv ? '!' : ' ', b->mod ? '*' : ' ',
+             b->fn, b->r, (unsigned char) *b->c) == -1)
             return 1;
         if (addnstr(sb, width) == ERR) {
             free(sb);
@@ -486,10 +496,13 @@ void clear_mark(struct buf *b)
 int main(int argc, char **argv)
 {
     int ret = 0;                /* Return value of text editor */
+    int rv = 0;                 /* Internal function return value */
     int running = 1;            /* Text editor is on */
     int x;                      /* Read char */
     struct buf *b = NULL;
     struct buf *cl = NULL;      /* Command line buffer */
+    int req_centre = 0;         /* User requests cursor centreing */
+    int req_clear = 0;          /* User requests screen clearing */
 
     if ((b = init_buf()) == NULL) {
         ret = 1;
@@ -507,10 +520,15 @@ int main(int argc, char **argv)
     }
 
     while (running) {
-        if (draw_screen(b, cl, 0)) {
+        if (draw_screen(b, cl, 0, rv, req_centre, req_clear)) {
             ret = 1;
             goto clean_up;
         }
+        /* Clear drawing options */
+        req_centre = 0;
+        req_clear = 0;
+        /* Clear internal return value */
+        rv = 0;
 
         x = getch();
 
@@ -523,26 +541,41 @@ int main(int argc, char **argv)
             break;
         case CTRL('h'):
         case KEY_BACKSPACE:
-            backspace_ch(b, 1);
+            rv = backspace_ch(b, 1);
             break;
         case KEY_LEFT:
-            left_ch(b, 1);
+            rv = left_ch(b, 1);
             break;
         case KEY_RIGHT:
-            right_ch(b, 1);
+            rv = right_ch(b, 1);
             break;
         case CTRL('d'):
         case KEY_DC:
-            delete_ch(b, 1);
+            rv = delete_ch(b, 1);
+            break;
+        case CTRL('l'):
+            req_centre = 1;
             break;
         case CTRL('x'):
             switch (x = getch()) {
             case CTRL('c'):
                 running = 0;
                 break;
+            case CTRL('s'):
+                rv = write_file(b);
+                break;
             }
+            break;
+        case ESC:
+            switch (x = getch()) {
+            case 'l':
+                req_centre = 1;
+                req_clear = 1;
+                break;
+            }
+            break;
         default:
-            insert_ch(b, x, 1);
+            rv = insert_ch(b, x, 1);
             break;
         }
     }
