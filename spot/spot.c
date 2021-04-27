@@ -47,14 +47,14 @@
                                   : b->c + b->i - (b->g - b->a))
 
 /* No bound or gap size checks are performed */
-#define INSERTCH(b, x) *b->g++ = x; if (x == '\n') ++b->r
+#define INSERTCH(b, x) do {*b->g++ = x; if (x == '\n') ++b->r;} while(0)
 #define DELETECH(b) ++b->c
 #define BACKSPACECH(b) if (*--b->g == '\n') --b->r
-#define LEFTCH(b) *--b->c = *--b->g; if (*b->c == '\n') --b->r
-#define RIGHTCH(b) if (*b->c == '\n') ++b->r; *b->g++ = *b->c++
+#define LEFTCH(b) do {*--b->c = *--b->g; if (*b->c == '\n') --b->r;} while(0)
+#define RIGHTCH(b) do {if (*b->c == '\n') ++b->r; *b->g++ = *b->c++;} while (0)
 
 /* Update settings when a buffer is modified */
-#define BUFMOD b->m = 0; b->m_set = 0; b->mod = 1
+#define BUFMOD do {b->m = 0; b->m_set = 0; b->mod = 1;} while (0)
 
 /* gap buffer */
 struct buf {
@@ -81,7 +81,8 @@ struct buf *init_buf(void)
     b->e = b->a + INIT_BUF_SIZE - 1;
     b->g = b->a;
     b->c = b->e;
-    *b->e = '~';                /* End of buffer char. Cannot be deleted. */
+    /* End of buffer char. Cannot be deleted. */
+    *b->e = '\0';
     b->r = 1;
     b->d = 0;
     b->m = 0;
@@ -481,6 +482,42 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active, int rv,
     return 0;
 }
 
+void start_of_buf(struct buf *b)
+{
+    while (b->a != b->g)
+        LEFTCH(b);
+}
+
+void end_of_buf(struct buf *b)
+{
+    while (b->c != b->e)
+        RIGHTCH(b);
+}
+
+void start_of_line(struct buf *b)
+{
+    while (b->a != b->g && *(b->g - 1) != '\n')
+        LEFTCH(b);
+}
+
+void end_of_line(struct buf *b)
+{
+    while (b->c != b->e && *b->c != '\n')
+        RIGHTCH(b);
+}
+
+void str_buf(struct buf *b)
+{
+    /* Prepares a buffer so that b->c can be used as a string */
+    end_of_buf(b);
+    while (b->a != b->g) {
+        LEFTCH(b);
+        if (*b->c == '\0')
+            DELETECH(b);
+    }
+    *b->e = '\0';
+}
+
 void set_mark(struct buf *b)
 {
     b->m = b->g - b->a;
@@ -493,6 +530,19 @@ void clear_mark(struct buf *b)
     b->m_set = 0;
 }
 
+int search(struct buf *b, char *p, size_t n)
+{
+    /* Forward search buffer b for memory p (n chars long) */
+    char *q;
+    if (b->c == b->e)
+        return 1;
+    if ((q = memmem(b->c + 1, b->e - b->c - 1, p, n)) == NULL)
+        return 1;
+    while (b->c != q)
+        RIGHTCH(b);
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     int ret = 0;                /* Return value of text editor */
@@ -501,8 +551,11 @@ int main(int argc, char **argv)
     int x;                      /* Read char */
     struct buf *b = NULL;
     struct buf *cl = NULL;      /* Command line buffer */
+    struct buf *z;              /* Shortcut to the active buffer */
     int req_centre = 0;         /* User requests cursor centreing */
     int req_clear = 0;          /* User requests screen clearing */
+    int cl_active = 0;          /* Command line is being used */
+    char operation = ' ';       /* Operation for which command line is being used */
 
     if ((b = init_buf()) == NULL) {
         ret = 1;
@@ -520,7 +573,8 @@ int main(int argc, char **argv)
     }
 
     while (running) {
-        if (draw_screen(b, cl, 0, rv, req_centre, req_clear)) {
+      top:
+        if (draw_screen(b, cl, cl_active, rv, req_centre, req_clear)) {
             ret = 1;
             goto clean_up;
         }
@@ -530,31 +584,63 @@ int main(int argc, char **argv)
         /* Clear internal return value */
         rv = 0;
 
+        /* Active buffer */
+        if (cl_active)
+            z = cl;
+        else
+            z = b;
+
         x = getch();
+
+        if (cl_active && x == '\n') {
+            switch (operation) {
+            case 'f':
+                str_buf(cl);
+                rv = insert_file(b, cl->c);
+                break;
+            case 's':
+                start_of_buf(cl);
+                rv = search(b, cl->c, cl->e - cl->c);
+                break;
+            }
+            cl_active = 0;
+            operation = ' ';
+            goto top;
+        }
 
         switch (x) {
         case CTRL_SPC:
-            set_mark(b);
+            set_mark(z);
             break;
         case CTRL('g'):
-            clear_mark(b);
+            clear_mark(z);
             break;
         case CTRL('h'):
         case KEY_BACKSPACE:
-            rv = backspace_ch(b, 1);
+            rv = backspace_ch(z, 1);
             break;
         case KEY_LEFT:
-            rv = left_ch(b, 1);
+            rv = left_ch(z, 1);
             break;
         case KEY_RIGHT:
-            rv = right_ch(b, 1);
+            rv = right_ch(z, 1);
+            break;
+        case CTRL('a'):
+            start_of_line(z);
+            break;
+        case CTRL('e'):
+            end_of_line(z);
             break;
         case CTRL('d'):
         case KEY_DC:
-            rv = delete_ch(b, 1);
+            rv = delete_ch(z, 1);
             break;
         case CTRL('l'):
             req_centre = 1;
+            break;
+        case CTRL('s'):
+            operation = 's';
+            cl_active = 1;
             break;
         case CTRL('x'):
             switch (x = getch()) {
@@ -562,7 +648,11 @@ int main(int argc, char **argv)
                 running = 0;
                 break;
             case CTRL('s'):
-                rv = write_file(b);
+                rv = write_file(z);
+                break;
+            case CTRL('f'):
+                operation = 'f';
+                cl_active = 1;
                 break;
             }
             break;
@@ -572,10 +662,20 @@ int main(int argc, char **argv)
                 req_centre = 1;
                 req_clear = 1;
                 break;
+            case 's':
+                start_of_buf(cl);
+                rv = search(z, cl->c, cl->e - cl->c);
+                break;
+            case '<':
+                start_of_buf(z);
+                break;
+            case '>':
+                end_of_buf(z);
+                break;
             }
             break;
         default:
-            rv = insert_ch(b, x, 1);
+            rv = insert_ch(z, x, 1);
             break;
         }
     }
