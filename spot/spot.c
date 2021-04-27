@@ -181,6 +181,141 @@ int right_ch(struct buf *b, size_t mult)
     return 0;
 }
 
+void start_of_buf(struct buf *b)
+{
+    while (b->a != b->g)
+        LEFTCH(b);
+}
+
+void end_of_buf(struct buf *b)
+{
+    while (b->c != b->e)
+        RIGHTCH(b);
+}
+
+void start_of_line(struct buf *b)
+{
+    while (b->a != b->g && *(b->g - 1) != '\n')
+        LEFTCH(b);
+}
+
+void end_of_line(struct buf *b)
+{
+    while (b->c != b->e && *b->c != '\n')
+        RIGHTCH(b);
+}
+
+void str_buf(struct buf *b)
+{
+    /* Prepares a buffer so that b->c can be used as a string */
+    end_of_buf(b);
+    while (b->a != b->g) {
+        LEFTCH(b);
+        if (*b->c == '\0')
+            DELETECH(b);
+    }
+    *b->e = '\0';
+}
+
+void set_mark(struct buf *b)
+{
+    b->m = b->g - b->a;
+    b->m_set = 1;
+}
+
+void clear_mark(struct buf *b)
+{
+    b->m = 0;
+    b->m_set = 0;
+}
+
+int search(struct buf *b, char *p, size_t n)
+{
+    /* Forward search buffer b for memory p (n chars long) */
+    char *q;
+    if (b->c == b->e)
+        return 1;
+    if ((q = memmem(b->c + 1, b->e - b->c - 1, p, n)) == NULL)
+        return 1;
+    while (b->c != q)
+        RIGHTCH(b);
+    return 0;
+}
+
+int match_bracket(struct buf *b)
+{
+    /* Moves the cursor to the corresponding nested bracket */
+    int right;
+    char orig = *b->c;
+    char target;
+    size_t depth;
+    char *backup = b->c;
+
+    switch (orig) {
+    case '(':
+        target = ')';
+        right = 1;
+        break;
+    case '{':
+        target = '}';
+        right = 1;
+        break;
+    case '[':
+        target = ']';
+        right = 1;
+        break;
+    case '<':
+        target = '>';
+        right = 1;
+        break;
+    case ')':
+        target = '(';
+        right = 0;
+        break;
+    case '}':
+        target = '{';
+        right = 0;
+        break;
+    case ']':
+        target = '[';
+        right = 0;
+        break;
+    case '>':
+        target = '<';
+        right = 0;
+        break;
+    default:
+        return 1;
+    }
+
+    depth = 1;
+    if (right) {
+        while (b->c != b->e) {
+            RIGHTCH(b);
+            if (*b->c == orig)
+                ++depth;
+            if (*b->c == target)
+                if (!--depth)
+                    return 0;
+        }
+        while (b->c != backup)
+            LEFTCH(b);
+    } else {
+        while (b->a != b->g) {
+            LEFTCH(b);
+            if (*b->c == orig)
+                ++depth;
+            if (*b->c == target)
+                if (!--depth)
+                    return 0;
+        }
+        while (b->c != backup)
+            RIGHTCH(b);
+    }
+
+    return 1;
+}
+
 int filesize(char *fn, size_t * fs)
 {
     /* Gets the filesize of a filename */
@@ -482,67 +617,6 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active, int rv,
     return 0;
 }
 
-void start_of_buf(struct buf *b)
-{
-    while (b->a != b->g)
-        LEFTCH(b);
-}
-
-void end_of_buf(struct buf *b)
-{
-    while (b->c != b->e)
-        RIGHTCH(b);
-}
-
-void start_of_line(struct buf *b)
-{
-    while (b->a != b->g && *(b->g - 1) != '\n')
-        LEFTCH(b);
-}
-
-void end_of_line(struct buf *b)
-{
-    while (b->c != b->e && *b->c != '\n')
-        RIGHTCH(b);
-}
-
-void str_buf(struct buf *b)
-{
-    /* Prepares a buffer so that b->c can be used as a string */
-    end_of_buf(b);
-    while (b->a != b->g) {
-        LEFTCH(b);
-        if (*b->c == '\0')
-            DELETECH(b);
-    }
-    *b->e = '\0';
-}
-
-void set_mark(struct buf *b)
-{
-    b->m = b->g - b->a;
-    b->m_set = 1;
-}
-
-void clear_mark(struct buf *b)
-{
-    b->m = 0;
-    b->m_set = 0;
-}
-
-int search(struct buf *b, char *p, size_t n)
-{
-    /* Forward search buffer b for memory p (n chars long) */
-    char *q;
-    if (b->c == b->e)
-        return 1;
-    if ((q = memmem(b->c + 1, b->e - b->c - 1, p, n)) == NULL)
-        return 1;
-    while (b->c != q)
-        RIGHTCH(b);
-    return 0;
-}
-
 int main(int argc, char **argv)
 {
     int ret = 0;                /* Return value of text editor */
@@ -665,6 +739,9 @@ int main(int argc, char **argv)
             case 's':
                 start_of_buf(cl);
                 rv = search(z, cl->c, cl->e - cl->c);
+                break;
+            case 'm':
+                rv = match_bracket(z);
                 break;
             case '<':
                 start_of_buf(z);
