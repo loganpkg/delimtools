@@ -42,9 +42,22 @@
 /* Escape key */
 #define ESC 27
 
+/* Calculates the gap size */
+#define GAPSIZE(b) (size_t) (b->c - b->g)
+
+/* Converts the cursor pointer to an index */
+#define CURSOR_INDEX(b) (size_t) (b->g - b->a)
+
 /* Converts an index to a pointer */
 #define INDEX_TO_POINTER(b, i) (b->a + b->i < b->g ? b->a + b->i \
                                   : b->c + b->i - (b->g - b->a))
+
+/* Delete buffer */
+#define DELETEBUF(b) do {b->g = b->a; b->c = b->e; b->r = 0; b->d = 0; \
+                         b->m = 0; b->m_set = 0; b->mod = 1;} while (0)
+
+/* Update settings when a buffer is modified */
+#define BUFMOD do {b->m = 0; b->m_set = 0; b->mod = 1;} while (0)
 
 /* No bound or gap size checks are performed */
 #define INSERTCH(b, x) do {*b->g++ = x; if (x == '\n') ++b->r;} while(0)
@@ -52,9 +65,6 @@
 #define BACKSPACECH(b) if (*--b->g == '\n') --b->r
 #define LEFTCH(b) do {*--b->c = *--b->g; if (*b->c == '\n') --b->r;} while(0)
 #define RIGHTCH(b) do {if (*b->c == '\n') ++b->r; *b->g++ = *b->c++;} while (0)
-
-/* Update settings when a buffer is modified */
-#define BUFMOD do {b->m = 0; b->m_set = 0; b->mod = 1;} while (0)
 
 /* gap buffer */
 struct buf {
@@ -130,7 +140,7 @@ int grow_gap(struct buf *b, size_t will_use)
 int insert_ch(struct buf *b, char c, size_t mult)
 {
     /* Inserts a char mult times into the buffer */
-    if ((size_t) (b->c - b->g) < mult)
+    if (GAPSIZE(b) < mult)
         if (grow_gap(b, mult))
             return 1;
     while (mult--)
@@ -153,7 +163,7 @@ int delete_ch(struct buf *b, size_t mult)
 int backspace_ch(struct buf *b, size_t mult)
 {
     /* Backspaces mult chars in a buffer */
-    if (mult > (size_t) (b->g - b->a))
+    if (mult > CURSOR_INDEX(b))
         return 1;
     while (mult--)
         BACKSPACECH(b);
@@ -164,7 +174,7 @@ int backspace_ch(struct buf *b, size_t mult)
 int left_ch(struct buf *b, size_t mult)
 {
     /* Move the cursor left mult positions */
-    if (mult > (size_t) (b->g - b->a))
+    if (mult > CURSOR_INDEX(b))
         return 1;
     while (mult--)
         LEFTCH(b);
@@ -219,7 +229,7 @@ void str_buf(struct buf *b)
 
 void set_mark(struct buf *b)
 {
-    b->m = b->g - b->a;
+    b->m = CURSOR_INDEX(b);
     b->m_set = 1;
 }
 
@@ -316,6 +326,79 @@ int match_bracket(struct buf *b)
     return 1;
 }
 
+int copy_region(struct buf *b, struct buf *p, int del)
+{
+    /*
+     * Appends the region from buffer b into buffer p,
+     * deleting the region if del is non-zero.
+     */
+    size_t s, r_start;
+    char *q, ch, *m_pointer;
+    if (!b->m_set)
+        return 1;
+    if (b->m == CURSOR_INDEX(b))
+        return 1;
+    if (b->m < CURSOR_INDEX(b)) {
+        q = b->a + b->m;
+        s = b->g - q;
+        if (s > GAPSIZE(p))
+            if (grow_gap(p, s))
+                return 1;
+        r_start = p->r;
+        while (q != b->g) {
+            ch = *q++;
+            INSERTCH(p, ch);
+        }
+        if (del) {
+            b->g = b->a + b->m;
+            /* Adjust for removed rows */
+            b->r -= p->r - r_start;
+        }
+    } else {
+        q = b->c;
+        m_pointer = INDEX_TO_POINTER(b, m);
+        s = m_pointer - q;
+        if (s > GAPSIZE(p))
+            if (grow_gap(p, s))
+                return 1;
+        while (q != m_pointer) {
+            ch = *q++;
+            INSERTCH(p, ch);
+        }
+        if (del)
+            b->c = m_pointer;
+    }
+    return 0;
+}
+
+
+int paste(struct buf *b, struct buf *p, size_t mult)
+{
+    /*
+     * Pastes (inserts) buffer p into buffer b mult times.
+     * Assumes the cursor is at the end of buffer p.
+     */
+    size_t s = p->g - p->a;
+    char *q, ch;
+    if (!s)
+        return 1;
+    if (MOF(s, mult))
+        return 1;
+    s *= mult;
+    if (s > GAPSIZE(b))
+        if (grow_gap(b, s))
+            return 1;
+    while (mult--) {
+        q = p->a;
+        while (q != p->g) {
+            ch = *q++;
+            INSERTCH(b, ch);
+        }
+    }
+    BUFMOD;
+    return 0;
+}
+
 int filesize(char *fn, size_t * fs)
 {
     /* Gets the filesize of a filename */
@@ -337,7 +420,7 @@ int insert_file(struct buf *b, char *fn)
     FILE *fp;
     if (filesize(fn, &fs))
         return 1;
-    if (fs > (size_t) (b->c - b->g))
+    if (fs > GAPSIZE(b))
         if (grow_gap(b, fs))
             return 1;
     if ((fp = fopen(fn, "r")) == NULL)
@@ -496,7 +579,7 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active, int rv,
                 goto draw_start;
             } else {
                 /* Draw from the cursor */
-                b->d = b->g - b->a;
+                b->d = CURSOR_INDEX(b);
                 goto draw_start;
             }
         }
@@ -626,6 +709,7 @@ int main(int argc, char **argv)
     struct buf *b = NULL;
     struct buf *cl = NULL;      /* Command line buffer */
     struct buf *z;              /* Shortcut to the active buffer */
+    struct buf *p = NULL;       /* Paste buffer */
     int req_centre = 0;         /* User requests cursor centreing */
     int req_clear = 0;          /* User requests screen clearing */
     int cl_active = 0;          /* Command line is being used */
@@ -637,6 +721,11 @@ int main(int argc, char **argv)
     }
 
     if ((cl = init_buf()) == NULL) {
+        ret = 1;
+        goto clean_up;
+    }
+
+    if ((p = init_buf()) == NULL) {
         ret = 1;
         goto clean_up;
     }
@@ -716,6 +805,13 @@ int main(int argc, char **argv)
             operation = 's';
             cl_active = 1;
             break;
+        case CTRL('w'):
+            DELETEBUF(p);
+            rv = copy_region(z, p, 1);
+            break;
+        case CTRL('y'):
+            rv = paste(z, p, 1);
+            break;
         case CTRL('x'):
             switch (x = getch()) {
             case CTRL('c'):
@@ -743,6 +839,10 @@ int main(int argc, char **argv)
             case 'm':
                 rv = match_bracket(z);
                 break;
+            case 'w':
+                DELETEBUF(p);
+                rv = copy_region(z, p, 0);
+                break;
             case '<':
                 start_of_buf(z);
                 break;
@@ -760,6 +860,7 @@ int main(int argc, char **argv)
   clean_up:
     free_buf(b);
     free_buf(cl);
+    free_buf(p);
     if (stdscr != NULL)
         if (endwin() == ERR)
             ret = 1;
