@@ -57,7 +57,7 @@
                          b->m = 0; b->m_set = 0; b->mod = 1;} while (0)
 
 /* Update settings when a buffer is modified */
-#define BUFMOD do {b->m = 0; b->m_set = 0; b->mod = 1;} while (0)
+#define SETMOD() do {b->m = 0; b->m_set = 0; b->mod = 1;} while (0)
 
 /* No bound or gap size checks are performed */
 #define INSERTCH(b, x) do {*b->g++ = x; if (x == '\n') ++b->r;} while(0)
@@ -145,7 +145,7 @@ int insert_ch(struct buf *b, char c, size_t mult)
             return 1;
     while (mult--)
         INSERTCH(b, c);
-    BUFMOD;
+    SETMOD();
     return 0;
 }
 
@@ -156,7 +156,7 @@ int delete_ch(struct buf *b, size_t mult)
         return 1;
     while (mult--)
         DELETECH(b);
-    BUFMOD;
+    SETMOD();
     return 0;
 }
 
@@ -167,7 +167,7 @@ int backspace_ch(struct buf *b, size_t mult)
         return 1;
     while (mult--)
         BACKSPACECH(b);
-    BUFMOD;
+    SETMOD();
     return 0;
 }
 
@@ -353,6 +353,7 @@ int copy_region(struct buf *b, struct buf *p, int del)
             b->g = b->a + b->m;
             /* Adjust for removed rows */
             b->r -= p->r - r_start;
+            SETMOD();
         }
     } else {
         q = b->c;
@@ -365,8 +366,10 @@ int copy_region(struct buf *b, struct buf *p, int del)
             ch = *q++;
             INSERTCH(p, ch);
         }
-        if (del)
+        if (del) {
             b->c = m_pointer;
+            SETMOD();
+        }
     }
     return 0;
 }
@@ -395,7 +398,7 @@ int paste(struct buf *b, struct buf *p, size_t mult)
             INSERTCH(b, ch);
         }
     }
-    BUFMOD;
+    SETMOD();
     return 0;
 }
 
@@ -430,7 +433,7 @@ int insert_file(struct buf *b, char *fn)
         return 1;
     }
     b->c -= fs;
-    BUFMOD;
+    SETMOD();
     return 0;
 }
 
