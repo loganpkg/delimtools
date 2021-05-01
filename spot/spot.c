@@ -24,17 +24,21 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <ctype.h>
 
 /* Initial buffer size */
 #define INIT_BUF_SIZE BUFSIZ
 
 /* size_t Addition OverFlow test */
-#define AOF(a, b) a > SIZE_MAX - b
+#define AOF(a, b) ((a) > SIZE_MAX - (b))
 /* size_t Multiplication OverFlow test */
-#define MOF(a, b) a && b > SIZE_MAX / a
+#define MOF(a, b) ((a) && (b) > SIZE_MAX / (a))
+
+/* Takes signed input */
+#define ISASCII(x) ((x) >= 0 && (x) <= 127)
 
 /* Converts a lowercase letter to it's control value */
-#define CTRL(l) l - 'a' + 1
+#define CTRL(l) ((l) - 'a' + 1)
 
 /* Control spacebar or control @ */
 #define CTRL_SPC 0
@@ -43,14 +47,14 @@
 #define ESC 27
 
 /* Calculates the gap size */
-#define GAPSIZE(b) (size_t) (b->c - b->g)
+#define GAPSIZE(b) ((size_t) (b->c - b->g))
 
 /* Converts the cursor pointer to an index */
-#define CURSOR_INDEX(b) (size_t) (b->g - b->a)
+#define CURSOR_INDEX(b) ((size_t) (b->g - b->a))
 
 /* Converts an index to a pointer */
 #define INDEX_TO_POINTER(b, i) (b->a + b->i < b->g ? b->a + b->i \
-                                  : b->c + b->i - (b->g - b->a))
+				: b->c + b->i - (b->g - b->a))
 
 /* Delete buffer */
 #define DELETEBUF(b) do {b->g = b->a; b->c = b->e; b->r = 0; b->d = 0; \
@@ -373,7 +377,6 @@ int copy_region(struct buf *b, struct buf *p, int del)
     }
     return 0;
 }
-
 
 int paste(struct buf *b, struct buf *p, size_t mult)
 {
@@ -717,6 +720,7 @@ int main(int argc, char **argv)
     int req_clear = 0;          /* User requests screen clearing */
     int cl_active = 0;          /* Command line is being used */
     char operation = ' ';       /* Operation for which command line is being used */
+    size_t mult;                /* Command multiplier */
 
     if ((b = init_buf()) == NULL) {
         ret = 1;
@@ -758,6 +762,27 @@ int main(int argc, char **argv)
 
         x = getch();
 
+        mult = 0;
+        if (x == CTRL('u')) {
+            x = getch();
+            while (ISASCII(x) && isdigit(x)) {
+                if (MOF(mult, 10)) {
+                    rv = 1;
+                    goto top;
+                }
+                mult *= 10;
+                if (AOF(mult, x - '0')) {
+                    rv = 1;
+                    goto top;
+                }
+                mult += x - '0';
+                x = getch();
+            }
+        }
+        /* mult cannot be zero */
+        if (!mult)
+            mult = 1;
+
         if (cl_active && x == '\n') {
             switch (operation) {
             case 'f':
@@ -783,13 +808,13 @@ int main(int argc, char **argv)
             break;
         case CTRL('h'):
         case KEY_BACKSPACE:
-            rv = backspace_ch(z, 1);
+            rv = backspace_ch(z, mult);
             break;
         case KEY_LEFT:
-            rv = left_ch(z, 1);
+            rv = left_ch(z, mult);
             break;
         case KEY_RIGHT:
-            rv = right_ch(z, 1);
+            rv = right_ch(z, mult);
             break;
         case CTRL('a'):
             start_of_line(z);
@@ -799,7 +824,7 @@ int main(int argc, char **argv)
             break;
         case CTRL('d'):
         case KEY_DC:
-            rv = delete_ch(z, 1);
+            rv = delete_ch(z, mult);
             break;
         case CTRL('l'):
             req_centre = 1;
@@ -813,7 +838,7 @@ int main(int argc, char **argv)
             rv = copy_region(z, p, 1);
             break;
         case CTRL('y'):
-            rv = paste(z, p, 1);
+            rv = paste(z, p, mult);
             break;
         case CTRL('x'):
             switch (x = getch()) {
@@ -855,7 +880,10 @@ int main(int argc, char **argv)
             }
             break;
         default:
-            rv = insert_ch(z, x, 1);
+            if (ISASCII(x)
+                && (isgraph(x) || x == ' ' || x == '\t' || x == '\n')) {
+                rv = insert_ch(z, x, mult);
+            }
             break;
         }
     }
