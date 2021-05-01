@@ -771,6 +771,35 @@ struct buf *new_buf(struct buf *b, char *fn)
     return t;
 }
 
+struct buf *kill_buf(struct buf *b)
+{
+    /*
+     * Kills (frees and unlinks) buffer b from the doubly linked list and
+     * returns the buffer to the left (if present) or right (if present).
+     */
+    struct buf *t = NULL;
+    if (b == NULL)
+        return NULL;
+    /* Unlink b */
+    if (b->prev != NULL) {
+        t = b->prev;
+        b->prev->next = b->next;
+    }
+    if (b->next != NULL) {
+        if (t == NULL)
+            t = b->next;
+        b->next->prev = b->prev;
+    }
+    /* Isolate b */
+    b->prev = NULL;
+    b->next = NULL;
+
+    /* Free b */
+    free_buf_list(b);
+
+    return t;
+}
+
 int main(int argc, char **argv)
 {
     int ret = 0;                /* Return value of text editor */
@@ -954,6 +983,11 @@ int main(int argc, char **argv)
             case 'w':
                 DELETEBUF(p);
                 rv = copy_region(z, p, 0);
+                break;
+            case 'k':
+                /* Close editor if last buffer is killed */
+                if ((b = kill_buf(b)) == NULL)
+                    running = 0;
                 break;
             case '<':
                 start_of_buf(z);
