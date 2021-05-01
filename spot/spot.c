@@ -20,6 +20,7 @@
  */
 
 #include <sys/stat.h>
+#include <unistd.h>
 #include <curses.h>
 #include <stdlib.h>
 #include <string.h>
@@ -72,6 +73,7 @@
 
 /* gap buffer */
 struct buf {
+    struct buf *prev;           /* Previous buffer node */
     char *fn;                   /* Filename */
     char *a;                    /* Start of buffer */
     char *g;                    /* Start of gap */
@@ -82,6 +84,7 @@ struct buf {
     size_t m;                   /* Mark index (ignores the gap) */
     int m_set;                  /* Mark is set */
     int mod;                    /* Buffer text has been modified */
+    struct buf *next;           /* Next buffer node */
 };
 
 struct buf *init_buf(void)
@@ -102,15 +105,27 @@ struct buf *init_buf(void)
     b->m = 0;
     b->m_set = 0;
     b->mod = 0;
+    b->prev = NULL;
+    b->next = NULL;
     return b;
 }
 
-void free_buf(struct buf *b)
+void free_buf_list(struct buf *b)
 {
-    /* Frees a buffer */
-    if (b != NULL) {
-        free(b->a);
-        free(b);
+    /* Frees a buffer doubly linked list (can be a single buffer) */
+    struct buf *t = b, *next;
+    if (b == NULL)
+        return;
+    /* Move to start of list */
+    while (t->prev != NULL)
+        t = t->prev;
+    /* Move forward freeing each node */
+    while (t != NULL) {
+        next = t->next;
+        free(t->fn);
+        free(t->a);
+        free(t);
+        t = next;
     }
 }
 
@@ -706,12 +721,63 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active, int rv,
     return 0;
 }
 
+int rename_buf(struct buf *b, char *new_fn)
+{
+    /* Sets the filename fn associated with buffer b to new_fn */
+    char *t;
+    if ((t = strdup(new_fn)) == NULL)
+        return 1;
+    free(b->fn);
+    b->fn = t;
+    return 0;
+}
+
+struct buf *new_buf(struct buf *b, char *fn)
+{
+    /* 
+     * Creates a new buffer to the right of buffer b in the doubly linked list
+     * and sets the associated filename to fn. The file will be loaded into
+     * the buffer if it exists.
+     */
+    struct buf *t;
+    if ((t = init_buf()) == NULL)
+        return NULL;
+
+    if (fn != NULL) {
+        if (!access(fn, F_OK)) {
+            /* File exists */
+            if (insert_file(t, fn)) {
+                free_buf_list(t);
+                return NULL;
+            }
+            /* Clear modification indicator */
+            t->mod = 0;
+        }
+        if (rename_buf(t, fn)) {
+            free_buf_list(t);
+            return NULL;
+        }
+    }
+
+    /* Link in the new node */
+    if (b != NULL) {
+        if (b->next != NULL) {
+            b->next->prev = t;
+            t->next = b->next;
+        }
+        b->next = t;
+        t->prev = b;
+    }
+    return t;
+}
+
 int main(int argc, char **argv)
 {
     int ret = 0;                /* Return value of text editor */
     int rv = 0;                 /* Internal function return value */
     int running = 1;            /* Text editor is on */
     int x;                      /* Read char */
+    /* Current buffer of the doubly linked list of text buffers */
     struct buf *b = NULL;
     struct buf *cl = NULL;      /* Command line buffer */
     struct buf *z;              /* Shortcut to the active buffer */
@@ -721,10 +787,20 @@ int main(int argc, char **argv)
     int cl_active = 0;          /* Command line is being used */
     char operation = ' ';       /* Operation for which command line is being used */
     size_t mult;                /* Command multiplier */
+    int i;
 
-    if ((b = init_buf()) == NULL) {
-        ret = 1;
-        goto clean_up;
+    if (argc <= 1) {
+        if ((b = new_buf(NULL, NULL)) == NULL) {
+            ret = 1;
+            goto clean_up;
+        }
+    } else {
+        for (i = 1; i < argc; ++i) {
+            if ((b = new_buf(b, *(argv + i))) == NULL) {
+                ret = 1;
+                goto clean_up;
+            }
+        }
     }
 
     if ((cl = init_buf()) == NULL) {
@@ -852,6 +928,14 @@ int main(int argc, char **argv)
                 operation = 'f';
                 cl_active = 1;
                 break;
+            case KEY_LEFT:
+                if (b->prev != NULL)
+                    b = b->prev;
+                break;
+            case KEY_RIGHT:
+                if (b->next != NULL)
+                    b = b->next;
+                break;
             }
             break;
         case ESC:
@@ -889,9 +973,9 @@ int main(int argc, char **argv)
     }
 
   clean_up:
-    free_buf(b);
-    free_buf(cl);
-    free_buf(p);
+    free_buf_list(b);
+    free_buf_list(cl);
+    free_buf_list(p);
     if (stdscr != NULL)
         if (endwin() == ERR)
             ret = 1;
