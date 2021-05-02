@@ -20,6 +20,7 @@
  */
 
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <curses.h>
 #include <stdlib.h>
@@ -62,7 +63,7 @@
                          b->m = 0; b->m_set = 0; b->mod = 1;} while (0)
 
 /* Update settings when a buffer is modified */
-#define SETMOD() do {b->m = 0; b->m_set = 0; b->mod = 1;} while (0)
+#define SETMOD(b) do {b->m = 0; b->m_set = 0; b->mod = 1;} while (0)
 
 /* No bound or gap size checks are performed */
 #define INSERTCH(b, x) do {*b->g++ = x; if (x == '\n') ++b->r;} while(0)
@@ -164,7 +165,7 @@ int insert_ch(struct buf *b, char c, size_t mult)
             return 1;
     while (mult--)
         INSERTCH(b, c);
-    SETMOD();
+    SETMOD(b);
     return 0;
 }
 
@@ -175,7 +176,7 @@ int delete_ch(struct buf *b, size_t mult)
         return 1;
     while (mult--)
         DELETECH(b);
-    SETMOD();
+    SETMOD(b);
     return 0;
 }
 
@@ -186,7 +187,7 @@ int backspace_ch(struct buf *b, size_t mult)
         return 1;
     while (mult--)
         BACKSPACECH(b);
-    SETMOD();
+    SETMOD(b);
     return 0;
 }
 
@@ -372,7 +373,7 @@ int copy_region(struct buf *b, struct buf *p, int del)
             b->g = b->a + b->m;
             /* Adjust for removed rows */
             b->r -= p->r - r_start;
-            SETMOD();
+            SETMOD(b);
         }
     } else {
         q = b->c;
@@ -387,7 +388,7 @@ int copy_region(struct buf *b, struct buf *p, int del)
         }
         if (del) {
             b->c = m_pointer;
-            SETMOD();
+            SETMOD(b);
         }
     }
     return 0;
@@ -395,12 +396,11 @@ int copy_region(struct buf *b, struct buf *p, int del)
 
 int paste(struct buf *b, struct buf *p, size_t mult)
 {
-    /*
-     * Pastes (inserts) buffer p into buffer b mult times.
-     * Assumes the cursor is at the end of buffer p.
-     */
-    size_t s = p->g - p->a;
+    /* Pastes (inserts) buffer p into buffer b mult times */
+    size_t s;
     char *q, ch;
+    end_of_buf(p);
+    s = p->g - p->a;
     if (!s)
         return 1;
     if (MOF(s, mult))
@@ -416,7 +416,7 @@ int paste(struct buf *b, struct buf *p, size_t mult)
             INSERTCH(b, ch);
         }
     }
-    SETMOD();
+    SETMOD(b);
     return 0;
 }
 
@@ -451,7 +451,7 @@ int insert_file(struct buf *b, char *fn)
         return 1;
     }
     b->c -= fs;
-    SETMOD();
+    SETMOD(b);
     return 0;
 }
 
@@ -800,6 +800,129 @@ struct buf *kill_buf(struct buf *b)
     return t;
 }
 
+int server(char *prgm, char **args, struct buf *src, struct buf *dst)
+{
+    /*
+     * Sets up a server (child) and pipes the src buffer to it, inserting
+     * the output from the server into the dst buffer.
+     */
+    int pa[2];
+    int pb[2];
+    pid_t pid;
+    /* Always use the C locale */
+    char *en[] = { "LC_ALL=C", NULL };
+    FILE *fpw, *fpr;
+    size_t dst_ci;
+    int x;
+    int status;
+
+    end_of_buf(src);
+
+    if (pipe(pa))
+        return 1;
+    if (pipe(pb)) {
+        close(pa[0]);
+        close(pa[1]);
+        return 1;
+    }
+    if ((pid = fork()) == -1) {
+        close(pa[0]);
+        close(pa[1]);
+        close(pb[0]);
+        close(pb[1]);
+        return 1;
+    }
+
+    if (!pid) {
+        /* Server (child) */
+        /* Close client (parent) side pipe ends */
+        if (close(pa[1]))
+            _exit(1);
+        if (close(pb[0]))
+            _exit(1);
+
+        /* Connect pipes */
+        if (dup2(pa[0], STDIN_FILENO) == -1)
+            _exit(1);
+        if (dup2(pb[1], STDOUT_FILENO) == -1)
+            _exit(1);
+
+        /* Execute program */
+        execvpe(prgm, args, en);
+        /* Error has occurred */
+        _exit(1);
+
+    } else {
+        /* Client (parent) */
+        /* Close server (child) side pipe ends */
+        if (close(pa[0])) {
+            close(pa[1]);
+            close(pb[0]);
+            close(pb[1]);
+            return 1;
+        }
+        if (close(pb[1])) {
+            close(pa[1]);
+            close(pb[0]);
+            return 1;
+        }
+
+        /* Prepare for writing */
+        if ((fpw = fdopen(pa[1], "w")) == NULL) {
+            close(pa[1]);
+            close(pb[0]);
+            return 1;
+        }
+
+        /* Prepare for reading */
+        if ((fpr = fdopen(pb[0], "r")) == NULL) {
+            fclose(fpw);
+            close(pb[0]);
+            return 1;
+        }
+
+        /* Write data */
+        if (fwrite(src->a, 1, CURSOR_INDEX(src), fpw) != CURSOR_INDEX(src)) {
+            fclose(fpw);
+            fclose(fpr);
+            return 1;
+        }
+
+        /* Will send EOF to server */
+        if (fclose(fpw)) {
+            fclose(fpr);
+            return 1;
+        }
+
+        dst_ci = CURSOR_INDEX(dst);
+        /* Read output from server */
+        while ((x = getc(fpr)) != EOF) {
+            if (!GAPSIZE(dst))
+                if (grow_gap(dst, 1)) {
+                    fclose(fpr);
+                    return 1;
+                }
+            INSERTCH(dst, x);
+        }
+        if (CURSOR_INDEX(dst) != dst_ci)
+            SETMOD(dst);
+
+        if (fclose(fpr))
+            return 1;
+
+        /* Wait for server (child) to exit */
+        if (wait(&status) == -1)
+            return 1;
+
+        /* Server (child) exited OK */
+        if (WIFEXITED(status) && !WEXITSTATUS(status))
+            return 0;
+
+        /* Server had an error */
+        return 1;
+    }
+}
+
 int main(int argc, char **argv)
 {
     int ret = 0;                /* Return value of text editor */
@@ -814,8 +937,11 @@ int main(int argc, char **argv)
     int req_centre = 0;         /* User requests cursor centreing */
     int req_clear = 0;          /* User requests screen clearing */
     int cl_active = 0;          /* Command line is being used */
-    char operation = ' ';       /* Operation for which command line is being used */
+    /* Operation for which command line is being used */
+    char operation = ' ';
     size_t mult;                /* Command multiplier */
+    /* Arguments for sed, the first NULL will be replaced with cl */
+    char *sed_args[] = { "sed", "-r", NULL, NULL };
     int i;
 
     if (argc <= 1) {
@@ -898,6 +1024,16 @@ int main(int argc, char **argv)
                 start_of_buf(cl);
                 rv = search(b, cl->c, cl->e - cl->c);
                 break;
+            case 'r':
+                str_buf(cl);
+                sed_args[2] = cl->a;
+                DELETEBUF(p);
+                if (copy_region(b, p, 1)) {
+                    rv = 1;
+                    break;
+                }
+                rv = server("/usr/bin/sed", sed_args, p, b);
+                break;
             }
             cl_active = 0;
             operation = ' ';
@@ -938,6 +1074,10 @@ int main(int argc, char **argv)
             operation = 's';
             cl_active = 1;
             break;
+        case CTRL('r'):
+            operation = 'r';
+            cl_active = 1;
+            break;
         case CTRL('w'):
             DELETEBUF(p);
             rv = copy_region(z, p, 1);
@@ -960,10 +1100,14 @@ int main(int argc, char **argv)
             case KEY_LEFT:
                 if (b->prev != NULL)
                     b = b->prev;
+                else
+                    rv = 1;
                 break;
             case KEY_RIGHT:
                 if (b->next != NULL)
                     b = b->next;
+                else
+                    rv = 1;
                 break;
             }
             break;
