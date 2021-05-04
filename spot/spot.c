@@ -109,6 +109,7 @@ struct buf *init_buf(void)
     b->m = 0;
     b->m_set = 0;
     b->mod = 0;
+    b->fn = NULL;
     b->prev = NULL;
     b->next = NULL;
     return b;
@@ -802,234 +803,74 @@ struct buf *kill_buf(struct buf *b)
     return t;
 }
 
-int server(char *prgm, char **args, struct buf *src, struct buf *dst)
+char *make_tmp_file(char *template)
 {
     /*
-     * Sets up a server (child) and pipes the src buffer to it, inserting
-     * the output from the server into the dst buffer.
+     * Creates a closed temporary file and returns the filename.
+     * Must free after use.
      */
-    int pa[2];
-    int pb[2];
-    pid_t pid;
-    /* Always use the C locale */
-    char *en[] = { "LC_ALL=C", NULL };
-    FILE *fpw;
-    size_t dst_ci, s, whole, part_s, j;
-    ssize_t num;
-    char *k, *q, ch, *w;
-    int status, f;
-
-    end_of_buf(src);
-
-    if (pipe(pa))
-        return 1;
-    if (pipe(pb)) {
-        close(pa[0]);
-        close(pa[1]);
-        return 1;
+    char *t;
+    int fd;
+    if ((t = strdup(template)) == NULL)
+        return NULL;
+    if ((fd = mkstemp(t)) == -1) {
+        free(t);
+        return NULL;
     }
-    if ((pid = fork()) == -1) {
-        close(pa[0]);
-        close(pa[1]);
-        close(pb[0]);
-        close(pb[1]);
+    free(t);
+    if (close(fd))
+        return NULL;
+    return t;
+}
+
+int write_region(struct buf *b, char *fn)
+{
+    /* Write the region to filename fn */
+    FILE *fp;
+    size_t s;
+    if (!b->m_set)
         return 1;
-    }
-
-    if (!pid) {
-        /* Server (child) */
-        /* Close client (parent) side pipe ends */
-        if (close(pa[1]))
-            _exit(1);
-        if (close(pb[0]))
-            _exit(1);
-
-        /* Connect pipes */
-        if (dup2(pa[0], STDIN_FILENO) == -1)
-            _exit(1);
-        if (dup2(pb[1], STDOUT_FILENO) == -1)
-            _exit(1);
-
-        /* Execute program */
-        execvpe(prgm, args, en);
-        /* Error has occurred */
-        _exit(1);
-
+    if (b->m == CURSOR_INDEX(b))
+        return 1;
+    if ((fp = fopen(fn, "w")) == NULL)
+        return 1;
+    if (b->m < CURSOR_INDEX(b)) {
+        s = CURSOR_INDEX(b) - b->m;
+        if (fwrite(b->m + b->a, 1, s, fp) != s) {
+            fclose(fp);
+            return 1;
+        }
     } else {
-        /* Client (parent) */
-        /* Close server (child) side pipe ends */
-        if (close(pa[0])) {
-            close(pa[1]);
-            close(pb[0]);
-            close(pb[1]);
+        s = b->m - CURSOR_INDEX(b);
+        if (fwrite(b->c, 1, s, fp) != s) {
+            fclose(fp);
             return 1;
         }
-        if (close(pb[1])) {
-            close(pa[1]);
-            close(pb[0]);
-            return 1;
-        }
-
-        /* Prepare for writing */
-        if ((fpw = fdopen(pa[1], "w")) == NULL) {
-            close(pa[1]);
-            close(pb[0]);
-            return 1;
-        }
-
-        /* Make the read non-blocking */
-        if (fcntl(pb[0], F_SETFL, O_NONBLOCK) == -1) {
-            fclose(fpw);
-            close(pb[0]);
-            return 1;
-        }
-
-        /* To see if any inserts are made */
-        dst_ci = CURSOR_INDEX(dst);
-
-        /*
-         * Determine the number of whole write chunks and the size of the final
-         * partial write.
-         */
-        s = CURSOR_INDEX(src);
-        whole = s / PIPE_BUF;
-        part_s = s % PIPE_BUF;
-
-        /* Allocate memory to read a chunk */
-        if ((k = malloc(PIPE_BUF)) == NULL) {
-            fclose(fpw);
-            close(pb[0]);
-            return 1;
-        }
-
-        w = src->a;
-        /* Write and read in chunks to reduce the risk of the pipe filling up */
-        while (whole--) {
-
-            /* Write data in chunks */
-            if (fwrite(w, 1, PIPE_BUF, fpw) != PIPE_BUF) {
-                fclose(fpw);
-                close(pb[0]);
-                free(k);
-                return 1;
-            }
-            w += PIPE_BUF;
-
-            if (fflush(fpw)) {
-                fclose(fpw);
-                close(pb[0]);
-                free(k);
-                return 1;
-            }
-
-            /* Read data in chunks (non-blocking) */
-            while (1) {
-                errno = 0;
-                num = read(pb[0], k, PIPE_BUF);
-                if (num == -1 && errno == EAGAIN)
-                    break;
-                if (num == -1) {
-                    /* Read error */
-                    fclose(fpw);
-                    close(pb[0]);
-                    free(k);
-                    return 1;
-                }
-                if (num == 0)
-                    break;
-                /* Check the gap size is big enough */
-                if (num > (ssize_t) (dst->c - dst->g)
-                    && grow_gap(dst, num)) {
-                    fclose(fpw);
-                    close(pb[0]);
-                    free(k);
-                    return 1;
-                }
-                q = k;
-                j = num;
-                while (j--) {
-                    ch = *q++;
-                    INSERTCH(dst, ch);
-                }
-            }
-        }
-
-        /* Send last write */
-        if (fwrite(w, 1, part_s, fpw) != part_s) {
-            fclose(fpw);
-            close(pb[0]);
-            free(k);
-            return 1;
-        }
-
-        /* Will send EOF to server (will terminate the server) */
-        if (fclose(fpw)) {
-            close(pb[0]);
-            free(k);
-            return 1;
-        }
-
-        /* Change read back to blocking */
-        if ((f = fcntl(pb[0], F_GETFL)) == -1) {
-            close(pb[0]);
-            free(k);
-            return 1;
-        }
-        f &= ~O_NONBLOCK;
-        if (fcntl(pb[0], F_SETFL, f) == -1) {
-            close(pb[0]);
-            free(k);
-            return 1;
-        }
-
-        /* Read remaining output (blocking) */
-        while (1) {
-            errno = 0;
-            num = read(pb[0], k, PIPE_BUF);
-            if (num == -1) {
-                /* Read error */
-                close(pb[0]);
-                free(k);
-                return 1;
-            }
-            if (num == 0)
-                break;
-            /* Check the gap size is big enough */
-            if (num > (ssize_t) (dst->c - dst->g)
-                && grow_gap(dst, num)) {
-                close(pb[0]);
-                free(k);
-                return 1;
-            }
-            q = k;
-            j = num;
-            while (j--) {
-                ch = *q++;
-                INSERTCH(dst, ch);
-            }
-        }
-
-        if (CURSOR_INDEX(dst) != dst_ci)
-            SETMOD(dst);
-
-        if (close(pb[0])) {
-            free(k);
-            return 1;
-        }
-
-        free(k);
-
-        /* Wait for server (child) to exit */
-        if (wait(&status) == -1)
-            return 1;
-
-        /* Server (child) exited OK */
-        if (WIFEXITED(status) && !WEXITSTATUS(status))
-            return 0;
-
-        /* Server had an error */
-        return 1;
     }
+    if (fclose(fp))
+        return 1;
+    return 0;
+}
+
+int insert_cmd(struct buf *b, char *cmd)
+{
+    /* Inserts the output of system command cmd into buffer b */
+    FILE *fp;
+    int x, status;
+    if ((fp = popen(cmd, "r")) == NULL)
+        return 1;
+    while ((x = getc(fp)) != EOF) {
+        if (!GAPSIZE(b) && grow_gap(b, 1)) {
+            fclose(fp);
+            return 1;
+        }
+        INSERTCH(b, x);
+    }
+    if ((status = pclose(fp)) == -1)
+        return 1;
+    if (WIFEXITED(status) && !WEXITSTATUS(status))
+        return 0;
+    return 1;
 }
 
 int main(int argc, char **argv)
@@ -1049,8 +890,8 @@ int main(int argc, char **argv)
     /* Operation for which command line is being used */
     char operation = ' ';
     size_t mult;                /* Command multiplier */
-    /* Arguments for sed, the first NULL will be replaced with cl */
-    char *sed_args[] = { "sed", "-r", NULL, NULL };
+    char *reg = NULL;           /* Filename used to save the region */
+    char *cmd;                  /* System command string */
     int i;
 
     if (argc <= 1) {
@@ -1073,6 +914,12 @@ int main(int argc, char **argv)
     }
 
     if ((p = init_buf()) == NULL) {
+        ret = 1;
+        goto clean_up;
+    }
+
+    /* Create temporary filename for saving the region */
+    if ((reg = make_tmp_file("reg_XXXXXXXXXX")) == NULL) {
         ret = 1;
         goto clean_up;
     }
@@ -1135,13 +982,22 @@ int main(int argc, char **argv)
                 break;
             case 'r':
                 str_buf(cl);
-                sed_args[2] = cl->c;
-                DELETEBUF(p);
-                if (copy_region(b, p, 1)) {
+                if (b->m_set && write_region(b, reg)) {
                     rv = 1;
                     break;
                 }
-                rv = server("/usr/bin/sed", sed_args, p, b);
+                /*
+                 * Prepare the shell command. The region filename is preloaded
+                 * as the reg shell variable.
+                 */
+                if (asprintf
+                    (&cmd, "LC_ALL='C'; reg='%s'; %s 2>&1\n", reg,
+                     cl->c) == -1) {
+                    rv = 1;
+                    break;
+                }
+                rv = insert_cmd(b, cmd);
+                free(cmd);
                 break;
             }
             cl_active = 0;
@@ -1263,6 +1119,12 @@ int main(int argc, char **argv)
     free_buf_list(b);
     free_buf_list(cl);
     free_buf_list(p);
+
+    /* Delete region file */
+    if (reg != NULL && remove(reg))
+        ret = 1;
+    free(reg);
+
     if (stdscr != NULL)
         if (endwin() == ERR)
             ret = 1;
