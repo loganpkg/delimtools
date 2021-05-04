@@ -22,10 +22,13 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
 #include <curses.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <limits.h>
 #include <ctype.h>
 
 /* Initial buffer size */
@@ -244,7 +247,6 @@ void str_buf(struct buf *b)
         if (*b->c == '\0')
             DELETECH(b);
     }
-    *b->e = '\0';
 }
 
 void set_mark(struct buf *b)
@@ -811,10 +813,11 @@ int server(char *prgm, char **args, struct buf *src, struct buf *dst)
     pid_t pid;
     /* Always use the C locale */
     char *en[] = { "LC_ALL=C", NULL };
-    FILE *fpw, *fpr;
-    size_t dst_ci;
-    int x;
-    int status;
+    FILE *fpw;
+    size_t dst_ci, s, whole, part_s, j;
+    ssize_t num;
+    char *k, *q, ch, *w;
+    int status, f;
 
     end_of_buf(src);
 
@@ -874,41 +877,147 @@ int server(char *prgm, char **args, struct buf *src, struct buf *dst)
             return 1;
         }
 
-        /* Prepare for reading */
-        if ((fpr = fdopen(pb[0], "r")) == NULL) {
+        /* Make the read non-blocking */
+        if (fcntl(pb[0], F_SETFL, O_NONBLOCK) == -1) {
             fclose(fpw);
             close(pb[0]);
             return 1;
         }
 
-        /* Write data */
-        if (fwrite(src->a, 1, CURSOR_INDEX(src), fpw) != CURSOR_INDEX(src)) {
-            fclose(fpw);
-            fclose(fpr);
-            return 1;
-        }
-
-        /* Will send EOF to server */
-        if (fclose(fpw)) {
-            fclose(fpr);
-            return 1;
-        }
-
+        /* To see if any inserts are made */
         dst_ci = CURSOR_INDEX(dst);
-        /* Read output from server */
-        while ((x = getc(fpr)) != EOF) {
-            if (!GAPSIZE(dst))
-                if (grow_gap(dst, 1)) {
-                    fclose(fpr);
+
+        /*
+         * Determine the number of whole write chunks and the size of the final
+         * partial write.
+         */
+        s = CURSOR_INDEX(src);
+        whole = s / PIPE_BUF;
+        part_s = s % PIPE_BUF;
+
+        /* Allocate memory to read a chunk */
+        if ((k = malloc(PIPE_BUF)) == NULL) {
+            fclose(fpw);
+            close(pb[0]);
+            return 1;
+        }
+
+        w = src->a;
+        /* Write and read in chunks to reduce the risk of the pipe filling up */
+        while (whole--) {
+
+            /* Write data in chunks */
+            if (fwrite(w, 1, PIPE_BUF, fpw) != PIPE_BUF) {
+                fclose(fpw);
+                close(pb[0]);
+                free(k);
+                return 1;
+            }
+            w += PIPE_BUF;
+
+            if (fflush(fpw)) {
+                fclose(fpw);
+                close(pb[0]);
+                free(k);
+                return 1;
+            }
+
+            /* Read data in chunks (non-blocking) */
+            while (1) {
+                errno = 0;
+                num = read(pb[0], k, PIPE_BUF);
+                if (num == -1 && errno == EAGAIN)
+                    break;
+                if (num == -1) {
+                    /* Read error */
+                    fclose(fpw);
+                    close(pb[0]);
+                    free(k);
                     return 1;
                 }
-            INSERTCH(dst, x);
+                if (num == 0)
+                    break;
+                /* Check the gap size is big enough */
+                if (num > (ssize_t) (dst->c - dst->g)
+                    && grow_gap(dst, num)) {
+                    fclose(fpw);
+                    close(pb[0]);
+                    free(k);
+                    return 1;
+                }
+                q = k;
+                j = num;
+                while (j--) {
+                    ch = *q++;
+                    INSERTCH(dst, ch);
+                }
+            }
         }
+
+        /* Send last write */
+        if (fwrite(w, 1, part_s, fpw) != part_s) {
+            fclose(fpw);
+            close(pb[0]);
+            free(k);
+            return 1;
+        }
+
+        /* Will send EOF to server (will terminate the server) */
+        if (fclose(fpw)) {
+            close(pb[0]);
+            free(k);
+            return 1;
+        }
+
+        /* Change read back to blocking */
+        if ((f = fcntl(pb[0], F_GETFL)) == -1) {
+            close(pb[0]);
+            free(k);
+            return 1;
+        }
+        f &= ~O_NONBLOCK;
+        if (fcntl(pb[0], F_SETFL, f) == -1) {
+            close(pb[0]);
+            free(k);
+            return 1;
+        }
+
+        /* Read remaining output (blocking) */
+        while (1) {
+            errno = 0;
+            num = read(pb[0], k, PIPE_BUF);
+            if (num == -1) {
+                /* Read error */
+                close(pb[0]);
+                free(k);
+                return 1;
+            }
+            if (num == 0)
+                break;
+            /* Check the gap size is big enough */
+            if (num > (ssize_t) (dst->c - dst->g)
+                && grow_gap(dst, num)) {
+                close(pb[0]);
+                free(k);
+                return 1;
+            }
+            q = k;
+            j = num;
+            while (j--) {
+                ch = *q++;
+                INSERTCH(dst, ch);
+            }
+        }
+
         if (CURSOR_INDEX(dst) != dst_ci)
             SETMOD(dst);
 
-        if (fclose(fpr))
+        if (close(pb[0])) {
+            free(k);
             return 1;
+        }
+
+        free(k);
 
         /* Wait for server (child) to exit */
         if (wait(&status) == -1)
@@ -1026,7 +1135,7 @@ int main(int argc, char **argv)
                 break;
             case 'r':
                 str_buf(cl);
-                sed_args[2] = cl->a;
+                sed_args[2] = cl->c;
                 DELETEBUF(p);
                 if (copy_region(b, p, 1)) {
                     rv = 1;
