@@ -62,11 +62,11 @@
 				: b->c + b->i - (b->g - b->a))
 
 /* Delete buffer */
-#define DELETEBUF(b) do {b->g = b->a; b->c = b->e; b->r = 0; b->d = 0; \
-                         b->m = 0; b->m_set = 0; b->mod = 1;} while (0)
+#define DELETEBUF(b) do {b->g = b->a; b->c = b->e; b->r = 1; b->d = 0; \
+             b->m = 0; b->mr = 1; b->m_set = 0; b->mod = 1;} while (0)
 
 /* Update settings when a buffer is modified */
-#define SETMOD(b) do {b->m = 0; b->m_set = 0; b->mod = 1;} while (0)
+#define SETMOD(b) do {b->m = 0; b->mr = 1; b->m_set = 0; b->mod = 1;} while (0)
 
 /* No bound or gap size checks are performed */
 #define INSERTCH(b, x) do {*b->g++ = x; if (x == '\n') ++b->r;} while(0)
@@ -86,6 +86,7 @@ struct buf {
     size_t r;                   /* Row number (starting from 1) */
     size_t d;                   /* Draw start index (ignores the gap) */
     size_t m;                   /* Mark index (ignores the gap) */
+    size_t mr;                  /* Row number at the mark */
     int m_set;                  /* Mark is set */
     int mod;                    /* Buffer text has been modified */
     struct buf *next;           /* Next buffer node */
@@ -107,6 +108,7 @@ struct buf *init_buf(void)
     b->r = 1;
     b->d = 0;
     b->m = 0;
+    b->mr = 1;
     b->m_set = 0;
     b->mod = 0;
     b->fn = NULL;
@@ -253,12 +255,14 @@ void str_buf(struct buf *b)
 void set_mark(struct buf *b)
 {
     b->m = CURSOR_INDEX(b);
+    b->mr = b->r;
     b->m_set = 1;
 }
 
 void clear_mark(struct buf *b)
 {
     b->m = 0;
+    b->mr = 1;
     b->m_set = 0;
 }
 
@@ -349,76 +353,112 @@ int match_bracket(struct buf *b)
     return 1;
 }
 
-int copy_region(struct buf *b, struct buf *p, int del)
+int copy_region(struct buf *b, struct buf *p)
 {
     /*
-     * Appends the region from buffer b into buffer p,
-     * deleting the region if del is non-zero.
+     * Copies the region from buffer b into buffer p.
+     * The cursor is moved to the end of buffer p first.
      */
-    size_t s, r_start;
-    char *q, ch, *m_pointer;
+    char *m_pointer;
+    size_t s;
+    /* Region does not exist */
     if (!b->m_set)
         return 1;
+    /* Region is empty */
     if (b->m == CURSOR_INDEX(b))
         return 1;
+    /* Make sure that the cursor is at the end of p */
+    end_of_buf(p);
+    m_pointer = INDEX_TO_POINTER(b, m);
+    /* Mark before cursor */
     if (b->m < CURSOR_INDEX(b)) {
-        q = b->a + b->m;
-        s = b->g - q;
+        s = b->g - m_pointer;
         if (s > GAPSIZE(p))
             if (grow_gap(p, s))
                 return 1;
-        r_start = p->r;
-        while (q != b->g) {
-            ch = *q++;
-            INSERTCH(p, ch);
-        }
-        if (del) {
-            b->g = b->a + b->m;
-            /* Adjust for removed rows */
-            b->r -= p->r - r_start;
-            SETMOD(b);
-        }
+        /* Left of gap insert */
+        memcpy(p->g, m_pointer, s);
+        p->g += s;
+        /* Adjust row number */
+        p->r += b->r - b->mr;
     } else {
-        q = b->c;
-        m_pointer = INDEX_TO_POINTER(b, m);
-        s = m_pointer - q;
+        /* Cursor before mark */
+        s = m_pointer - b->c;
         if (s > GAPSIZE(p))
             if (grow_gap(p, s))
                 return 1;
-        while (q != m_pointer) {
-            ch = *q++;
-            INSERTCH(p, ch);
-        }
-        if (del) {
-            b->c = m_pointer;
-            SETMOD(b);
-        }
+        /* Left of gap insert */
+        memcpy(p->g, b->c, s);
+        p->g += s;
+        /* Adjust row number */
+        p->r += b->mr - b->r;
     }
+    SETMOD(p);
+    return 0;
+}
+
+int delete_region(struct buf *b)
+{
+    /* Deletes the region */
+    /* Region does not exist */
+    if (!b->m_set)
+        return 1;
+    /* Region is empty */
+    if (b->m == CURSOR_INDEX(b))
+        return 1;
+    /* Mark before cursor */
+    if (b->m < CURSOR_INDEX(b)) {
+        b->g = b->a + b->m;
+        /* Adjust for removed rows */
+        b->r = b->mr;
+    } else {
+        /* Cursor before mark */
+        b->c = INDEX_TO_POINTER(b, m);
+    }
+    SETMOD(b);
+    return 0;
+}
+
+int cut_region(struct buf *b, struct buf *p)
+{
+    /*
+     * Copies the region from buffer b into buffer p.
+     * The cursor is moved to the end of buffer p first.
+     */
+    if (copy_region(b, p))
+        return 1;
+    if (delete_region(b))
+        return 1;
     return 0;
 }
 
 int paste(struct buf *b, struct buf *p, size_t mult)
 {
-    /* Pastes (inserts) buffer p into buffer b mult times */
-    size_t s;
-    char *q, ch;
+    /*
+     * Pastes (inserts) buffer p into buffer b mult times.
+     * Moves the cursor to the end of buffer p first.
+     */
+    size_t num = mult;
+    size_t s, ts;
+    char *q;
     end_of_buf(p);
     s = p->g - p->a;
     if (!s)
         return 1;
     if (MOF(s, mult))
         return 1;
-    s *= mult;
-    if (s > GAPSIZE(b))
-        if (grow_gap(b, s))
+    ts = s * mult;
+    if (ts > GAPSIZE(b))
+        if (grow_gap(b, ts))
             return 1;
-    while (mult--) {
-        q = p->a;
-        while (q != p->g) {
-            ch = *q++;
-            INSERTCH(b, ch);
-        }
+    q = b->g;
+    while (num--) {
+        /* Left of gap insert */
+        memcpy(q, p->a, s);
+        q += s;
     }
+    b->g += ts;
+    b->r += (p->r - 1) * mult;
     SETMOD(b);
     return 0;
 }
@@ -639,7 +679,6 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active, int rv,
         ++q;
     }
 
-
     if (height >= 3) {
         /* Status bar */
         if (move(height - 2, 0) == ERR)
@@ -817,7 +856,6 @@ char *make_tmp_file(char *template)
         free(t);
         return NULL;
     }
-    free(t);
     if (close(fd))
         return NULL;
     return t;
@@ -1045,7 +1083,7 @@ int main(int argc, char **argv)
             break;
         case CTRL('w'):
             DELETEBUF(p);
-            rv = copy_region(z, p, 1);
+            rv = cut_region(z, p);
             break;
         case CTRL('y'):
             rv = paste(z, p, mult);
@@ -1091,7 +1129,7 @@ int main(int argc, char **argv)
                 break;
             case 'w':
                 DELETEBUF(p);
-                rv = copy_region(z, p, 0);
+                rv = copy_region(z, p);
                 break;
             case 'k':
                 /* Close editor if last buffer is killed */
