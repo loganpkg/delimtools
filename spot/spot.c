@@ -890,21 +890,11 @@ int write_region(struct buf *b, char *fn)
     return 0;
 }
 
-int insert_cmd(struct buf *b, char *cmd)
+int system_cmd(char *cmd)
 {
-    /* Inserts the output of system command cmd into buffer b */
-    FILE *fp;
-    int x, status;
-    if ((fp = popen(cmd, "r")) == NULL)
-        return 1;
-    while ((x = getc(fp)) != EOF) {
-        if (!GAPSIZE(b) && grow_gap(b, 1)) {
-            fclose(fp);
-            return 1;
-        }
-        INSERTCH(b, x);
-    }
-    if ((status = pclose(fp)) == -1)
+    /* Runs a system command */
+    int status;
+    if ((status = system(cmd)) == -1)
         return 1;
     if (WIFEXITED(status) && !WEXITSTATUS(status))
         return 0;
@@ -929,6 +919,7 @@ int main(int argc, char **argv)
     char operation = ' ';
     size_t mult;                /* Command multiplier */
     char *reg = NULL;           /* Filename used to save the region */
+    char *out = NULL;           /* Filename used for system command output */
     char *cmd;                  /* System command string */
     int i;
 
@@ -958,6 +949,11 @@ int main(int argc, char **argv)
 
     /* Create temporary filename for saving the region */
     if ((reg = make_tmp_file("reg_XXXXXXXXXX")) == NULL) {
+        ret = 1;
+        goto clean_up;
+    }
+
+    if ((out = make_tmp_file("out_XXXXXXXXXX")) == NULL) {
         ret = 1;
         goto clean_up;
     }
@@ -1029,13 +1025,17 @@ int main(int argc, char **argv)
                  * as the reg shell variable.
                  */
                 if (asprintf
-                    (&cmd, "LC_ALL='C'; reg='%s'; %s 2>&1\n", reg,
-                     cl->c) == -1) {
+                    (&cmd, "LC_ALL='C'; reg='%s'; %s > %s\n", reg,
+                     cl->c, out) == -1) {
                     rv = 1;
                     break;
                 }
-                rv = insert_cmd(b, cmd);
+                if (system_cmd(cmd)) {
+                    rv = 1;
+                    break;
+                }
                 free(cmd);
+                rv = insert_file(b, out);
                 break;
             }
             cl_active = 0;
@@ -1162,6 +1162,10 @@ int main(int argc, char **argv)
     if (reg != NULL && remove(reg))
         ret = 1;
     free(reg);
+
+    if (out != NULL && remove(out))
+        ret = 1;
+    free(out);
 
     if (stdscr != NULL)
         if (endwin() == ERR)
