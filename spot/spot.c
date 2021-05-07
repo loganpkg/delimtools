@@ -1015,6 +1015,7 @@ int main(int argc, char **argv)
                 rv = search(b, cl->c, cl->e - cl->c);
                 break;
             case 'r':
+            case 'o':
                 str_buf(cl);
                 if (b->m_set && write_region(b, reg)) {
                     rv = 1;
@@ -1035,6 +1036,19 @@ int main(int argc, char **argv)
                     break;
                 }
                 free(cmd);
+                if (operation == 'r' && b->m_set && delete_region(b)) {
+                    rv = 1;
+                    break;
+                }
+                if (operation == 'o') {
+                    if (new_buf(b, NULL) == NULL) {
+                        rv = 1;
+                        break;
+                    } else {
+                        /* Move to new buffer */
+                        b = b->next;
+                    }
+                }
                 rv = insert_file(b, out);
                 break;
             }
@@ -1079,6 +1093,10 @@ int main(int argc, char **argv)
             break;
         case CTRL('r'):
             operation = 'r';
+            cl_active = 1;
+            break;
+        case CTRL('o'):
+            operation = 'o';
             cl_active = 1;
             break;
         case CTRL('w'):
