@@ -84,6 +84,8 @@ struct buf {
     char *c;                    /* Cursor (to the right of the gap) */
     char *e;                    /* End of buffer */
     size_t r;                   /* Row number (starting from 1) */
+    size_t sc;                  /* Sticky column number (starting from 0) */
+    int sc_set;                 /* Sticky column is set */
     size_t d;                   /* Draw start index (ignores the gap) */
     size_t m;                   /* Mark index (ignores the gap) */
     size_t mr;                  /* Row number at the mark */
@@ -239,6 +241,70 @@ void end_of_line(struct buf *b)
 {
     while (b->c != b->e && *b->c != '\n')
         RIGHTCH(b);
+}
+
+size_t col_num(struct buf *b)
+{
+    /* Returns the column number, which starts from zero */
+    char *q = b->g;
+    while (q != b->a && *(q - 1) != '\n')
+        --q;
+    return b->g - q;
+}
+
+void up_line(struct buf *b, size_t mult)
+{
+    /* Attempts to move the cursor up mult lines */
+    size_t col;
+    size_t target_row;
+    if (b->r > mult)
+        target_row = b->r - mult;
+    else
+        return;
+
+    /* Get or set sticky column */
+    if (b->sc_set) {
+        col = b->sc;
+    } else {
+        col = col_num(b);
+        b->sc = col;
+        b->sc_set = 1;
+    }
+
+    while (b->g != b->a && b->r != target_row)
+        LEFTCH(b);
+    start_of_line(b);
+    while (b->c != b->e && col && *b->c != '\n') {
+        RIGHTCH(b);
+        --col;
+    }
+}
+
+void down_line(struct buf *b, size_t mult)
+{
+    /* Attempts to move the cursor down mult lines */
+    size_t col;
+    size_t target_row;
+
+    if (AOF(b->r, mult))
+        return;
+    target_row = b->r + mult;
+
+    /* Get or set sticky column */
+    if (b->sc_set) {
+        col = b->sc;
+    } else {
+        col = col_num(b);
+        b->sc = col;
+        b->sc_set = 1;
+    }
+
+    while (b->c != b->e && b->r != target_row)
+        RIGHTCH(b);
+    while (b->c != b->e && col && *b->c != '\n') {
+        RIGHTCH(b);
+        --col;
+    }
 }
 
 void str_buf(struct buf *b)
@@ -686,8 +752,9 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active, int rv,
         /* Clear the line */
         /* if (clrtoeol() == ERR) return 1; */
         if (asprintf
-            (&sb, "%c%c %s (%lu) %02X", rv ? '!' : ' ', b->mod ? '*' : ' ',
-             b->fn, b->r, (unsigned char) *b->c) == -1)
+            (&sb, "%c%c %s (%lu,%lu) %02X", rv ? '!' : ' ',
+             b->mod ? '*' : ' ', b->fn, b->r, col_num(b),
+             (unsigned char) *b->c) == -1)
             return 1;
         if (addnstr(sb, width) == ERR) {
             free(sb);
@@ -921,6 +988,8 @@ int main(int argc, char **argv)
     char *reg = NULL;           /* Filename used to save the region */
     char *out = NULL;           /* Filename used for system command output */
     char *cmd;                  /* System command string */
+    /* Persist the sticky column (used for repeated up or down) */
+    int persist_sc = 0;
     int i;
 
     if (argc <= 1) {
@@ -974,6 +1043,16 @@ int main(int argc, char **argv)
         req_clear = 0;
         /* Clear internal return value */
         rv = 0;
+
+        /* Update sticky column */
+        if (persist_sc) {
+            /* Turn off persist status, but do not clear sticky column yet */
+            persist_sc = 0;
+        } else {
+            /* Clear stick column */
+            z->sc = 0;
+            z->sc_set = 0;
+        }
 
         /* Active buffer */
         if (cl_active)
@@ -1068,11 +1147,23 @@ int main(int argc, char **argv)
         case KEY_BACKSPACE:
             rv = backspace_ch(z, mult);
             break;
+        case CTRL('b'):
         case KEY_LEFT:
             rv = left_ch(z, mult);
             break;
+        case CTRL('f'):
         case KEY_RIGHT:
             rv = right_ch(z, mult);
+            break;
+        case CTRL('p'):
+        case KEY_UP:
+            up_line(z, mult);
+            persist_sc = 1;
+            break;
+        case CTRL('n'):
+        case KEY_DOWN:
+            down_line(z, mult);
+            persist_sc = 1;
             break;
         case CTRL('a'):
             start_of_line(z);
@@ -1086,6 +1177,7 @@ int main(int argc, char **argv)
             break;
         case CTRL('l'):
             req_centre = 1;
+            req_clear = 1;
             break;
         case CTRL('s'):
             operation = 's';
@@ -1101,6 +1193,10 @@ int main(int argc, char **argv)
             break;
         case CTRL('w'):
             DELETEBUF(p);
+            rv = cut_region(z, p);
+            break;
+        case CTRL('c'):
+            /* Cut, inserting at end of paste buffer */
             rv = cut_region(z, p);
             break;
         case CTRL('y'):
@@ -1134,11 +1230,8 @@ int main(int argc, char **argv)
             break;
         case ESC:
             switch (x = getch()) {
-            case 'l':
-                req_centre = 1;
-                req_clear = 1;
-                break;
             case 's':
+                /* Search without editing the command line */
                 start_of_buf(cl);
                 rv = search(z, cl->c, cl->e - cl->c);
                 break;
@@ -1149,6 +1242,11 @@ int main(int argc, char **argv)
                 DELETEBUF(p);
                 rv = copy_region(z, p);
                 break;
+            case 'c':
+                /* Copy, inserting at end of paste buffer */
+                rv = copy_region(z, p);
+                break;
+
             case 'k':
                 /* Close editor if last buffer is killed */
                 if ((b = kill_buf(b)) == NULL)
