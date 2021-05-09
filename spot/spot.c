@@ -252,15 +252,15 @@ size_t col_num(struct buf *b)
     return b->g - q;
 }
 
-void up_line(struct buf *b, size_t mult)
+int up_line(struct buf *b, size_t mult)
 {
-    /* Attempts to move the cursor up mult lines */
+    /* Moves the cursor up mult lines */
     size_t col;
     size_t target_row;
     if (b->r > mult)
         target_row = b->r - mult;
     else
-        return;
+        return 1;
 
     /* Get or set sticky column */
     if (b->sc_set) {
@@ -278,33 +278,51 @@ void up_line(struct buf *b, size_t mult)
         RIGHTCH(b);
         --col;
     }
+    return 0;
 }
 
-void down_line(struct buf *b, size_t mult)
+int down_line(struct buf *b, size_t mult)
 {
-    /* Attempts to move the cursor down mult lines */
+    /* Moves the cursor down mult lines */
     size_t col;
     size_t target_row;
+    char *c_backup = b->c;
 
     if (AOF(b->r, mult))
-        return;
+        return 1;
+
     target_row = b->r + mult;
 
-    /* Get or set sticky column */
-    if (b->sc_set) {
+    /* Get sticky column */
+    if (b->sc_set)
         col = b->sc;
-    } else {
+    else
         col = col_num(b);
+
+    /* Try to go down */
+    while (b->c != b->e && b->r != target_row)
+        RIGHTCH(b);
+
+    if (b->r != target_row) {
+        /* Failed, go back */
+        while (b->c != c_backup)
+            LEFTCH(b);
+        return 1;
+    }
+
+    /* Set the sticky column if not set (only set upon success) */
+    if (!b->sc_set) {
         b->sc = col;
         b->sc_set = 1;
     }
 
-    while (b->c != b->e && b->r != target_row)
-        RIGHTCH(b);
+    /* Try to move to the desired column */
     while (b->c != b->e && col && *b->c != '\n') {
         RIGHTCH(b);
         --col;
     }
+
+    return 0;
 }
 
 void str_buf(struct buf *b)
@@ -1157,12 +1175,12 @@ int main(int argc, char **argv)
             break;
         case CTRL('p'):
         case KEY_UP:
-            up_line(z, mult);
+            rv = up_line(z, mult);
             persist_sc = 1;
             break;
         case CTRL('n'):
         case KEY_DOWN:
-            down_line(z, mult);
+            rv = down_line(z, mult);
             persist_sc = 1;
             break;
         case CTRL('a'):
