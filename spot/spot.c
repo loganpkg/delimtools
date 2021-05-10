@@ -325,6 +325,118 @@ int down_line(struct buf *b, size_t mult)
     return 0;
 }
 
+void forward_word(struct buf *b, int mode, size_t mult)
+{
+    /*
+     * Moves forward up to mult words. If mode is 0 then no editing
+     * occurs. If mode is 1 then words will be converted to uppercase,
+     * and if mode is 3 then words will be converted to lowercase.
+     */
+    int mod = 0;
+    while (b->c != b->e && mult--) {
+        /* Eat leading non-alphanumeric characters */
+        while (b->c != b->e && ISASCII(*b->c) && !isalnum(*b->c))
+            RIGHTCH(b);
+
+        /* Convert letters to uppercase while in the alphanumeric word */
+        while (b->c != b->e && ISASCII(*b->c) && isalnum(*b->c)) {
+            switch (mode) {
+            case 0:
+                break;
+            case 1:
+                if (islower(*b->c)) {
+                    *b->c = 'A' + *b->c - 'a';
+                    mod = 1;
+                }
+                break;
+            case 2:
+                if (isupper(*b->c)) {
+                    *b->c = 'a' + *b->c - 'A';
+                    mod = 1;
+                }
+                break;
+            }
+            RIGHTCH(b);
+        }
+    }
+    if (mod)
+        SETMOD(b);
+}
+
+void backward_word(struct buf *b, size_t mult)
+{
+    /* Moves back a maximum of mult words */
+    while (b->g != b->a && mult--) {
+        /* Eat trailing non-alphanumeric characters */
+        while (b->g != b->a && ISASCII(*(b->g - 1))
+               && !isalnum(*(b->g - 1)))
+            LEFTCH(b);
+        /* Go to start of word */
+        while (b->g != b->a && ISASCII(*(b->g - 1))
+               && isalnum(*(b->g - 1))) {
+            LEFTCH(b);
+        }
+    }
+}
+
+void trim_clean(struct buf *b)
+{
+    /*
+     * Trims trailing whitespace and deletes any character that is
+     * not in {isgraph, ' ', '\t', '\n'}.
+     */
+    size_t r_backup = b->r;
+    size_t col = col_num(b);
+    int nl_found = 0;
+    int at_eol = 0;
+    int mod = 0;
+
+    end_of_buf(b);
+
+    /* Delete to end of text, sparing the first newline character */
+    while (b->g != b->a) {
+        LEFTCH(b);
+        if (ISASCII(*b->c) && isgraph(*b->c)) {
+            break;
+        } else if (*b->c == '\n' && !nl_found) {
+            nl_found = 1;
+        } else {
+            DELETECH(b);
+            mod = 1;
+        }
+    }
+
+    /* Process text, triming trailing whitespace */
+    while (b->g != b->a) {
+        LEFTCH(b);
+        if (*b->c == '\n') {
+            at_eol = 1;
+        } else if (ISASCII(*b->c) && isgraph(*b->c)) {
+            /* Never delete a graph character */
+            at_eol = 0;
+        } else if (at_eol) {
+            /* Delete any remaining character at the end of the line */
+            DELETECH(b);
+            mod = 1;
+        } else if (*b->c != ' ' && *b->c != '\t' && *b->c != '\n') {
+            /* Delete any remaining characters inside the line */
+            DELETECH(b);
+            mod = 1;
+        }
+    }
+
+    if (mod)
+        SETMOD(b);
+
+    /* Attempt to move back to old position */
+    while (b->c != b->e && b->r != r_backup)
+        RIGHTCH(b);
+    while (b->c != b->e && col && *b->c != '\n') {
+        RIGHTCH(b);
+        --col;
+    }
+}
+
 void str_buf(struct buf *b)
 {
     /* Prepares a buffer so that b->c can be used as a string */
@@ -547,6 +659,26 @@ int paste(struct buf *b, struct buf *p, size_t mult)
     return 0;
 }
 
+int cut_to_eol(struct buf *b, struct buf *p)
+{
+    /* Cut to the end of the line */
+    set_mark(b);
+    end_of_line(b);
+    if (cut_region(b, p))
+        return 1;
+    return 0;
+}
+
+int cut_to_sol(struct buf *b, struct buf *p)
+{
+    /* Cut to the start of the line */
+    set_mark(b);
+    start_of_line(b);
+    if (cut_region(b, p))
+        return 1;
+    return 0;
+}
+
 int filesize(char *fn, size_t * fs)
 {
     /* Gets the filesize of a filename */
@@ -561,11 +693,16 @@ int filesize(char *fn, size_t * fs)
     return 0;
 }
 
-int insert_file(struct buf *b, char *fn)
+int insert_file(struct buf *b, char *fn, int right)
 {
-    /* Inserts a file into the righthand side of the gap */
-    size_t fs;
+    /*
+     * Inserts a file into the righthand side of the gap if right is non-zero.
+     * Otherwise it inserts into the lefthand side of the gap.
+     */
+    size_t fs, r, num;
     FILE *fp;
+    char *q;
+    int x;
     if (filesize(fn, &fs))
         return 1;
     if (fs > GAPSIZE(b))
@@ -573,11 +710,30 @@ int insert_file(struct buf *b, char *fn)
             return 1;
     if ((fp = fopen(fn, "r")) == NULL)
         return 1;
-    if (fread(b->c - fs, 1, fs, fp) != fs) {
-        fclose(fp);
-        return 1;
+    if (right) {
+        /* Right of gap insert */
+        if (fread(b->c - fs, 1, fs, fp) != fs) {
+            fclose(fp);
+            return 1;
+        }
+        b->c -= fs;
+    } else {
+        /* Left of gap insert */
+        q = b->g;
+        r = b->r;
+        num = 0;
+        while ((x = getc(fp)) != EOF) {
+            num++;
+            *q++ = x;
+            if (x == '\n')
+                ++r;
+        }
+        if (num != fs)
+            return 1;
+        /* Only update buf variables after success */
+        b->g = q;
+        b->r = r;
     }
-    b->c -= fs;
     SETMOD(b);
     return 0;
 }
@@ -873,7 +1029,7 @@ struct buf *new_buf(struct buf *b, char *fn)
     if (fn != NULL) {
         if (!access(fn, F_OK)) {
             /* File exists */
-            if (insert_file(t, fn)) {
+            if (insert_file(t, fn, 1)) {
                 free_buf_list(t);
                 return NULL;
             }
@@ -1008,6 +1164,7 @@ int main(int argc, char **argv)
     char *cmd;                  /* System command string */
     /* Persist the sticky column (used for repeated up or down) */
     int persist_sc = 0;
+    size_t ci_backup, r_backup; /* Cursor index and row number backup */
     int i;
 
     if (argc <= 1) {
@@ -1105,7 +1262,7 @@ int main(int argc, char **argv)
             switch (operation) {
             case 'f':
                 str_buf(cl);
-                rv = insert_file(b, cl->c);
+                rv = insert_file(b, cl->c, 1);
                 break;
             case 's':
                 start_of_buf(cl);
@@ -1146,7 +1303,15 @@ int main(int argc, char **argv)
                         b = b->next;
                     }
                 }
-                rv = insert_file(b, out);
+                /* Record information to set the mark after the insert */
+                ci_backup = CURSOR_INDEX(b);
+                r_backup = b->r;
+                rv = insert_file(b, out, 0);
+                if (!rv) {
+                    b->m = ci_backup;
+                    b->mr = r_backup;
+                    b->m_set = 1;
+                }
                 break;
             }
             cl_active = 0;
@@ -1220,6 +1385,13 @@ int main(int argc, char **argv)
         case CTRL('y'):
             rv = paste(z, p, mult);
             break;
+        case CTRL('k'):
+            DELETEBUF(p);
+            rv = cut_to_eol(z, p);
+            break;
+        case CTRL('t'):
+            trim_clean(z);
+            break;
         case CTRL('x'):
             switch (x = getch()) {
             case CTRL('c'):
@@ -1264,11 +1436,26 @@ int main(int argc, char **argv)
                 /* Copy, inserting at end of paste buffer */
                 rv = copy_region(z, p);
                 break;
-
-            case 'k':
+            case '!':
                 /* Close editor if last buffer is killed */
                 if ((b = kill_buf(b)) == NULL)
                     running = 0;
+                break;
+            case 'k':
+                DELETEBUF(p);
+                rv = cut_to_sol(z, p);
+                break;
+            case 'b':
+                backward_word(z, mult);
+                break;
+            case 'f':
+                forward_word(z, 0, mult);
+                break;
+            case 'u':
+                forward_word(z, 1, mult);
+                break;
+            case 'l':
+                forward_word(z, 2, mult);
                 break;
             case '<':
                 start_of_buf(z);
