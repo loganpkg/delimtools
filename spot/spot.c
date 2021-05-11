@@ -379,6 +379,33 @@ void backward_word(struct buf *b, size_t mult)
     }
 }
 
+int insert_hex(struct buf *b, size_t mult)
+{
+    /*
+     * Inserts a character mult times that was typed as its two digit
+     * hexadecimal value.
+     */
+    int x;
+    char ch = 0;
+    size_t i = 2;
+    while (i--) {
+        x = getch();
+        if (ISASCII(x) && isxdigit(x)) {
+            if (islower(x))
+                ch = ch * 16 + x - 'a' + 10;
+            else if (isupper(x))
+                ch = ch * 16 + x - 'A' + 10;
+            else
+                ch = ch * 16 + x - '0';
+        } else {
+            return 1;
+        }
+    }
+    if (insert_ch(b, ch, mult))
+        return 1;
+    return 0;
+}
+
 void trim_clean(struct buf *b)
 {
     /*
@@ -1391,6 +1418,9 @@ int main(int argc, char **argv)
             break;
         case CTRL('t'):
             trim_clean(z);
+            break;
+        case CTRL('q'):
+            rv = insert_hex(z, mult);
             break;
         case CTRL('x'):
             switch (x = getch()) {
