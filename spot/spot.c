@@ -108,6 +108,8 @@ struct buf *init_buf(void)
     /* End of buffer char. Cannot be deleted. */
     *b->e = '\0';
     b->r = 1;
+    b->sc = 0;
+    b->sc_set = 0;
     b->d = 0;
     b->m = 0;
     b->mr = 1;
@@ -720,47 +722,27 @@ int filesize(char *fn, size_t * fs)
     return 0;
 }
 
-int insert_file(struct buf *b, char *fn, int right)
+int insert_file(struct buf *b, char *fn)
 {
-    /*
-     * Inserts a file into the righthand side of the gap if right is non-zero.
-     * Otherwise it inserts into the lefthand side of the gap.
-     */
-    size_t fs, r, num;
+    /* Inserts a file into the righthand side of the gap */
+    size_t fs;
     FILE *fp;
-    char *q;
-    int x;
     if (filesize(fn, &fs))
         return 1;
+    /* Nothing to do */
+    if (!fs)
+        return 0;
     if (fs > GAPSIZE(b))
         if (grow_gap(b, fs))
             return 1;
     if ((fp = fopen(fn, "r")) == NULL)
         return 1;
-    if (right) {
-        /* Right of gap insert */
-        if (fread(b->c - fs, 1, fs, fp) != fs) {
-            fclose(fp);
-            return 1;
-        }
-        b->c -= fs;
-    } else {
-        /* Left of gap insert */
-        q = b->g;
-        r = b->r;
-        num = 0;
-        while ((x = getc(fp)) != EOF) {
-            num++;
-            *q++ = x;
-            if (x == '\n')
-                ++r;
-        }
-        if (num != fs)
-            return 1;
-        /* Only update buf variables after success */
-        b->g = q;
-        b->r = r;
+    /* Right of gap insert */
+    if (fread(b->c - fs, 1, fs, fp) != fs) {
+        fclose(fp);
+        return 1;
     }
+    b->c -= fs;
     SETMOD(b);
     return 0;
 }
@@ -1056,7 +1038,7 @@ struct buf *new_buf(struct buf *b, char *fn)
     if (fn != NULL) {
         if (!access(fn, F_OK)) {
             /* File exists */
-            if (insert_file(t, fn, 1)) {
+            if (insert_file(t, fn)) {
                 free_buf_list(t);
                 return NULL;
             }
@@ -1110,65 +1092,6 @@ struct buf *kill_buf(struct buf *b)
     return t;
 }
 
-char *make_tmp_file(char *template)
-{
-    /*
-     * Creates a closed temporary file and returns the filename.
-     * Must free after use.
-     */
-    char *t;
-    int fd;
-    if ((t = strdup(template)) == NULL)
-        return NULL;
-    if ((fd = mkstemp(t)) == -1) {
-        free(t);
-        return NULL;
-    }
-    if (close(fd))
-        return NULL;
-    return t;
-}
-
-int write_region(struct buf *b, char *fn)
-{
-    /* Write the region to filename fn */
-    FILE *fp;
-    size_t s;
-    if (!b->m_set)
-        return 1;
-    if (b->m == CURSOR_INDEX(b))
-        return 1;
-    if ((fp = fopen(fn, "w")) == NULL)
-        return 1;
-    if (b->m < CURSOR_INDEX(b)) {
-        s = CURSOR_INDEX(b) - b->m;
-        if (fwrite(b->m + b->a, 1, s, fp) != s) {
-            fclose(fp);
-            return 1;
-        }
-    } else {
-        s = b->m - CURSOR_INDEX(b);
-        if (fwrite(b->c, 1, s, fp) != s) {
-            fclose(fp);
-            return 1;
-        }
-    }
-    if (fclose(fp))
-        return 1;
-    return 0;
-}
-
-int system_cmd(char *cmd)
-{
-    /* Runs a system command */
-    int status;
-    if ((status = system(cmd)) == -1)
-        return 1;
-    if (WIFEXITED(status) && !WEXITSTATUS(status))
-        return 0;
-    return 1;
-}
-
 int main(int argc, char **argv)
 {
     int ret = 0;                /* Return value of text editor */
@@ -1186,12 +1109,8 @@ int main(int argc, char **argv)
     /* Operation for which command line is being used */
     char operation = ' ';
     size_t mult;                /* Command multiplier */
-    char *reg = NULL;           /* Filename used to save the region */
-    char *out = NULL;           /* Filename used for system command output */
-    char *cmd;                  /* System command string */
     /* Persist the sticky column (used for repeated up or down) */
     int persist_sc = 0;
-    size_t ci_backup, r_backup; /* Cursor index and row number backup */
     int i;
 
     if (argc <= 1) {
@@ -1218,17 +1137,6 @@ int main(int argc, char **argv)
         goto clean_up;
     }
 
-    /* Create temporary filename for saving the region */
-    if ((reg = make_tmp_file("reg_XXXXXXXXXX")) == NULL) {
-        ret = 1;
-        goto clean_up;
-    }
-
-    if ((out = make_tmp_file("out_XXXXXXXXXX")) == NULL) {
-        ret = 1;
-        goto clean_up;
-    }
-
     if (init_ncurses()) {
         ret = 1;
         goto clean_up;
@@ -1246,6 +1154,12 @@ int main(int argc, char **argv)
         /* Clear internal return value */
         rv = 0;
 
+        /* Active buffer */
+        if (cl_active)
+            z = cl;
+        else
+            z = b;
+
         /* Update sticky column */
         if (persist_sc) {
             /* Turn off persist status, but do not clear sticky column yet */
@@ -1255,12 +1169,6 @@ int main(int argc, char **argv)
             z->sc = 0;
             z->sc_set = 0;
         }
-
-        /* Active buffer */
-        if (cl_active)
-            z = cl;
-        else
-            z = b;
 
         x = getch();
 
@@ -1289,56 +1197,15 @@ int main(int argc, char **argv)
             switch (operation) {
             case 'f':
                 str_buf(cl);
-                rv = insert_file(b, cl->c, 1);
+                rv = insert_file(b, cl->c);
                 break;
             case 's':
                 start_of_buf(cl);
                 rv = search(b, cl->c, cl->e - cl->c);
                 break;
             case 'r':
-            case 'o':
                 str_buf(cl);
-                if (b->m_set && write_region(b, reg)) {
-                    rv = 1;
-                    break;
-                }
-                /*
-                 * Prepare the shell command. The region filename is preloaded
-                 * as the reg shell variable.
-                 */
-                if (asprintf
-                    (&cmd, "LC_ALL='C'; reg='%s'; %s > %s\n", reg,
-                     cl->c, out) == -1) {
-                    rv = 1;
-                    break;
-                }
-                if (system_cmd(cmd)) {
-                    rv = 1;
-                    break;
-                }
-                free(cmd);
-                if (operation == 'r' && b->m_set && delete_region(b)) {
-                    rv = 1;
-                    break;
-                }
-                if (operation == 'o') {
-                    if (new_buf(b, NULL) == NULL) {
-                        rv = 1;
-                        break;
-                    } else {
-                        /* Move to new buffer */
-                        b = b->next;
-                    }
-                }
-                /* Record information to set the mark after the insert */
-                ci_backup = CURSOR_INDEX(b);
-                r_backup = b->r;
-                rv = insert_file(b, out, 0);
-                if (!rv) {
-                    b->m = ci_backup;
-                    b->mr = r_backup;
-                    b->m_set = 1;
-                }
+                rv = rename_buf(b, cl->c);
                 break;
             }
             cl_active = 0;
@@ -1508,15 +1375,6 @@ int main(int argc, char **argv)
     free_buf_list(b);
     free_buf_list(cl);
     free_buf_list(p);
-
-    /* Delete region file */
-    if (reg != NULL && remove(reg))
-        ret = 1;
-    free(reg);
-
-    if (out != NULL && remove(out))
-        ret = 1;
-    free(out);
 
     if (stdscr != NULL)
         if (endwin() == ERR)
