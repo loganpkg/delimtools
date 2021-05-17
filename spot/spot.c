@@ -17,6 +17,8 @@
 /*
  * spot: text editor.
  * Dedicated to my son who was only a 4mm "spot" in his first ultrasound.
+ *
+ * $ cc -ansi -g -O3 -Wall -Wextra -pedantic spot.c -lncurses && mv a.out spot
  */
 
 #include <sys/stat.h>
@@ -1026,7 +1028,7 @@ int rename_buf(struct buf *b, char *new_fn)
 
 struct buf *new_buf(struct buf *b, char *fn)
 {
-    /* 
+    /*
      * Creates a new buffer to the right of buffer b in the doubly linked list
      * and sets the associated filename to fn. The file will be loaded into
      * the buffer if it exists.
@@ -1207,6 +1209,15 @@ int main(int argc, char **argv)
                 str_buf(cl);
                 rv = rename_buf(b, cl->c);
                 break;
+            case 'o':
+                str_buf(cl);
+                if (new_buf(b, cl->c) == NULL) {
+                    rv = 1;
+                } else {
+                    b = b->next;
+                    rv = 0;
+                }
+                break;
             }
             cl_active = 0;
             operation = ' ';
@@ -1257,14 +1268,17 @@ int main(int argc, char **argv)
             req_clear = 1;
             break;
         case CTRL('s'):
+            DELETEBUF(p);
             operation = 's';
             cl_active = 1;
             break;
         case CTRL('r'):
+            DELETEBUF(p);
             operation = 'r';
             cl_active = 1;
             break;
         case CTRL('o'):
+            DELETEBUF(p);
             operation = 'o';
             cl_active = 1;
             break;
@@ -1298,6 +1312,7 @@ int main(int argc, char **argv)
                 rv = write_file(z);
                 break;
             case CTRL('f'):
+                DELETEBUF(p);
                 operation = 'f';
                 cl_active = 1;
                 break;
