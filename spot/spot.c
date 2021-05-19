@@ -145,7 +145,7 @@ void free_buf_list(struct buf *b)
 int grow_gap(struct buf *b, size_t will_use)
 {
     /* Grows the gap size of a buffer */
-    char *t;
+    char *t, *new_e;
     size_t buf_size = b->e - b->a + 1;
     if (MOF(buf_size, 2))
         return 1;
@@ -157,12 +157,15 @@ int grow_gap(struct buf *b, size_t will_use)
         return 1;
     /* Copy text before the gap */
     memcpy(t, b->a, b->g - b->a);
-    /* Copy text after the gap */
-    memcpy(t + buf_size - 1 - (b->e - b->c + 1), b->c, b->e - b->c + 1);
+    /* Copy text after the gap, excluding the end of buffer character */
+    new_e = t + buf_size - 1;
+    memcpy(new_e - (b->e - b->c), b->c, b->e - b->c);
+    /* Set end of buffer character */
+    *new_e = '\0';
     /* Update pointers, indices do not need to be changed */
     b->g = t + (b->g - b->a);
-    b->c = t + buf_size - 1 - (b->e - b->c + 1);
-    b->e = t + buf_size - 1;
+    b->c = new_e - (b->e - b->c);
+    b->e = new_e;
     /* Free old memory */
     free(b->a);
     b->a = t;
@@ -693,6 +696,8 @@ int paste(struct buf *b, struct buf *p, size_t mult)
 int cut_to_eol(struct buf *b, struct buf *p)
 {
     /* Cut to the end of the line */
+    if (*b->c == '\n')
+        return delete_ch(b, 1);
     set_mark(b);
     end_of_line(b);
     if (cut_region(b, p))
@@ -1332,7 +1337,7 @@ int main(int argc, char **argv)
             break;
         case ESC:
             switch (x = getch()) {
-            case 's':
+            case 'n':
                 /* Search without editing the command line */
                 start_of_buf(cl);
                 rv = search(z, cl->c, cl->e - cl->c);
