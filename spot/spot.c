@@ -1234,7 +1234,14 @@ int main(int argc, char **argv)
             set_mark(z);
             break;
         case CTRL('g'):
-            clear_mark(z);
+            if (z->m_set) {
+                /* Clear mark if set */
+                clear_mark(z);
+            } else {
+                /* Or quit the command line */
+                cl_active = 0;
+                operation = ' ';
+            }
             break;
         case CTRL('h'):
         case KEY_BACKSPACE:
@@ -1273,17 +1280,17 @@ int main(int argc, char **argv)
             req_clear = 1;
             break;
         case CTRL('s'):
-            DELETEBUF(p);
+            DELETEBUF(cl);
             operation = 's';
             cl_active = 1;
             break;
         case CTRL('r'):
-            DELETEBUF(p);
+            DELETEBUF(cl);
             operation = 'r';
             cl_active = 1;
             break;
         case CTRL('o'):
-            DELETEBUF(p);
+            DELETEBUF(cl);
             operation = 'o';
             cl_active = 1;
             break;
@@ -1317,7 +1324,7 @@ int main(int argc, char **argv)
                 rv = write_file(z);
                 break;
             case CTRL('f'):
-                DELETEBUF(p);
+                DELETEBUF(cl);
                 operation = 'f';
                 cl_active = 1;
                 break;
