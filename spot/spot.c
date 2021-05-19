@@ -1202,7 +1202,7 @@ int main(int argc, char **argv)
 
         if (cl_active && x == '\n') {
             switch (operation) {
-            case 'f':
+            case 'i':
                 str_buf(cl);
                 rv = insert_file(b, cl->c);
                 break;
@@ -1214,7 +1214,7 @@ int main(int argc, char **argv)
                 str_buf(cl);
                 rv = rename_buf(b, cl->c);
                 break;
-            case 'o':
+            case 'n':
                 str_buf(cl);
                 if (new_buf(b, cl->c) == NULL) {
                     rv = 1;
@@ -1280,18 +1280,15 @@ int main(int argc, char **argv)
             req_clear = 1;
             break;
         case CTRL('s'):
+            /* Search */
             DELETEBUF(cl);
             operation = 's';
             cl_active = 1;
             break;
         case CTRL('r'):
+            /* Rename buffer */
             DELETEBUF(cl);
             operation = 'r';
-            cl_active = 1;
-            break;
-        case CTRL('o'):
-            DELETEBUF(cl);
-            operation = 'o';
             cl_active = 1;
             break;
         case CTRL('w'):
@@ -1323,9 +1320,16 @@ int main(int argc, char **argv)
             case CTRL('s'):
                 rv = write_file(z);
                 break;
-            case CTRL('f'):
+            case 'i':
+                /* Insert file at the cursor */
                 DELETEBUF(cl);
-                operation = 'f';
+                operation = 'i';
+                cl_active = 1;
+                break;
+            case CTRL('f'):
+                /* New buffer */
+                DELETEBUF(cl);
+                operation = 'n';
                 cl_active = 1;
                 break;
             case KEY_LEFT:
