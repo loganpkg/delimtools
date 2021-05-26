@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <ctype.h>
 #include <errno.h>
 
 #define INIT_BUF_SIZE 2
@@ -130,14 +131,68 @@ int include(struct buf *b, char *fn)
     return 0;
 }
 
+void delete_buf(struct buf *b)
+{
+    b->i = 0;
+}
+
+int getword(struct buf *token, struct buf *input, int *err)
+{
+    int x;
+    delete_buf(token);
+
+    /* Always read at least one char */
+    errno = 0;
+    if ((x = getch(input)) == EOF) {
+        if (errno)
+            *err = 1;
+        return 1;
+    }
+    if (ungetch(token, x) == EOF)
+        return 1;
+
+    if (isalpha(x) || x == '_') {
+        /* Could be the start of a macro name */
+        while (1) {
+            /* Read another char */
+            errno = 0;
+            if ((x = getch(input)) == EOF) {
+                if (errno)
+                    *err = 1;
+                return 1;
+            }
+            if (!(isalnum(x) || x == '_')) {
+                /* Read past the end of the token, so put the char back */
+                if (ungetch(input, x) == EOF)
+                    return 1;
+                break;
+            } else {
+                /* Store the char */
+                if (ungetch(token, x) == EOF)
+                    return 1;
+            }
+        }
+    }
+    /* Null terminate token */
+    if (ungetch(token, '\0') == EOF)
+        return 1;
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     int ret = 0;
-    int x;
+    int err;
+    /* int x; */
     int j;
-    struct buf *input;
+    struct buf *input = NULL, *token = NULL;
 
     if ((input = init_buf()) == NULL) {
+        ret = 1;
+        goto clean_up;
+    }
+
+    if ((token = init_buf()) == NULL) {
         ret = 1;
         goto clean_up;
     }
@@ -157,11 +212,21 @@ int main(int argc, char **argv)
     ungetch(input, 'e');
     ungetch(input, 'h');
 
+/*
     while ((x = getch(input)) != EOF)
         putchar(x);
+*/
+    err = 0;
+    while (!getword(token, input, &err))
+        printf("%s", token->a);
+    if (err) {
+        ret = 1;
+        goto clean_up;
+    }
 
   clean_up:
     free_buf(input);
+    free_buf(token);
 
     return ret;
 }
