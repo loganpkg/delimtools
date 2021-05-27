@@ -623,6 +623,7 @@ int copy_region(struct buf *b, struct buf *p)
         /* Adjust row number */
         p->r += b->mr - b->r;
     }
+    clear_mark(b);
     SETMOD(p);
     return 0;
 }
