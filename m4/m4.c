@@ -26,6 +26,8 @@
 
 #define INIT_BUF_SIZE 2
 
+#define HASH_TABLE_SIZE 100
+
 /* size_t Addition OverFlow test */
 #define AOF(a, b) ((a) > SIZE_MAX - (b))
 /* size_t Multiplication OverFlow test */
@@ -179,11 +181,20 @@ int getword(struct buf *token, struct buf *input, int *err)
     return 0;
 }
 
+size_t hash_str(char *s)
+{
+    /* djb2 */
+    unsigned char c;
+    size_t h = 5381;
+    while ((c = *s++))
+        h = h * 33 ^ c;
+    return h % HASH_TABLE_SIZE;
+}
+
 int main(int argc, char **argv)
 {
     int ret = 0;
     int err;
-    /* int x; */
     int j;
     struct buf *input = NULL, *token = NULL;
 
@@ -212,13 +223,11 @@ int main(int argc, char **argv)
     ungetch(input, 'e');
     ungetch(input, 'h');
 
-/*
-    while ((x = getch(input)) != EOF)
-        putchar(x);
-*/
     err = 0;
-    while (!getword(token, input, &err))
+    while (!getword(token, input, &err)) {
         printf("%s", token->a);
+        printf("%lu\n", hash_str(token->a));
+    }
     if (err) {
         ret = 1;
         goto clean_up;
