@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <ctype.h>
 #include <errno.h>
 
@@ -33,13 +34,19 @@
 /* size_t Multiplication OverFlow test */
 #define MOF(a, b) ((a) && (b) > SIZE_MAX / (a))
 
+#define getch(b) (b->i ? *(b->a + --b->i) : getchar())
+
 struct buf {
     char *a;
     size_t i;
     size_t s;
 };
 
-#define getch(b) (b->i ? *(b->a + --b->i) : getchar())
+struct entry {
+    struct entry *next;
+    char *name;
+    char *def;
+};
 
 struct buf *init_buf(void)
 {
@@ -181,6 +188,17 @@ int getword(struct buf *token, struct buf *input, int *err)
     return 0;
 }
 
+struct entry *init_entry(void)
+{
+    struct entry *e;
+    if ((e = malloc(sizeof(struct entry))) == NULL)
+        return NULL;
+    e->next = NULL;
+    e->name = NULL;
+    e->def = NULL;
+    return e;
+}
+
 size_t hash_str(char *s)
 {
     /* djb2 */
@@ -191,12 +209,87 @@ size_t hash_str(char *s)
     return h % HASH_TABLE_SIZE;
 }
 
+struct entry *lookup_entry(struct entry **ht, char *name)
+{
+    size_t h = hash_str(name);
+    struct entry *e = *(ht + h);
+    while (e != NULL) {
+        /* Found */
+        if (!strcmp(name, e->name))
+            return e;
+        e = e->next;
+    }
+    /* Not found */
+    return NULL;
+}
+
+char *get_def(struct entry **ht, char *name)
+{
+    struct entry *e;
+    if ((e = lookup_entry(ht, name)) == NULL)
+        return NULL;
+    return e->def;
+}
+
+int upsert_entry(struct entry **ht, char *name, char *def)
+{
+    struct entry *e;
+    size_t h;
+    char *t;
+    if ((e = lookup_entry(ht, name)) == NULL) {
+        /* Insert entry: */
+        if ((e = init_entry()) == NULL)
+            return 1;
+        /* Store data */
+        if ((e->name = strdup(name)) == NULL) {
+            free(e);
+            return 1;
+        }
+        if ((e->def = strdup(def)) == NULL) {
+            free(e->name);
+            free(e);
+            return 1;
+        }
+        h = hash_str(name);
+        /* Link new entry in at head of list (the existing head could be NULL) */
+        e->next = *(ht + h);
+        *(ht + h) = e;
+    } else {
+        /* Update entry: */
+        if ((t = strdup(def)) == NULL)
+            return 1;
+        free(e->def);
+        e->def = t;
+    }
+    return 0;
+}
+
+void free_hash_table(struct entry **ht)
+{
+    struct entry *e, *ne;
+    size_t j;
+    if (ht != NULL) {
+        for (j = 0; j < HASH_TABLE_SIZE; ++j) {
+            e = *(ht + j);
+            while (e != NULL) {
+                ne = e->next;
+                free(e->name);
+                free(e->def);
+                free(e);
+                e = ne;
+            }
+        }
+        free(ht);
+    }
+}
+
 int main(int argc, char **argv)
 {
     int ret = 0;
     int err;
     int j;
     struct buf *input = NULL, *token = NULL;
+    struct entry **ht = NULL;
 
     if ((input = init_buf()) == NULL) {
         ret = 1;
@@ -204,6 +297,11 @@ int main(int argc, char **argv)
     }
 
     if ((token = init_buf()) == NULL) {
+        ret = 1;
+        goto clean_up;
+    }
+
+    if ((ht = calloc(HASH_TABLE_SIZE, sizeof(struct entry *))) == NULL) {
         ret = 1;
         goto clean_up;
     }
@@ -224,18 +322,28 @@ int main(int argc, char **argv)
     ungetch(input, 'h');
 
     err = 0;
+/*
     while (!getword(token, input, &err)) {
         printf("%s", token->a);
         printf("%lu\n", hash_str(token->a));
+        upsert_entry(ht, token->a, "hello");
     }
     if (err) {
         ret = 1;
         goto clean_up;
     }
+*/
+
+    printf("%s\n", get_def(ht, "logan"));
+    upsert_entry(ht, "logan", "wow");
+    printf("%s\n", get_def(ht, "logan"));
+    upsert_entry(ht, "logan", "elephant");
+    printf("%s\n", get_def(ht, "logan"));
 
   clean_up:
     free_buf(input);
     free_buf(token);
+    free_hash_table(ht);
 
     return ret;
 }
