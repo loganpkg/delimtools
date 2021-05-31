@@ -16,6 +16,8 @@
 
 /* m4 */
 
+/* Assumes NULL pointers are zero */
+
 #include <sys/stat.h>
 
 #include <stdio.h>
@@ -34,7 +36,7 @@
 /* size_t Multiplication OverFlow test */
 #define MOF(a, b) ((a) && (b) > SIZE_MAX / (a))
 
-#define getch(b) (b->i ? *(b->a + --b->i) : getchar())
+#define getch(b, read_stdin) (b->i ? *(b->a + --b->i) : (read_stdin ? getchar() : EOF))
 
 struct buf {
     char *a;
@@ -42,10 +44,27 @@ struct buf {
     size_t s;
 };
 
+/*
+ * For hash table entries. Multpile entries at the same hash value link
+ * together to form a singularly linked list.
+ */
 struct entry {
     struct entry *next;
     char *name;
     char *def;
+};
+
+/*
+ * mcall used to stack on nested macro calls.
+ * Only argument buffers 1 to 9 are used (index 0 will be NULL).
+ */
+struct mcall {
+    struct mcall *next;
+    char *name;                 /* Macro name */
+    char *def;                  /* Macro definition before substitution */
+    size_t bracket_depth;       /* Only unquoted brackets are counted */
+    size_t active_arg;          /* The current argument being collected */
+    struct buf *arg_buf[10];    /* For argument collection */
 };
 
 struct buf *init_buf(void)
@@ -134,6 +153,10 @@ int include(struct buf *b, char *fn)
     if (fclose(fp))
         return 1;
 
+    /* Check */
+    if (back_i != b->i)
+        return 1;
+
     /* Success */
     b->i += fs;
 
@@ -145,14 +168,14 @@ void delete_buf(struct buf *b)
     b->i = 0;
 }
 
-int getword(struct buf *token, struct buf *input, int *err)
+int getword(struct buf *token, struct buf *input, int read_stdin, int *err)
 {
     int x;
     delete_buf(token);
 
     /* Always read at least one char */
     errno = 0;
-    if ((x = getch(input)) == EOF) {
+    if ((x = getch(input, read_stdin)) == EOF) {
         if (errno)
             *err = 1;
         return 1;
@@ -165,7 +188,7 @@ int getword(struct buf *token, struct buf *input, int *err)
         while (1) {
             /* Read another char */
             errno = 0;
-            if ((x = getch(input)) == EOF) {
+            if ((x = getch(input, read_stdin)) == EOF) {
                 if (errno)
                     *err = 1;
                 return 1;
@@ -235,7 +258,7 @@ int upsert_entry(struct entry **ht, char *name, char *def)
 {
     struct entry *e;
     size_t h;
-    char *t;
+    char *t = NULL;
     if ((e = lookup_entry(ht, name)) == NULL) {
         /* Insert entry: */
         if ((e = init_entry()) == NULL)
@@ -245,7 +268,7 @@ int upsert_entry(struct entry **ht, char *name, char *def)
             free(e);
             return 1;
         }
-        if ((e->def = strdup(def)) == NULL) {
+        if (def != NULL && (e->def = strdup(def)) == NULL) {
             free(e->name);
             free(e);
             return 1;
@@ -256,12 +279,41 @@ int upsert_entry(struct entry **ht, char *name, char *def)
         *(ht + h) = e;
     } else {
         /* Update entry: */
-        if ((t = strdup(def)) == NULL)
+        if (def != NULL && (t = strdup(def)) == NULL)
             return 1;
         free(e->def);
-        e->def = t;
+        e->def = t;             /* Could be NULL */
     }
     return 0;
+}
+
+int delete_entry(struct entry **ht, char *name)
+{
+    size_t h = hash_str(name);
+    struct entry *e = *(ht + h), *prev = NULL;
+    while (e != NULL) {
+        /* Found */
+        if (!strcmp(name, e->name))
+            break;
+        prev = e;
+        e = e->next;
+    }
+    if (e != NULL) {
+        /* Found */
+        /* Link around the entry */
+        if (prev != NULL)
+            prev->next = e->next;
+        free(e->name);
+        free(e->def);
+        free(e);
+        /* At head of list */
+        if (prev == NULL)
+            *(ht + h) = NULL;
+        return 0;
+    }
+
+    /* Not found */
+    return 1;
 }
 
 void free_hash_table(struct entry **ht)
@@ -283,13 +335,41 @@ void free_hash_table(struct entry **ht)
     }
 }
 
+void free_mcall(struct mcall *m)
+{
+    size_t j;
+    if (m != NULL) {
+        for (j = 1; j < 10; ++j)
+            free_buf(*(m->arg_buf + j));
+        free(m);
+    }
+}
+
+struct mcall *init_mcall(void)
+{
+    struct mcall *m;
+    size_t j;
+    if ((m = calloc(1, sizeof(struct mcall))) == NULL)
+        return NULL;
+    /* Arg 0 is not used */
+    for (j = 1; j < 10; ++j)
+        if ((*(m->arg_buf + j) = init_buf()) == NULL) {
+            free_mcall(m);
+            return NULL;
+        }
+    m->active_arg = 1;
+    return m;
+}
+
 int main(int argc, char **argv)
 {
-    int ret = 0;
-    int err;
-    int j;
+    int ret = 0, read_stdin = 1, err, j, x;
     struct buf *input = NULL, *token = NULL;
-    struct entry **ht = NULL;
+    struct entry **ht = NULL, *e;
+    int quote_on = 0;
+    size_t quote_depth = 0, fs, total_fs = 0;
+    /* Diversion 10 is -1 */
+    struct buf *diversion[11] = { NULL }, *act_div;
 
     if ((input = init_buf()) == NULL) {
         ret = 1;
@@ -301,12 +381,41 @@ int main(int argc, char **argv)
         goto clean_up;
     }
 
+    /* Setup diversions */
+    for (j = 0; j < 11; ++j)
+        if ((*(diversion + j) = init_buf()) == NULL) {
+            ret = 1;
+            goto clean_up;
+        }
+    act_div = *diversion;
+
     if ((ht = calloc(HASH_TABLE_SIZE, sizeof(struct entry *))) == NULL) {
         ret = 1;
         goto clean_up;
     }
 
+    /* Define built-in macros. They have a def of NULL. */
+    if (upsert_entry(ht, "define", NULL)) {
+        ret = 1;
+        goto clean_up;
+    }
+
     if (argc > 1) {
+        read_stdin = 0;
+        /* Get total size of command line files */
+        for (j = argc - 1; j; --j) {
+            if (filesize(*(argv + j), &fs)) {
+                ret = 1;
+                goto clean_up;
+            }
+            total_fs += fs;
+        }
+        /* Make sure buffer is big enough to hold all files */
+        if (grow_buf(input, total_fs)) {
+            ret = 1;
+            goto clean_up;
+        }
+
         /* Load command line files into buffer */
         for (j = argc - 1; j; --j)
             if (include(input, *(argv + j))) {
@@ -315,18 +424,16 @@ int main(int argc, char **argv)
             }
     }
 
-    ungetch(input, 'o');
-    ungetch(input, 'l');
-    ungetch(input, 'l');
-    ungetch(input, 'e');
-    ungetch(input, 'h');
+    /* Read input word by word */
 
-    err = 0;
+
 /*
-    while (!getword(token, input, &err)) {
-        printf("%s", token->a);
-        printf("%lu\n", hash_str(token->a));
-        upsert_entry(ht, token->a, "hello");
+    err = 0;
+    while (!getword(token, input, read_stdin, &err)) {
+
+
+
+
     }
     if (err) {
         ret = 1;
@@ -334,15 +441,30 @@ int main(int argc, char **argv)
     }
 */
 
+
+    upsert_entry(ht, "logan", "cool");
+
     printf("%s\n", get_def(ht, "logan"));
-    upsert_entry(ht, "logan", "wow");
+
+    delete_entry(ht, "logan");
+
     printf("%s\n", get_def(ht, "logan"));
-    upsert_entry(ht, "logan", "elephant");
+
+    delete_entry(ht, "logan");
+    delete_entry(ht, "logan");
+    delete_entry(ht, "logan");
+
+    upsert_entry(ht, "logan", "cool");
+
     printf("%s\n", get_def(ht, "logan"));
+
 
   clean_up:
     free_buf(input);
     free_buf(token);
+    for (j = 0; j < 11; ++j)
+        free_buf(*(diversion + j));
+
     free_hash_table(ht);
 
     return ret;
