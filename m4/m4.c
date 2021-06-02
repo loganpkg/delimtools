@@ -456,6 +456,28 @@ int sub_args(struct buf *result, struct mcall *stack)
     return 0;
 }
 
+char *strip_def(char *def)
+{
+    char *d, *t, ch;
+    int dollar_enc = 0;
+    if ((d = strdup(def)) == NULL)
+        return NULL;
+    t = d;
+    while ((ch = *def++)) {
+        if (ch == '$') {
+            dollar_enc = 1;
+        } else if (dollar_enc && isdigit(ch) && ch != '0') {
+            /* Do nothing */
+        } else {
+            if (dollar_enc)
+                *t++ = '$';
+            *t++ = ch;
+        }
+    }
+    *t = '\0';
+    return d;
+}
+
 int terminate_args(struct mcall *stack)
 {
     size_t j;
@@ -484,6 +506,7 @@ int main(int argc, char **argv)
     char left_quote[2] = { '[', '\0' };
     char right_quote[2] = { ']', '\0' };
     struct mcall *stack = NULL;
+    char *sd = NULL;
 
     if (argc < 1)
         return 1;
@@ -510,6 +533,10 @@ int main(int argc, char **argv)
     /* Define built-in macros. They have a def of NULL. */
     if (upsert_entry(ht, "define", NULL))
         QUIT;
+    if (upsert_entry(ht, "undefine", NULL))
+        QUIT;
+    if (upsert_entry(ht, "changequote", NULL))
+        QUIT;
 
     if (argc > 1) {
         /* Do not read stdin if there are command line files */
@@ -528,7 +555,6 @@ int main(int argc, char **argv)
             if (include(input, *(argv + j)))
                 QUIT;
     }
-
 
 /* Token string */
 #define TS token->a
@@ -590,6 +616,7 @@ int main(int argc, char **argv)
     } \
 } while(0)
 
+/* Eat whitespace */
 #define EAT_WS do { \
     do \
         READ_TOKEN(next_token); \
@@ -597,123 +624,140 @@ int main(int argc, char **argv)
     if (ungetstr(input, NTS)) QUIT; \
 } while (0)
 
+#define SN stack->name
+
+#define emsg(m) fprintf(stderr, m "\n")
+
+/* Process built-in macro with args */
+#define PROCESS_BI_WITH_ARGS do { \
+    if (!strcmp(SN, "define")) { \
+        if (upsert_entry(ht, ARG(1), ARG(2))) \
+            QUIT; \
+    } else if (!strcmp(SN, "undefine")) { \
+        if (delete_entry(ht, ARG(1))) \
+            QUIT; \
+    } else if (!strcmp(SN, "changequote")) { \
+        if (strlen(ARG(1)) != 1 || strlen(ARG(2)) != 1 || *ARG(1) == *ARG(2) \
+            || !isgraph(*ARG(1)) || !isgraph(*ARG(2)) \
+            || *ARG(1) == '(' || *ARG(2) == '(' \
+            || *ARG(1) == ')' || *ARG(2) == ')' \
+            || *ARG(1) == ',' || *ARG(2) == ',') { \
+            emsg("changequote: quotes must be different single graph chars" \
+                " that cannot a comma or parentheses"); \
+            QUIT; \
+        } \
+        *left_quote = *ARG(1); \
+        *right_quote = *ARG(2); \
+    } \
+} while (0)
+
+
     /* m4 loop: read input word by word */
-  top:
-    /* Write stdout buffer (diversion 0) for interactive use */
-    OUT_DIV(0);
-    /* Read token */
-    READ_TOKEN(token);
+    while (1) {
+        /* Write diversion 0 (for interactive use) */
+        OUT_DIV(0);
+        /* Read token */
+        READ_TOKEN(token);
 
-    if (!strcmp(TS, left_quote)) {
-        if (!quote_on)
-            quote_on = 1;
-        if (quote_depth && put_str(output, TS))
-            QUIT;
-        ++quote_depth;
-        goto top;
-    }
-
-    if (!strcmp(TS, right_quote)) {
-        if (quote_depth > 1 && put_str(output, TS))
-            QUIT;
-        if (!--quote_depth)
-            quote_on = 0;
-        goto top;
-    }
-
-    if (quote_on) {
-        if (put_str(output, TS))
-            QUIT;
-        goto top;
-    }
-
-    if (TOKEN_MATCH) {
-        /* Token match */
-        READ_TOKEN(next_token);
-
-        if (!strcmp(NTS, "(")) {
-            /* Start of macro */
-            /* Add macro call to stack */
-            if (stack_on_mcall(&stack))
+        if (!strcmp(TS, left_quote)) {
+            if (!quote_on)
+                quote_on = 1;
+            if (quote_depth && put_str(output, TS))
                 QUIT;
-            /* Copy macro name */
-            if ((stack->name = strdup(TS)) == NULL)
+            ++quote_depth;
+        } else if (!strcmp(TS, right_quote)) {
+            if (quote_depth > 1 && put_str(output, TS))
                 QUIT;
-            /* Copy macro definition (built-ins will be NULL) */
-            if (e->def != NULL && (stack->def = strdup(e->def)) == NULL)
+            if (!--quote_depth)
+                quote_on = 0;
+        } else if (quote_on) {
+            if (put_str(output, TS))
                 QUIT;
-            /* Increment bracket depth for this first bracket */
-            ++stack->bracket_depth;
+        } else if (TOKEN_MATCH) {
+            /* Token match */
+            READ_TOKEN(next_token);
+
+            if (!strcmp(NTS, "(")) {
+                /* Start of macro with arguments */
+                /* Add macro call to stack */
+                if (stack_on_mcall(&stack))
+                    QUIT;
+                /* Copy macro name */
+                if ((stack->name = strdup(TS)) == NULL)
+                    QUIT;
+                /* Copy macro definition (built-ins will be NULL) */
+                if (e->def != NULL
+                    && (stack->def = strdup(e->def)) == NULL)
+                    QUIT;
+                /* Increment bracket depth for this first bracket */
+                ++stack->bracket_depth;
+                SET_OUTPUT;
+                EAT_WS;
+            } else {
+                /* Macro call without arguments */
+                /* Put the next token back into the input */
+                if (ungetstr(input, NTS))
+                    QUIT;
+                /* User defined macro */
+                /* Strip dollar argument positions from definition */
+                if ((sd = strip_def(e->def)) == NULL)
+                    QUIT;
+                if (ungetstr(input, sd))
+                    QUIT;
+                free(sd);
+                sd = NULL;
+            }
+        } else if (ARG_END) {
+            /* End of argument collection */
+            /* Decrement bracket depth for bracket just encountered */
+            --stack->bracket_depth;
+            if (stack->def == NULL) {
+                /* Define built-in macro */
+                if (terminate_args(stack))
+                    QUIT;
+                PROCESS_BI_WITH_ARGS;
+            } else if (stack->def != NULL) {
+                /* User defined macro */
+                if (sub_args(result, stack))
+                    QUIT;
+                if (ungetstr(input, result->a))
+                    QUIT;
+            }
+            REMOVE_SH;
+        } else if (ARG_COMMA) {
+            if (stack->act_arg == 9) {
+                emsg("Macro call has too many arguments");
+                QUIT;
+            }
+            ++stack->act_arg;
             SET_OUTPUT;
             EAT_WS;
-        } else {
-            /* All macro calls must have arguments */
-            /* Put the next token back into the input */
-            if (ungetstr(input, NTS))
+        } else if (NESTED_CB) {
+            if (put_str(output, TS))
                 QUIT;
-            /* Send token to output */
+            --stack->bracket_depth;
+        } else if (NESTED_OB) {
+            if (put_str(output, TS))
+                QUIT;
+            ++stack->bracket_depth;
+        } else {
+            /* Pass through token */
             if (put_str(output, TS))
                 QUIT;
         }
-        goto top;
     }
-
-    if (ARG_END) {
-        /* End of argument collection */
-        /* Decrement bracket depth for bracket just encountered */
-        --stack->bracket_depth;
-        if (stack->def == NULL && !strcmp(stack->name, "define")) {
-            /* Define built-in macro */
-            if (terminate_args(stack))
-                QUIT;
-            if (upsert_entry(ht, ARG(1), ARG(2)))
-                QUIT;
-        } else if (stack->def != NULL) {
-            /* User defined macro */
-            if (sub_args(result, stack))
-                QUIT;
-            if (ungetstr(input, result->a))
-                QUIT;
-        }
-        REMOVE_SH;
-        goto top;
-    }
-
-    if (ARG_COMMA) {
-        if (stack->act_arg == 9) {
-            fprintf(stderr, "Macro call has too many arguments\n");
-            QUIT;
-        }
-        ++stack->act_arg;
-        SET_OUTPUT;
-        EAT_WS;
-        goto top;
-    }
-
-    if (NESTED_CB) {
-        if (put_str(output, TS))
-            QUIT;
-        --stack->bracket_depth;
-        /* Do we want to eat whitespace here? */
-        goto top;
-    }
-
-    if (NESTED_OB) {
-        if (put_str(output, TS))
-            QUIT;
-        ++stack->bracket_depth;
-        /* Do we want to eat whitespace here? */
-        goto top;
-    }
-
-    /* Pass through token */
-    if (put_str(output, TS)) {
-        QUIT;
-        goto top;
-    }
-    goto top;
 
   end_of_input:
+
+    /* Checks */
+    if (stack != NULL) {
+        emsg("Input finished without unwinding the stack");
+        QUIT;
+    }
+    if (quote_on) {
+        emsg("Input finished without exiting quotes");
+        QUIT;
+    }
 
     for (k = 0; k < 10; k++)
         OUT_DIV(k);
@@ -727,5 +771,6 @@ int main(int argc, char **argv)
         free_buf(*(diversion + k));
     free_hash_table(ht);
     free_stack(stack);
+    free(sd);
     return ret;
 }
