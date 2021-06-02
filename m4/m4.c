@@ -467,7 +467,7 @@ char *strip_def(char *def)
         if (ch == '$') {
             dollar_enc = 1;
         } else if (dollar_enc && isdigit(ch) && ch != '0') {
-            /* Do nothing */
+            dollar_enc = 0;
         } else {
             if (dollar_enc)
                 *t++ = '$';
@@ -537,6 +537,10 @@ int main(int argc, char **argv)
         QUIT;
     if (upsert_entry(ht, "changequote", NULL))
         QUIT;
+    if (upsert_entry(ht, "divert", NULL))
+        QUIT;
+    if (upsert_entry(ht, "dumpdef", NULL))
+        QUIT;
 
     if (argc > 1) {
         /* Do not read stdin if there are command line files */
@@ -577,9 +581,9 @@ int main(int argc, char **argv)
 #define ARG_COMMA (stack != NULL && stack->bracket_depth == 1 \
     && !strcmp(TS, ","))
 
-/* Token is a match of a macro name */
-#define TOKEN_MATCH ((isalpha(*TS) || *TS == '_') \
-    && (e = lookup_entry(ht, TS)) != NULL)
+/* String s is a match of a macro name */
+#define ISMACRO(s) ((isalpha(*s) || *s == '_') \
+    && (e = lookup_entry(ht, s)) != NULL)
 
 /* Set output to stack argument collection buffer or diversion buffer */
 #define SET_OUTPUT output = (stack == NULL ? *(diversion + act_div) \
@@ -626,7 +630,12 @@ int main(int argc, char **argv)
 
 #define SN stack->name
 
-#define emsg(m) fprintf(stderr, m "\n")
+#define EMSG(m) fprintf(stderr, m "\n")
+
+#define EQUIT(m) do { \
+    EMSG(m); \
+    QUIT; \
+} while (0)
 
 /* Process built-in macro with args */
 #define PROCESS_BI_WITH_ARGS do { \
@@ -642,12 +651,27 @@ int main(int argc, char **argv)
             || *ARG(1) == '(' || *ARG(2) == '(' \
             || *ARG(1) == ')' || *ARG(2) == ')' \
             || *ARG(1) == ',' || *ARG(2) == ',') { \
-            emsg("changequote: quotes must be different single graph chars" \
+            EQUIT("changequote: quotes must be different single graph chars" \
                 " that cannot a comma or parentheses"); \
-            QUIT; \
         } \
         *left_quote = *ARG(1); \
         *right_quote = *ARG(2); \
+    } else if (!strcmp(SN, "divert")) { \
+        if (strlen(ARG(1)) == 1 && isdigit(*ARG(1))) \
+            act_div = *ARG(1) - '0'; \
+        else if (!strcmp(ARG(1), "-1")) \
+            act_div = 10; \
+        else \
+            EQUIT("divert: Diversion number must be 0 to 9 or -1"); \
+        SET_OUTPUT; \
+    } else if (!strcmp(SN, "dumpdef")) { \
+        for (k = 1; k < 10; ++k) { \
+            if (ISMACRO(ARG(k))) \
+                fprintf(stderr, "%s: %s\n", ARG(k), \
+                    e->def == NULL ? "built-in" : e->def); \
+            else if (*ARG(k) != '\0') \
+                fprintf(stderr, "%s: undefined\n", ARG(k)); \
+        } \
     } \
 } while (0)
 
@@ -673,7 +697,7 @@ int main(int argc, char **argv)
         } else if (quote_on) {
             if (put_str(output, TS))
                 QUIT;
-        } else if (TOKEN_MATCH) {
+        } else if (ISMACRO(TS)) {
             /* Token match */
             READ_TOKEN(next_token);
 
@@ -725,10 +749,8 @@ int main(int argc, char **argv)
             }
             REMOVE_SH;
         } else if (ARG_COMMA) {
-            if (stack->act_arg == 9) {
-                emsg("Macro call has too many arguments");
-                QUIT;
-            }
+            if (stack->act_arg == 9)
+                EQUIT("Macro call has too many arguments");
             ++stack->act_arg;
             SET_OUTPUT;
             EAT_WS;
@@ -750,14 +772,10 @@ int main(int argc, char **argv)
   end_of_input:
 
     /* Checks */
-    if (stack != NULL) {
-        emsg("Input finished without unwinding the stack");
-        QUIT;
-    }
-    if (quote_on) {
-        emsg("Input finished without exiting quotes");
-        QUIT;
-    }
+    if (stack != NULL)
+        EQUIT("Input finished without unwinding the stack");
+    if (quote_on)
+        EQUIT("Input finished without exiting quotes");
 
     for (k = 0; k < 10; k++)
         OUT_DIV(k);
