@@ -488,6 +488,28 @@ int terminate_args(struct mcall *stack)
     return 0;
 }
 
+int str_to_num(char *s, size_t * num)
+{
+    char ch;
+    size_t n = 0;
+    if (s == NULL)
+        return 1;
+    while ((ch = *s++)) {
+        if (isdigit(ch)) {
+            if (MOF(n, 10))
+                return 1;
+            n *= 10;
+            if (AOF(n, (ch - '0')))
+                return 1;
+            n += (ch - '0');
+        } else {
+            return 1;
+        }
+    }
+    *num = n;
+    return 0;
+}
+
 #define QUIT do { \
     ret = 1; \
     goto clean_up; \
