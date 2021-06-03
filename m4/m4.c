@@ -506,7 +506,7 @@ int main(int argc, char **argv)
     char left_quote[2] = { '[', '\0' };
     char right_quote[2] = { ']', '\0' };
     struct mcall *stack = NULL;
-    char *sd = NULL;
+    char *sd = NULL, *tmp_str = NULL, *p;
 
     if (argc < 1)
         return 1;
@@ -540,6 +540,18 @@ int main(int argc, char **argv)
     if (upsert_entry(ht, "divert", NULL))
         QUIT;
     if (upsert_entry(ht, "dumpdef", NULL))
+        QUIT;
+    if (upsert_entry(ht, "errprint", NULL))
+        QUIT;
+    if (upsert_entry(ht, "ifdef", NULL))
+        QUIT;
+    if (upsert_entry(ht, "ifelse", NULL))
+        QUIT;
+    if (upsert_entry(ht, "include", NULL))
+        QUIT;
+    if (upsert_entry(ht, "len", NULL))
+        QUIT;
+    if (upsert_entry(ht, "index", NULL))
         QUIT;
 
     if (argc > 1) {
@@ -672,6 +684,41 @@ int main(int argc, char **argv)
             else if (*ARG(k) != '\0') \
                 fprintf(stderr, "%s: undefined\n", ARG(k)); \
         } \
+    } else if (!strcmp(SN, "errprint")) { \
+        for (k = 1; k < 10; ++k) \
+            if (*ARG(k) != '\0') \
+                fprintf(stderr, "%s\n", ARG(k)); \
+    } else if (!strcmp(SN, "ifdef")) { \
+        if (ungetstr(input, ISMACRO(ARG(1)) ? ARG(2) : ARG(3))) \
+            QUIT; \
+    } else if (!strcmp(SN, "ifelse")) { \
+        if (ungetstr(input, !strcmp(ARG(1), ARG(2)) ? ARG(3) : ARG(4))) \
+            QUIT; \
+    } else if (!strcmp(SN, "include")) { \
+        if (include(input, ARG(1))) { \
+            fprintf(stderr, "include: Failed to include file: %s\n", ARG(1)); \
+            QUIT; \
+        } \
+    } else if (!strcmp(SN, "len")) { \
+        if (asprintf(&tmp_str, "%lu", strlen(ARG(1))) == -1) \
+            QUIT; \
+        if (ungetstr(input, tmp_str)) \
+            QUIT; \
+        free(tmp_str); \
+        tmp_str = NULL; \
+    } else if (!strcmp(SN, "index")) { \
+        p = strstr(ARG(1), ARG(2)); \
+        if (p == NULL) { \
+            if (asprintf(&tmp_str, "%d", -1) == -1) \
+                QUIT; \
+        } else { \
+            if (asprintf(&tmp_str, "%lu", p - ARG(1)) == -1) \
+                QUIT; \
+        } \
+        if (ungetstr(input, tmp_str)) \
+            QUIT; \
+        free(tmp_str); \
+        tmp_str = NULL; \
     } \
 } while (0)
 
@@ -790,5 +837,6 @@ int main(int argc, char **argv)
     free_hash_table(ht);
     free_stack(stack);
     free(sd);
+    free(tmp_str);
     return ret;
 }
