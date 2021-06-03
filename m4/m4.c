@@ -25,6 +25,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <ctype.h>
+#include <limits.h>
 #include <errno.h>
 
 #define INIT_BUF_SIZE 2
@@ -507,7 +508,9 @@ int main(int argc, char **argv)
     char right_quote[2] = { ']', '\0' };
     struct mcall *stack = NULL;
 #define NUM_SIZE 24
-    char *sd = NULL, num[NUM_SIZE], *p;
+    char *sd = NULL, *tmp_str = NULL, num[NUM_SIZE], *p, *q;
+    unsigned char uc, uc2;
+    int map[UCHAR_MAX], x;
 
     if (argc < 1)
         return 1;
@@ -553,6 +556,8 @@ int main(int argc, char **argv)
     if (upsert_entry(ht, "len", NULL))
         QUIT;
     if (upsert_entry(ht, "index", NULL))
+        QUIT;
+    if (upsert_entry(ht, "translit", NULL))
         QUIT;
 
     if (argc > 1) {
@@ -712,6 +717,37 @@ int main(int argc, char **argv)
             snprintf(num, NUM_SIZE, "%lu", p - ARG(1)); \
         if (ungetstr(input, num)) \
             QUIT; \
+    } else if (!strcmp(SN, "translit")) { \
+        /* Set mapping to pass through (-1) */ \
+        for (k = 0; k < UCHAR_MAX; k++) \
+            *(map + k) = -1; \
+        p = ARG(2); \
+        q = ARG(3); \
+        /* Create mapping while strings are in parallel */ \
+        while ((uc = *p++) && (uc2 = *q++)) \
+            if (*(map + uc) == -1) /* Preference to first occurrence */ \
+                *(map + uc) = uc2; \
+        /* Continue first string, setting mapping to delete (\0) */ \
+        while (uc != '\0') { \
+            *(map + uc) = '\0'; \
+            uc = *p++; \
+        } \
+        if ((tmp_str = strdup(ARG(1))) == NULL) \
+            QUIT; \
+        p = ARG(1); \
+        q = tmp_str; \
+        while ((uc = *p++)) { \
+            x = *(map + uc); \
+            if (x == -1) \
+                *q++ = uc; \
+            else if (x != '\0') \
+                *q++ = x; \
+        } \
+        *q = '\0'; \
+        if (ungetstr(input, tmp_str)) \
+            QUIT; \
+        free(tmp_str); \
+        tmp_str = NULL; \
     } \
 } while (0)
 
@@ -830,5 +866,6 @@ int main(int argc, char **argv)
     free_hash_table(ht);
     free_stack(stack);
     free(sd);
+    free(tmp_str);
     return ret;
 }
