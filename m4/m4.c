@@ -506,7 +506,8 @@ int main(int argc, char **argv)
     char left_quote[2] = { '[', '\0' };
     char right_quote[2] = { ']', '\0' };
     struct mcall *stack = NULL;
-    char *sd = NULL, *tmp_str = NULL, *p;
+#define NUM_SIZE 24
+    char *sd = NULL, num[NUM_SIZE], *p;
 
     if (argc < 1)
         return 1;
@@ -700,25 +701,17 @@ int main(int argc, char **argv)
             QUIT; \
         } \
     } else if (!strcmp(SN, "len")) { \
-        if (asprintf(&tmp_str, "%lu", strlen(ARG(1))) == -1) \
+        snprintf(num, NUM_SIZE, "%lu", strlen(ARG(1))); \
+        if (ungetstr(input, num)) \
             QUIT; \
-        if (ungetstr(input, tmp_str)) \
-            QUIT; \
-        free(tmp_str); \
-        tmp_str = NULL; \
     } else if (!strcmp(SN, "index")) { \
         p = strstr(ARG(1), ARG(2)); \
-        if (p == NULL) { \
-            if (asprintf(&tmp_str, "%d", -1) == -1) \
-                QUIT; \
-        } else { \
-            if (asprintf(&tmp_str, "%lu", p - ARG(1)) == -1) \
-                QUIT; \
-        } \
-        if (ungetstr(input, tmp_str)) \
+        if (p == NULL) \
+            snprintf(num, NUM_SIZE, "%d", -1); \
+        else \
+            snprintf(num, NUM_SIZE, "%lu", p - ARG(1)); \
+        if (ungetstr(input, num)) \
             QUIT; \
-        free(tmp_str); \
-        tmp_str = NULL; \
     } \
 } while (0)
 
@@ -837,6 +830,5 @@ int main(int argc, char **argv)
     free_hash_table(ht);
     free_stack(stack);
     free(sd);
-    free(tmp_str);
     return ret;
 }
