@@ -37,6 +37,9 @@
 /* size_t Multiplication OverFlow test */
 #define MOF(a, b) ((a) && (b) > SIZE_MAX / (a))
 
+/* Minimum */
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+
 #define getch(b, read_stdin) (b->i ? *(b->a + --b->i) : (read_stdin ? getchar() : EOF))
 
 #define GAP_SIZE(b) (b->s - b->i)
@@ -510,6 +513,16 @@ int str_to_num(char *s, size_t * num)
     return 0;
 }
 
+int buf_dump_buf(struct buf *dst, struct buf *src)
+{
+    if (src->i > GAP_SIZE(dst) && grow_buf(dst, src->i))
+        return 1;
+    memcpy(dst->a + dst->i, src->a, src->i);
+    dst->i += src->i;
+    src->i = 0;
+    return 0;
+}
+
 #define QUIT do { \
     ret = 1; \
     goto clean_up; \
@@ -522,7 +535,7 @@ int main(int argc, char **argv)
         NULL;
     struct entry **ht = NULL, *e;
     int quote_on = 0;
-    size_t quote_depth = 0, fs, total_fs = 0, act_div = 0, k;
+    size_t quote_depth = 0, fs, total_fs = 0, act_div = 0, k, len, w, n;
     /* Diversion 10 is -1 */
     struct buf *diversion[11] = { NULL };
     struct buf *output;
@@ -581,6 +594,14 @@ int main(int argc, char **argv)
         QUIT;
     if (upsert_entry(ht, "translit", NULL))
         QUIT;
+    if (upsert_entry(ht, "substr", NULL))
+        QUIT;
+    if (upsert_entry(ht, "dnl", NULL))
+        QUIT;
+    if (upsert_entry(ht, "divnum", NULL))
+        QUIT;
+    if (upsert_entry(ht, "undivert", NULL))
+        QUIT;
 
     if (argc > 1) {
         /* Do not read stdin if there are command line files */
@@ -637,6 +658,9 @@ int main(int argc, char **argv)
     DIV(n)->i = 0; \
 } while (0)
 
+#define UNDIVERT_ALL for (k = 0; k < 10; k++) \
+    OUT_DIV(k)
+
 /* Tests if a string consists of a single whitespace character */
 #define WS(s) (!strcmp(s, " ") || !strcmp(s, "\t") || !strcmp(s, "\n") \
     || !strcmp(s, "\r"))
@@ -665,7 +689,15 @@ int main(int argc, char **argv)
     do \
         READ_TOKEN(next_token); \
     while (WS(NTS)); \
-    if (ungetstr(input, NTS)) QUIT; \
+    if (ungetstr(input, NTS)) \
+        QUIT; \
+} while (0)
+
+/* Delete to new line (inclusive) */
+#define DNL do { \
+    do \
+        READ_TOKEN(next_token); \
+    while (strcmp(NTS, "\n")); \
 } while (0)
 
 #define SN stack->name
@@ -770,6 +802,59 @@ int main(int argc, char **argv)
             QUIT; \
         free(tmp_str); \
         tmp_str = NULL; \
+    } else if (!strcmp(SN, "substr")) { \
+        if ((len = strlen(ARG(1)))) { \
+            if (str_to_num(ARG(2), &w) || str_to_num(ARG(3), &n)) \
+                EQUIT("substr: Invalid index or length"); \
+            if (w < len) { \
+                /* Do not need to check for overflow here */ \
+                if ((tmp_str = malloc(len + 1)) == NULL) \
+                    QUIT; \
+                if (AOF(n, 1)) \
+                    QUIT; \
+                snprintf(tmp_str, MIN(len + 1, n + 1), "%s", ARG(1) + w); \
+                if (ungetstr(input, tmp_str)) \
+                    QUIT; \
+                free(tmp_str); \
+                tmp_str = NULL; \
+            } \
+        } \
+    } else if (!strcmp(SN, "undivert")) { \
+        if (!act_div) { \
+            /* In diversion 0 */ \
+            for (k = 1; k < 10; k++) \
+                if (strlen(ARG(k)) == 1 && isdigit(*ARG(k)) && *ARG(k) != '0') \
+                    OUT_DIV(*ARG(k) - '0'); \
+        } else { \
+            /* Cannot undivert division 0 or the active diversion */ \
+            for (k = 1; k < 10; k++) \
+                if (strlen(ARG(k)) == 1 && isdigit(*ARG(k)) && *ARG(k) != '0' \
+                    && (size_t) (*ARG(k) - '0') != act_div \
+                    && buf_dump_buf(DIV(act_div), DIV((*ARG(k) - '0')))) \
+                        QUIT; \
+        } \
+    } \
+} while (0)
+
+/* Process built-in macro with no arguments */
+#define PROCESS_BI_NO_ARGS do { \
+    if (!strcmp(TS, "dnl")) { \
+        DNL; \
+    } else if (!strcmp(TS, "divnum")) { \
+        if (act_div == 10) \
+            snprintf(num, NUM_SIZE, "%d", -1); \
+        else \
+            snprintf(num, NUM_SIZE, "%lu", act_div); \
+        if (ungetstr(input, num)) \
+            QUIT; \
+    } else if (!strcmp(TS, "undivert")) { \
+        if (act_div) \
+            EQUIT("undivert: Can only call from diversion 0" \
+                " when called without arguments"); \
+        UNDIVERT_ALL; \
+    } else if (!strcmp(TS, "divert")) { \
+        act_div = 0; \
+        SET_OUTPUT; \
     } \
 } while (0)
 
@@ -816,29 +901,34 @@ int main(int argc, char **argv)
                 SET_OUTPUT;
                 EAT_WS;
             } else {
-                /* Macro call without arguments */
+                /* Macro call without arguments (stack is not used) */
                 /* Put the next token back into the input */
                 if (ungetstr(input, NTS))
                     QUIT;
-                /* User defined macro */
-                /* Strip dollar argument positions from definition */
-                if ((sd = strip_def(e->def)) == NULL)
-                    QUIT;
-                if (ungetstr(input, sd))
-                    QUIT;
-                free(sd);
-                sd = NULL;
+                if (e->def == NULL) {
+                    /* Built-in macro */
+                    PROCESS_BI_NO_ARGS;
+                } else {
+                    /* User defined macro */
+                    /* Strip dollar argument positions from definition */
+                    if ((sd = strip_def(e->def)) == NULL)
+                        QUIT;
+                    if (ungetstr(input, sd))
+                        QUIT;
+                    free(sd);
+                    sd = NULL;
+                }
             }
         } else if (ARG_END) {
             /* End of argument collection */
             /* Decrement bracket depth for bracket just encountered */
             --stack->bracket_depth;
             if (stack->def == NULL) {
-                /* Define built-in macro */
+                /* Built-in macro */
                 if (terminate_args(stack))
                     QUIT;
                 PROCESS_BI_WITH_ARGS;
-            } else if (stack->def != NULL) {
+            } else {
                 /* User defined macro */
                 if (sub_args(result, stack))
                     QUIT;
@@ -875,8 +965,7 @@ int main(int argc, char **argv)
     if (quote_on)
         EQUIT("Input finished without exiting quotes");
 
-    for (k = 0; k < 10; k++)
-        OUT_DIV(k);
+    UNDIVERT_ALL;
 
   clean_up:
     free_buf(input);
