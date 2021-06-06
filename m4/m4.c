@@ -646,6 +646,8 @@ int main(int argc, char **argv)
         QUIT;
     if (upsert_entry(ht, "esyscmd", NULL))
         QUIT;
+    if (upsert_entry(ht, "eval", NULL))
+        QUIT;
 
     if (argc > 1) {
         /* Do not read stdin if there are command line files */
@@ -911,6 +913,14 @@ int main(int argc, char **argv)
     } else if (!strcmp(SN, "esyscmd")) { \
         if (esyscmd(input, tmp_buf, ARG(1))) \
             EQUIT("esyscmd: Failed"); \
+    } else if (!strcmp(SN, "eval")) { \
+        if (asprintf(&tmp_str, "printf '%%s\\n' '%s' | bc | tr -d '\\n'", \
+            ARG(1)) == -1) \
+            QUIT; \
+        if (esyscmd(input, tmp_buf, tmp_str)) \
+            EQUIT("eval: Failed"); \
+        free(tmp_str); \
+        tmp_str = NULL; \
     } \
 } while (0)
 
