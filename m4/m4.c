@@ -19,7 +19,8 @@
 /* Assumes NULL pointers are zero */
 
 #include <sys/stat.h>
-
+#include <sys/wait.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -40,7 +41,8 @@
 /* Minimum */
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
-#define getch(b, read_stdin) (b->i ? *(b->a + --b->i) : (read_stdin ? getchar() : EOF))
+#define getch(b, read_stdin) (b->i ? *(b->a + --b->i) \
+    : (read_stdin ? getchar() : EOF))
 
 #define GAP_SIZE(b) (b->s - b->i)
 
@@ -233,6 +235,37 @@ int ungetstr(struct buf *b, char *s)
     while (len)
         if (ungetch(b, *(s + --len)) == EOF)
             return 1;
+    return 0;
+}
+
+int esyscmd(struct buf *input, struct buf *tmp_buf, char *cmd)
+{
+    FILE *fp;
+    int x, status;
+    delete_buf(tmp_buf);
+    if ((fp = popen(cmd, "r")) == NULL)
+        return 1;
+    errno = 0;
+    while ((x = getc(fp)) != EOF)
+        if (x != '\0' && ungetch(tmp_buf, x) == EOF) {
+            pclose(fp);
+            return 1;
+        }
+    if (errno) {
+        pclose(fp);
+        return 1;
+    }
+    if ((status = pclose(fp)) == -1)
+        return 1;
+
+#define EXIT_OK (WIFEXITED(status) && !WEXITSTATUS(status))
+
+    if (!EXIT_OK)
+        return 1;
+    if (ungetch(tmp_buf, '\0') == EOF)
+        return 1;
+    if (ungetstr(input, tmp_buf->a))
+        return 1;
     return 0;
 }
 
@@ -494,10 +527,11 @@ int terminate_args(struct mcall *stack)
 int str_to_num(char *s, size_t * num)
 {
     char ch;
-    size_t n = 0;
+    size_t n = 0, len = 0;
     if (s == NULL)
         return 1;
     while ((ch = *s++)) {
+        ++len;
         if (isdigit(ch)) {
             if (MOF(n, 10))
                 return 1;
@@ -509,6 +543,8 @@ int str_to_num(char *s, size_t * num)
             return 1;
         }
     }
+    if (!len)
+        return 1;
     *num = n;
     return 0;
 }
@@ -530,9 +566,9 @@ int buf_dump_buf(struct buf *dst, struct buf *src)
 
 int main(int argc, char **argv)
 {
-    int ret = 0, read_stdin = 1, err, j;
+    int ret = 0, read_stdin = 1, err, j, fd;
     struct buf *input = NULL, *token = NULL, *next_token = NULL, *result =
-        NULL;
+        NULL, *tmp_buf = NULL;
     struct entry **ht = NULL, *e;
     int quote_on = 0;
     size_t quote_depth = 0, fs, total_fs = 0, act_div = 0, k, len, w, n;
@@ -558,6 +594,8 @@ int main(int argc, char **argv)
     if ((next_token = init_buf()) == NULL)
         QUIT;
     if ((result = init_buf()) == NULL)
+        QUIT;
+    if ((tmp_buf = init_buf()) == NULL)
         QUIT;
 
     /* Setup diversions */
@@ -601,6 +639,12 @@ int main(int argc, char **argv)
     if (upsert_entry(ht, "divnum", NULL))
         QUIT;
     if (upsert_entry(ht, "undivert", NULL))
+        QUIT;
+    if (upsert_entry(ht, "maketemp", NULL))
+        QUIT;
+    if (upsert_entry(ht, "incr", NULL))
+        QUIT;
+    if (upsert_entry(ht, "esyscmd", NULL))
         QUIT;
 
     if (argc > 1) {
@@ -700,6 +744,15 @@ int main(int argc, char **argv)
     while (strcmp(NTS, "\n")); \
 } while (0)
 
+#define DIVNUM do { \
+    if (act_div == 10) \
+        snprintf(num, NUM_SIZE, "%d", -1); \
+    else \
+        snprintf(num, NUM_SIZE, "%lu", act_div); \
+    if (ungetstr(input, num)) \
+        QUIT; \
+} while (0)
+
 #define SN stack->name
 
 #define EMSG(m) fprintf(stderr, m "\n")
@@ -708,6 +761,7 @@ int main(int argc, char **argv)
     EMSG(m); \
     QUIT; \
 } while (0)
+
 
 /* Process built-in macro with args */
 #define PROCESS_BI_WITH_ARGS do { \
@@ -833,20 +887,40 @@ int main(int argc, char **argv)
                     && buf_dump_buf(DIV(act_div), DIV((*ARG(k) - '0')))) \
                         QUIT; \
         } \
+    } else if (!strcmp(SN, "dnl")) { \
+        DNL; \
+    } else if (!strcmp(SN, "divnum")) { \
+        DIVNUM; \
+    } else if (!strcmp(SN, "maketemp")) { \
+        /* ARG(1) is the template string which is modified in-place */ \
+        if ((fd = mkstemp(ARG(1))) == -1) \
+            EQUIT("maketemp: Failed"); \
+        if (close(fd)) \
+            EQUIT("maketemp: Failed to close temp file"); \
+        if (ungetstr(input, ARG(1))) \
+            QUIT; \
+    } else if (!strcmp(SN, "incr")) { \
+        if(str_to_num(ARG(1), &n)) \
+            EQUIT("incr: Invalid number"); \
+        if (AOF(n, 1)) \
+            EQUIT("incr: Integer overflow"); \
+        n += 1; \
+        snprintf(num, NUM_SIZE, "%lu", n); \
+        if (ungetstr(input, num)) \
+            QUIT; \
+    } else if (!strcmp(SN, "esyscmd")) { \
+        if (esyscmd(input, tmp_buf, ARG(1))) \
+            EQUIT("esyscmd: Failed"); \
     } \
 } while (0)
+
 
 /* Process built-in macro with no arguments */
 #define PROCESS_BI_NO_ARGS do { \
     if (!strcmp(TS, "dnl")) { \
         DNL; \
     } else if (!strcmp(TS, "divnum")) { \
-        if (act_div == 10) \
-            snprintf(num, NUM_SIZE, "%d", -1); \
-        else \
-            snprintf(num, NUM_SIZE, "%lu", act_div); \
-        if (ungetstr(input, num)) \
-            QUIT; \
+        DIVNUM; \
     } else if (!strcmp(TS, "undivert")) { \
         if (act_div) \
             EQUIT("undivert: Can only call from diversion 0" \
@@ -855,6 +929,10 @@ int main(int argc, char **argv)
     } else if (!strcmp(TS, "divert")) { \
         act_div = 0; \
         SET_OUTPUT; \
+    } else { \
+        /* The remaining macros must take arguments, so pass through */ \
+        if (put_str(output, TS)) \
+            QUIT; \
     } \
 } while (0)
 
@@ -972,6 +1050,7 @@ int main(int argc, char **argv)
     free_buf(token);
     free_buf(next_token);
     free_buf(result);
+    free_buf(tmp_buf);
     for (k = 0; k < 11; ++k)
         free_buf(*(diversion + k));
     free_hash_table(ht);
