@@ -18,9 +18,16 @@
 
 /* Assumes NULL pointers are zero */
 
+#include <sys/types.h>
 #include <sys/stat.h>
+
+#ifdef _WIN32
+#include <io.h>
+#else
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -28,6 +35,11 @@
 #include <ctype.h>
 #include <limits.h>
 #include <errno.h>
+
+#ifdef _WIN32
+#define popen _popen
+#define pclose _pclose
+#endif
 
 #define INIT_BUF_SIZE 2
 
@@ -130,6 +142,11 @@ int filesize(char *fn, size_t * fs)
     struct stat st;
     if (stat(fn, &st))
         return 1;
+
+#ifndef S_ISREG
+#define S_ISREG(m) ((m & S_IFMT) == S_IFREG)
+#endif
+
     if (!S_ISREG(st.st_mode))
         return 1;
     if (st.st_size < 0)
@@ -149,7 +166,7 @@ int include(struct buf *b, char *fn)
         return 1;
     if (fs > GAP_SIZE(b) && grow_buf(b, fs))
         return 1;
-    if ((fp = fopen(fn, "r")) == NULL)
+    if ((fp = fopen(fn, "rb")) == NULL)
         return 1;
     back_i = b->i + fs;
 
@@ -243,8 +260,15 @@ int esyscmd(struct buf *input, struct buf *tmp_buf, char *cmd)
     FILE *fp;
     int x, status;
     delete_buf(tmp_buf);
-    if ((fp = popen(cmd, "r")) == NULL)
+
+#ifdef _WIN32
+#define R_STR "rb"
+#else
+#define R_STR "r"
+#endif
+    if ((fp = popen(cmd, R_STR)) == NULL)
         return 1;
+
     errno = 0;
     while ((x = getc(fp)) != EOF)
         if (x != '\0' && ungetch(tmp_buf, x) == EOF) {
@@ -257,11 +281,14 @@ int esyscmd(struct buf *input, struct buf *tmp_buf, char *cmd)
     }
     if ((status = pclose(fp)) == -1)
         return 1;
-
+#ifdef _WIN32
+    if (status)
+        return 1;
+#else
 #define EXIT_OK (WIFEXITED(status) && !WEXITSTATUS(status))
-
     if (!EXIT_OK)
         return 1;
+#endif
     if (ungetch(tmp_buf, '\0') == EOF)
         return 1;
     if (ungetstr(input, tmp_buf->a))
@@ -575,8 +602,8 @@ int main(int argc, char **argv)
     /* Diversion 10 is -1 */
     struct buf *diversion[11] = { NULL };
     struct buf *output;
-    char left_quote[2] = { '[', '\0' };
-    char right_quote[2] = { ']', '\0' };
+    char left_quote[2] = { '`', '\0' };
+    char right_quote[2] = { '\'', '\0' };
     struct mcall *stack = NULL;
 #define NUM_SIZE 24
     char *sd = NULL, *tmp_str = NULL, num[NUM_SIZE], *p, *q;
@@ -750,7 +777,7 @@ int main(int argc, char **argv)
     if (act_div == 10) \
         snprintf(num, NUM_SIZE, "%d", -1); \
     else \
-        snprintf(num, NUM_SIZE, "%lu", act_div); \
+        snprintf(num, NUM_SIZE, "%lu", (unsigned long) act_div); \
     if (ungetstr(input, num)) \
         QUIT; \
 } while (0)
@@ -764,6 +791,19 @@ int main(int argc, char **argv)
     QUIT; \
 } while (0)
 
+#ifdef _WIN32
+/* No integer overflow risk, as already a string. */
+/* This function does not actually create the file */
+#define MAKETEMP(s) if (_mktemp_s(s, strlen(s) + 1)) \
+    EQUIT("maketemp: Failed")
+#else
+#define MAKETEMP(s) do { \
+    if ((fd = mkstemp(s)) == -1) \
+        EQUIT("maketemp: Failed"); \
+    if (close(fd)) \
+        EQUIT("maketemp: Failed to close temp file"); \
+} while (0)
+#endif
 
 /* Process built-in macro with args */
 #define PROCESS_BI_WITH_ARGS do { \
@@ -816,7 +856,7 @@ int main(int argc, char **argv)
             QUIT; \
         } \
     } else if (!strcmp(SN, "len")) { \
-        snprintf(num, NUM_SIZE, "%lu", strlen(ARG(1))); \
+        snprintf(num, NUM_SIZE, "%lu", (unsigned long) strlen(ARG(1))); \
         if (ungetstr(input, num)) \
             QUIT; \
     } else if (!strcmp(SN, "index")) { \
@@ -824,7 +864,7 @@ int main(int argc, char **argv)
         if (p == NULL) \
             snprintf(num, NUM_SIZE, "%d", -1); \
         else \
-            snprintf(num, NUM_SIZE, "%lu", p - ARG(1)); \
+            snprintf(num, NUM_SIZE, "%lu", (unsigned long) (p - ARG(1))); \
         if (ungetstr(input, num)) \
             QUIT; \
     } else if (!strcmp(SN, "translit")) { \
@@ -895,10 +935,7 @@ int main(int argc, char **argv)
         DIVNUM; \
     } else if (!strcmp(SN, "maketemp")) { \
         /* ARG(1) is the template string which is modified in-place */ \
-        if ((fd = mkstemp(ARG(1))) == -1) \
-            EQUIT("maketemp: Failed"); \
-        if (close(fd)) \
-            EQUIT("maketemp: Failed to close temp file"); \
+        MAKETEMP(ARG(1)); \
         if (ungetstr(input, ARG(1))) \
             QUIT; \
     } else if (!strcmp(SN, "incr")) { \
@@ -907,16 +944,21 @@ int main(int argc, char **argv)
         if (AOF(n, 1)) \
             EQUIT("incr: Integer overflow"); \
         n += 1; \
-        snprintf(num, NUM_SIZE, "%lu", n); \
+        snprintf(num, NUM_SIZE, "%lu", (unsigned long) n); \
         if (ungetstr(input, num)) \
             QUIT; \
     } else if (!strcmp(SN, "esyscmd")) { \
         if (esyscmd(input, tmp_buf, ARG(1))) \
             EQUIT("esyscmd: Failed"); \
     } else if (!strcmp(SN, "eval")) { \
-        if (asprintf(&tmp_str, "printf '%%s\\n' '%s' | bc | tr -d '\\n'", \
-            ARG(1)) == -1) \
+        n = strlen(ARG(1)); \
+        if (AOF(n, 100)) \
             QUIT; \
+        n += 100; \
+        if ((tmp_str = malloc(n)) == NULL) \
+            QUIT; \
+        snprintf(tmp_str, n, "printf '%%s\\n' '%s' | bc | tr -d '\\n'", \
+            ARG(1)); \
         if (esyscmd(input, tmp_buf, tmp_str)) \
             EQUIT("eval: Failed"); \
         free(tmp_str); \
