@@ -18,9 +18,19 @@
  * spot: text editor.
  * Dedicated to my son who was only a 4mm "spot" in his first ultrasound.
  *
+ * README:
+ * To install:
+ * 1. Download this file.
+ * 2. Compile. This requires ncurses.
  * $ cc -ansi -g -O3 -Wall -Wextra -pedantic spot.c -lncurses && mv a.out spot
+ * 3. Place somewhere in your PATH. For example:
+ * $ mv spot ~/bin/
+ * To use:
+ * $ spot [file...]
+ * The keybindings are shown below the #include statements.
  */
 
+#include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -32,6 +42,49 @@
 #include <stdint.h>
 #include <limits.h>
 #include <ctype.h>
+
+#define HELP char *help[] = { \
+"spot keybindings", \
+"Commands with descriptions ending with * take an optional command", \
+"multiplier prefix ^U n (where n is a positive number)", \
+"^[?      Display keybindings in new buffer", \
+"^B       Backward char (left)*", \
+"^F       Forward char (right)*", \
+"^P       Previous line (up)*", \
+"^N       Next line (down)*", \
+"^H       Backspace*", \
+"^D       Delete*", \
+"^[f      Forward word*", \
+"^[b      Backward word*", \
+"^[u      Uppercase word*", \
+"^[l      Lowercase word*", \
+"^Q hh    Quote two digit hexadecimal value*", \
+"^A       Start of line (home)", \
+"^E       End of line", \
+"^[<      Start of buffer", \
+"^[>      End of buffer", \
+"^[m      Match bracket", \
+"^L       Level cursor and redraw screen", \
+"^W       Wipe (cut) region", \
+"^C       Cut region appending to paste buffer", \
+"^[w      Soft wipe (copy) region", \
+"^[c      Copy region appending to paste buffer", \
+"^K       Kill (cut) to end of line", \
+"^[k      Kill (cut) to start of line", \
+"^Y       Yank (paste)", \
+"^T       Trim trailing whitespace and clean", \
+"^S       Search", \
+"^[n      Search without editing the command line", \
+"^X i     Insert file at cursor", \
+"^X ^F    Open file in new buffer", \
+"^R       Rename buffer", \
+"^X ^S    Save current buffer", \
+"^X LEFT  Move left one buffer", \
+"^X RIGHT Move right one buffer", \
+"^[!      Close current buffer without saving", \
+"^X ^C    Close editor without saving any buffers", \
+NULL \
+}
 
 /* Initial buffer size */
 #define INIT_BUF_SIZE BUFSIZ
@@ -623,7 +676,6 @@ int copy_region(struct buf *b, struct buf *p)
         /* Adjust row number */
         p->r += b->mr - b->r;
     }
-    clear_mark(b);
     SETMOD(p);
     return 0;
 }
@@ -691,6 +743,17 @@ int paste(struct buf *b, struct buf *p, size_t mult)
     b->g += ts;
     b->r += (p->r - 1) * mult;
     SETMOD(b);
+    return 0;
+}
+
+int insert_help_line(struct buf *b, char *str)
+{
+    char ch;
+    while ((ch = *str++))
+        if (insert_ch(b, ch, 1))
+            return 1;
+    if (insert_ch(b, '\n', 1))
+        return 1;
     return 0;
 }
 
@@ -1120,6 +1183,9 @@ int main(int argc, char **argv)
     /* Persist the sticky column (used for repeated up or down) */
     int persist_sc = 0;
     int i;
+    /* For displaying keybindings help */
+    HELP;
+    char **h;
 
     if (argc <= 1) {
         if ((b = new_buf(NULL, NULL)) == NULL) {
@@ -1229,7 +1295,6 @@ int main(int argc, char **argv)
             operation = ' ';
             goto top;
         }
-
         switch (x) {
         case CTRL_SPC:
             set_mark(z);
@@ -1360,6 +1425,7 @@ int main(int argc, char **argv)
             case 'w':
                 DELETEBUF(p);
                 rv = copy_region(z, p);
+                clear_mark(z);
                 break;
             case 'c':
                 /* Copy, inserting at end of paste buffer */
@@ -1391,6 +1457,17 @@ int main(int argc, char **argv)
                 break;
             case '>':
                 end_of_buf(z);
+                break;
+            case '?':
+                if (new_buf(b, NULL) == NULL) {
+                    rv = 1;
+                } else {
+                    b = b->next;
+                    h = help;
+                    while (*h != NULL)
+                        if ((rv = insert_help_line(b, *h++)))
+                            break;
+                }
                 break;
             }
             break;
