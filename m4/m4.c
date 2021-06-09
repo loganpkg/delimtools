@@ -43,7 +43,7 @@
 
 #define INIT_BUF_SIZE 2
 
-#define HASH_TABLE_SIZE 100
+#define HASH_TABLE_SIZE 1000
 
 /* size_t Addition OverFlow test */
 #define AOF(a, b) ((a) > SIZE_MAX - (b))
@@ -315,6 +315,24 @@ size_t hash_str(char *s)
     while ((c = *s++))
         h = h * 33 ^ c;
     return h % HASH_TABLE_SIZE;
+}
+
+void htdist(struct entry **ht) {
+   struct entry *e;
+   size_t freq[101] = {0}, count, k;
+   for (k = 0; k < HASH_TABLE_SIZE; ++k) {
+        e = *(ht + k);
+        count = 0;
+        while (e != NULL) {
+             e = e->next;
+             ++count;
+        }
+        count < 100 ? ++*(freq + count) : ++*(freq + 100);
+   }
+   fprintf(stderr, "entries_per_bucket number_of_buckets\n");
+   for (k = 0; k < 100; k++)
+       if (*(freq + k)) fprintf(stderr, "%lu %lu\n", k, *(freq + k));
+   if (*(freq + 100)) fprintf(stderr, ">=100 %lu\n", *(freq + 100));
 }
 
 struct entry *lookup_entry(struct entry **ht, char *name)
@@ -673,7 +691,7 @@ int main(int argc, char **argv)
         QUIT;
     if (upsert_entry(ht, "esyscmd", NULL))
         QUIT;
-    if (upsert_entry(ht, "eval", NULL))
+    if (upsert_entry(ht, "htdist", NULL))
         QUIT;
 
     if (argc > 1) {
@@ -803,6 +821,12 @@ int main(int argc, char **argv)
     if (close(fd)) \
         EQUIT("maketemp: Failed to close temp file"); \
 } while (0)
+#endif
+
+#ifdef _WIN32
+#define EVAL_FORMAT_STR "set /a \"%s\""
+#else
+#define EVAL_FORMAT_STR "printf '%%s\\n' '%s' | bc | tr -d '\\n'"
 #endif
 
 /* Process built-in macro with args */
@@ -950,19 +974,6 @@ int main(int argc, char **argv)
     } else if (!strcmp(SN, "esyscmd")) { \
         if (esyscmd(input, tmp_buf, ARG(1))) \
             EQUIT("esyscmd: Failed"); \
-    } else if (!strcmp(SN, "eval")) { \
-        n = strlen(ARG(1)); \
-        if (AOF(n, 100)) \
-            QUIT; \
-        n += 100; \
-        if ((tmp_str = malloc(n)) == NULL) \
-            QUIT; \
-        snprintf(tmp_str, n, "printf '%%s\\n' '%s' | bc | tr -d '\\n'", \
-            ARG(1)); \
-        if (esyscmd(input, tmp_buf, tmp_str)) \
-            EQUIT("eval: Failed"); \
-        free(tmp_str); \
-        tmp_str = NULL; \
     } \
 } while (0)
 
@@ -981,6 +992,8 @@ int main(int argc, char **argv)
     } else if (!strcmp(TS, "divert")) { \
         act_div = 0; \
         SET_OUTPUT; \
+    } else if (!strcmp(TS, "htdist")) { \
+        htdist(ht); \
     } else { \
         /* The remaining macros must take arguments, so pass through */ \
         if (put_str(output, TS)) \
