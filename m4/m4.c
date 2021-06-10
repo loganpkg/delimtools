@@ -14,9 +14,57 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* m4 */
+/*
+ * m4 macro processor.
+ * Assumes NULL pointers are zero.
+ *
+ * README:
+ * To install:
+ * 1. Download this file.
+ * 2. Compile:
+ * $ cc -ansi -g -O3 -Wall -Wextra -pedantic m4.c && mv a.out m4
+ * 3. Place somewhere in your PATH. For example:
+ * $ mv m4 ~/bin/
+ * To use:
+ * $ m4 [file...]
+ *
+ * Built-in macros, presented as a mini-tutorial:
+ * changequote([, ])
+ * define(cool, $1 and $2)
+ * cool(goat, mice)
+ * undefine([cool])
+ * define(cool, wow)
+ * dumpdef([cool], [y])
+ * hello dnl this will be removed
+ * divnum
+ * divert(2)
+ * divnum
+ * cool
+ * divert(6)
+ * divnum
+ * y
+ * undivert(2)
+ * divert
+ * undivert
+ * incr(76)
+ * len(goat)
+ * index(elephant, ha)
+ * substr(elephant, 2, 4)
+ * translit(bananas, abcs, xyz)
+ * ifdef([cool], yes defined, not defined)
+ * define(y, 5)
+ * ifelse(y, 5, true, false)
+ * esyscmd(ifelse(dirsep, /, ls, dir))
+ * esyscmd(echo hello > .test)
+ * include(.test)
+ * maketemp(XXXXXX)
+ * errprint(oops there is an error)
+ * htdist
+ */
 
-/* Assumes NULL pointers are zero */
+#ifdef __linux__
+#define _XOPEN_SOURCE 500
+#endif
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -41,7 +89,7 @@
 #define pclose _pclose
 #endif
 
-#define INIT_BUF_SIZE 2
+#define INIT_BUF_SIZE 512
 
 #define HASH_TABLE_SIZE 1000
 
@@ -693,6 +741,8 @@ int main(int argc, char **argv)
         QUIT;
     if (upsert_entry(ht, "htdist", NULL))
         QUIT;
+    if (upsert_entry(ht, "dirsep", NULL))
+        QUIT;
 
     if (argc > 1) {
         /* Do not read stdin if there are command line files */
@@ -824,9 +874,9 @@ int main(int argc, char **argv)
 #endif
 
 #ifdef _WIN32
-#define EVAL_FORMAT_STR "set /a \"%s\""
+#define DIRSEP "\\"
 #else
-#define EVAL_FORMAT_STR "printf '%%s\\n' '%s' | bc | tr -d '\\n'"
+#define DIRSEP "/"
 #endif
 
 /* Process built-in macro with args */
@@ -974,6 +1024,11 @@ int main(int argc, char **argv)
     } else if (!strcmp(SN, "esyscmd")) { \
         if (esyscmd(input, tmp_buf, ARG(1))) \
             EQUIT("esyscmd: Failed"); \
+    } else if (!strcmp(SN, "htdist")) { \
+        htdist(ht); \
+    } else if (!strcmp(SN, "dirsep")) { \
+        if (ungetstr(input, DIRSEP)) \
+            QUIT; \
     } \
 } while (0)
 
@@ -994,6 +1049,9 @@ int main(int argc, char **argv)
         SET_OUTPUT; \
     } else if (!strcmp(TS, "htdist")) { \
         htdist(ht); \
+    } else if (!strcmp(TS, "dirsep")) { \
+        if (ungetstr(input, DIRSEP)) \
+            QUIT; \
     } else { \
         /* The remaining macros must take arguments, so pass through */ \
         if (put_str(output, TS)) \
