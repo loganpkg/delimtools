@@ -26,9 +26,13 @@
  * 2. Compile. This requires ncurses or pdcurses. For example:
  * $ cc -ansi -g -O3 -Wall -Wextra -pedantic spot.c -lncurses && mv a.out spot
  * or:
+ *
+ * > cd C:\Users\logan\Documents\PDCurses-3.9\PDCurses-3.9\wincon 
+ * > nmake -f Makefile.vc
+ * > cd C:\Users\logan\Documents\spot
  * > cl spot.c pdcurses.lib User32.Lib AdvAPI32.Lib ^
- *   /I C:\Users\logan\Documents\PDCurses\PDCurses-3.9 ^
- *   /link /LIBPATH:C:\Users\logan\Documents\PDCurses\PDCurses-3.9\wincon
+ *   /I C:\Users\logan\Documents\PDCurses-3.9\PDCurses-3.9 ^
+ *   /link /LIBPATH:C:\Users\logan\Documents\PDCurses-3.9\PDCurses-3.9\wincon
  * 3. Place somewhere in your PATH. For example:
  * $ mv spot ~/bin/
  * To use:
@@ -882,6 +886,11 @@ int write_file(struct buf *b)
     char *tmp_fn;
     FILE *fp;
     size_t n, b_fn_len;
+
+#ifndef _WIN32
+    struct stat st;
+#endif
+
     /* No filename */
     if (b->fn == NULL || !(b_fn_len = strlen(b->fn)))
         return 1;
@@ -892,7 +901,7 @@ int write_file(struct buf *b)
     memcpy(tmp_fn, b->fn, b_fn_len);
     *(tmp_fn + b_fn_len) = '~';
     *(tmp_fn + b_fn_len + 1) = '\0';
-    if ((fp = fopen(tmp_fn, "w")) == NULL) {
+    if ((fp = fopen(tmp_fn, "wb")) == NULL) {
         free(tmp_fn);
         return 1;
     }
@@ -914,11 +923,30 @@ int write_file(struct buf *b)
         free(tmp_fn);
         return 1;
     }
-    /* Atomic */
+#ifndef _WIN32
+    /* If original file exists, then apply its permissions to the new file */
+    if (!stat(b->fn, &st) && S_ISREG(st.st_mode)
+        && chmod(tmp_fn, st.st_mode & 0777)) {
+        free(tmp_fn);
+        return 1;
+    }
+#endif
+
+#ifdef _WIN32
+    /* rename does not overwrite files */
+    errno = 0;
+    if (remove(b->fn) && errno != ENOENT) {
+        free(tmp_fn);
+        return 1;
+    }
+#endif
+
+    /* Atomic on POSIX systems */
     if (rename(tmp_fn, b->fn)) {
         free(tmp_fn);
         return 1;
     }
+
     free(tmp_fn);
     b->mod = 0;
     return 0;
@@ -1356,7 +1384,7 @@ int main(int argc, char **argv)
             mult = 1;
 
         /* Map Carriage Returns to Line Feeds */
-        if (x == '\r')
+        if (x == '\r' || x == KEY_ENTER)
             x = '\n';
 
         if (cl_active && x == '\n') {
@@ -1424,9 +1452,11 @@ int main(int argc, char **argv)
             persist_sc = 1;
             break;
         case CTRL('a'):
+        case KEY_HOME:
             start_of_line(z);
             break;
         case CTRL('e'):
+        case KEY_END:
             end_of_line(z);
             break;
         case CTRL('d'):
