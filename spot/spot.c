@@ -17,12 +17,18 @@
 /*
  * spot: text editor.
  * Dedicated to my son who was only a 4mm "spot" in his first ultrasound.
- *
+ */
+
+/*
  * README:
  * To install:
  * 1. Download this file.
- * 2. Compile. This requires ncurses.
+ * 2. Compile. This requires ncurses or pdcurses. For example:
  * $ cc -ansi -g -O3 -Wall -Wextra -pedantic spot.c -lncurses && mv a.out spot
+ * or:
+ * > cl spot.c pdcurses.lib User32.Lib AdvAPI32.Lib ^
+ *   /I C:\Users\logan\Documents\PDCurses\PDCurses-3.9 ^
+ *   /link /LIBPATH:C:\Users\logan\Documents\PDCurses\PDCurses-3.9\wincon
  * 3. Place somewhere in your PATH. For example:
  * $ mv spot ~/bin/
  * To use:
@@ -30,10 +36,20 @@
  * The keybindings are shown below the #include statements.
  */
 
+#ifdef __linux__
+#define _GNU_SOURCE
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
+
+#ifdef _WIN32
+#include <io.h>
+#else
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
+
 #include <fcntl.h>
 #include <errno.h>
 #include <curses.h>
@@ -45,44 +61,47 @@
 
 #define HELP char *help[] = { \
 "spot keybindings", \
+"^ means the control key, RK is the right key, and LK is the left key.", \
 "Commands with descriptions ending with * take an optional command", \
-"multiplier prefix ^U n (where n is a positive number)", \
-"^[?      Display keybindings in new buffer", \
-"^B       Backward char (left)*", \
-"^F       Forward char (right)*", \
-"^P       Previous line (up)*", \
-"^N       Next line (down)*", \
-"^H       Backspace*", \
-"^D       Delete*", \
-"^[f      Forward word*", \
-"^[b      Backward word*", \
-"^[u      Uppercase word*", \
-"^[l      Lowercase word*", \
-"^Q hh    Quote two digit hexadecimal value*", \
-"^A       Start of line (home)", \
-"^E       End of line", \
-"^[<      Start of buffer", \
-"^[>      End of buffer", \
-"^[m      Match bracket", \
-"^L       Level cursor and redraw screen", \
-"^W       Wipe (cut) region", \
-"^C       Cut region appending to paste buffer", \
-"^[w      Soft wipe (copy) region", \
-"^[c      Copy region appending to paste buffer", \
-"^K       Kill (cut) to end of line", \
-"^[k      Kill (cut) to start of line", \
-"^Y       Yank (paste)", \
-"^T       Trim trailing whitespace and clean", \
-"^S       Search", \
-"^[n      Search without editing the command line", \
-"^X i     Insert file at cursor", \
-"^X ^F    Open file in new buffer", \
-"^R       Rename buffer", \
-"^X ^S    Save current buffer", \
-"^X LEFT  Move left one buffer", \
-"^X RIGHT Move right one buffer", \
-"^[!      Close current buffer without saving", \
-"^X ^C    Close editor without saving any buffers", \
+"multiplier prefix ^U n (where n is a positive number).", \
+"^[ ?   Display keybindings in new buffer", \
+"^b     Backward char (left)*", \
+"^f     Forward char (right)*", \
+"^p     Previous line (up)*", \
+"^n     Next line (down)*", \
+"^h     Backspace*", \
+"^d     Delete*", \
+"^[ f   Forward word*", \
+"^[ b   Backward word*", \
+"^[ u   Uppercase word*", \
+"^[ l   Lowercase word*", \
+"^q hh  Quote two digit hexadecimal value*", \
+"^a     Start of line (home)", \
+"^e     End of line", \
+"^[ <   Start of buffer", \
+"^[ >   End of buffer", \
+"^[ m   Match bracket", \
+"^l     Level cursor and redraw screen", \
+"^2     Set the mark", \
+"^g     Clear the mark or escape the command line", \
+"^w     Wipe (cut) region", \
+"^c     Cut region appending to paste buffer", \
+"^[ w   Soft wipe (copy) region", \
+"^[ c   Copy region appending to paste buffer", \
+"^k     Kill (cut) to end of line", \
+"^[ k   Kill (cut) to start of line", \
+"^y     Yank (paste)", \
+"^t     Trim trailing whitespace and clean", \
+"^s     Search", \
+"^[ n   Search without editing the command line", \
+"^x i   Insert file at cursor", \
+"^x ^F  Open file in new buffer", \
+"^r     Rename buffer", \
+"^x ^s  Save current buffer", \
+"^x LK  Move left one buffer", \
+"^x RK  Move right one buffer", \
+"^[ !   Close current buffer without saving", \
+"^x ^c  Close editor without saving any buffers", \
 NULL \
 }
 
@@ -174,6 +193,40 @@ struct buf *init_buf(void)
     b->prev = NULL;
     b->next = NULL;
     return b;
+}
+
+char *memmatch(char *big, size_t big_len, char *little, size_t little_len)
+{
+    /* Quick Search algorithm */
+#define UCHAR_NUM (UCHAR_MAX + 1)
+    unsigned char bad[UCHAR_NUM], *pattern, *q, *q_stop, *q_check;
+    size_t to_match, j;
+    if (!little_len)
+        return big;
+    if (little_len > big_len)
+        return NULL;
+    for (j = 0; j < UCHAR_NUM; ++j)
+        bad[j] = little_len + 1;
+    pattern = (unsigned char *) little;
+    for (j = 0; j < little_len; ++j)
+        bad[pattern[j]] = little_len - j;
+    q = (unsigned char *) big;
+    q_stop = (unsigned char *) big + big_len - little_len;
+    while (q <= q_stop) {
+        q_check = q;
+        pattern = (unsigned char *) little;
+        to_match = little_len;
+        /* Compare pattern to text */
+        while (to_match && *q_check++ == *pattern++)
+            --to_match;
+        /* Match found */
+        if (!to_match)
+            return (char *) q;
+        /* Jump using the bad character table */
+        q += bad[q[little_len]];
+    }
+    /* Not found */
+    return NULL;
 }
 
 void free_buf_list(struct buf *b)
@@ -555,7 +608,7 @@ int search(struct buf *b, char *p, size_t n)
     char *q;
     if (b->c == b->e)
         return 1;
-    if ((q = memmem(b->c + 1, b->e - b->c - 1, p, n)) == NULL)
+    if ((q = memmatch(b->c + 1, b->e - b->c - 1, p, n)) == NULL)
         return 1;
     while (b->c != q)
         RIGHTCH(b);
@@ -785,6 +838,11 @@ int filesize(char *fn, size_t * fs)
     struct stat st;
     if (stat(fn, &st))
         return 1;
+
+#ifndef S_ISREG
+#define S_ISREG(m) ((m & S_IFMT) == S_IFREG)
+#endif
+
     if (!S_ISREG(st.st_mode))
         return 1;
     if (st.st_size < 0)
@@ -823,12 +881,17 @@ int write_file(struct buf *b)
     /* Writes a buffer to file */
     char *tmp_fn;
     FILE *fp;
-    size_t n;
+    size_t n, b_fn_len;
     /* No filename */
-    if (b->fn == NULL || !strlen(b->fn))
+    if (b->fn == NULL || !(b_fn_len = strlen(b->fn)))
         return 1;
-    if (asprintf(&tmp_fn, "%s~", b->fn) == -1)
+    if (AOF(b_fn_len, 2))
         return 1;
+    if ((tmp_fn = malloc(b_fn_len + 2)) == NULL)
+        return 1;
+    memcpy(tmp_fn, b->fn, b_fn_len);
+    *(tmp_fn + b_fn_len) = '~';
+    *(tmp_fn + b_fn_len + 1) = '\0';
     if ((fp = fopen(tmp_fn, "w")) == NULL) {
         free(tmp_fn);
         return 1;
@@ -897,9 +960,9 @@ void centre_cursor(struct buf *b, int text_height)
         return;
     }
     q = b->g - 1;
-    while (q != b->a && up) {
-        if (*q == '\n')
-            --up;
+    while (q != b->a) {
+        if (*q == '\n' && !--up)
+            break;
         --q;
     }
 
@@ -910,19 +973,22 @@ void centre_cursor(struct buf *b, int text_height)
     b->d = q - b->a;
 }
 
-int draw_screen(struct buf *b, struct buf *cl, int cl_active, int rv,
-                int req_centre, int req_clear)
+int draw_screen(struct buf *b, struct buf *cl, int cl_active, char **sb,
+                size_t * sb_s, int rv, int req_centre, int req_clear)
 {
     /* Draws a buffer to the screen, including the command line buffer */
-    char *q;
+    char *q, ch;
     int height, width;          /* Screen size */
+    size_t w;                   /* Screen width as size_t */
     int cy, cx;                 /* Final cursor position */
     int y, x;                   /* Changing cursor position */
     int centred = 0;            /* Indicates if centreing has occurred */
     int rv_a = 0;               /* Return value of addch */
-    char *sb;                   /* Status bar */
 
     getmaxyx(stdscr, height, width);
+
+    if (height < 1 || width < 1)
+        return 1;
 
     /* Cursor is above the screen */
     if (req_centre || b->c < INDEX_TO_POINTER(b, d)) {
@@ -953,7 +1019,12 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active, int rv,
         if (b->m_set && q == INDEX_TO_POINTER(b, m))
             if (standout() == ERR)
                 return 1;
-        rv_a = addch(*q);
+
+#define DISPLAYCH(ch) (isgraph(ch) || ch == ' ' || ch == '\t' || ch == '\n' \
+    ? ch : (ch == '\0' ? '~' : '?'))
+
+        ch = *q;
+        rv_a = addch(DISPLAYCH(ch));
         getyx(stdscr, y, x);
         if ((height >= 3 && y >= height - 2) || rv_a == ERR) {
             /* Cursor out of text portion of the screen */
@@ -992,7 +1063,8 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active, int rv,
         if (b->m_set && q == INDEX_TO_POINTER(b, m))
             if (standend() == ERR)
                 return 1;
-        rv_a = addch(*q);
+        ch = *q;
+        rv_a = addch(DISPLAYCH(ch));
         getyx(stdscr, y, x);
         if ((height >= 3 && y >= height - 2) || rv_a == ERR)
             break;
@@ -1003,18 +1075,25 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active, int rv,
         /* Status bar */
         if (move(height - 2, 0) == ERR)
             return 1;
-        /* Clear the line */
-        /* if (clrtoeol() == ERR) return 1; */
-        if (asprintf
-            (&sb, "%c%c %s (%lu,%lu) %02X", rv ? '!' : ' ',
-             b->mod ? '*' : ' ', b->fn, b->r, col_num(b),
-             (unsigned char) *b->c) == -1)
-            return 1;
-        if (addnstr(sb, width) == ERR) {
-            free(sb);
-            return 1;
+        w = (size_t) width;
+        /* sb_s needs to include the '\0' terminator */
+        if (w >= *sb_s) {
+            free(*sb);
+            *sb = NULL;
+            *sb_s = 0;
+            if (AOF(w, 1))
+                return 1;
+            if ((*sb = malloc(w + 1)) == NULL)
+                return 1;
+            *sb_s = w + 1;
         }
-        free(sb);
+        if (snprintf
+            (*sb, *sb_s, "%c%c %s (%lu,%lu) %02X", rv ? '!' : ' ',
+             b->mod ? '*' : ' ', b->fn, (unsigned long) b->r,
+             (unsigned long) col_num(b), (unsigned char) *b->c) < 0)
+            return 1;
+        if (addnstr(*sb, width) == ERR)
+            return 1;
         /* Highlight status bar */
         if (mvchgat(height - 2, 0, width, A_STANDOUT, 0, NULL) == ERR)
             return 1;
@@ -1040,7 +1119,8 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active, int rv,
             if (cl->m_set && q == INDEX_TO_POINTER(cl, m))
                 if (standout() == ERR)
                     return 1;
-            if (addch(*q) == ERR) {
+            ch = *q;
+            if (addch(DISPLAYCH(ch)) == ERR) {
                 /* Draw from the cursor */
                 cl->d = cl->g - cl->a;
                 goto cl_draw_start;
@@ -1070,7 +1150,8 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active, int rv,
             if (cl->m_set && q == INDEX_TO_POINTER(cl, m))
                 if (standend() == ERR)
                     return 1;
-            if (addch(*q) == ERR)
+            ch = *q;
+            if (addch(DISPLAYCH(ch)) == ERR)
                 break;
             ++q;
         }
@@ -1105,6 +1186,10 @@ struct buf *new_buf(struct buf *b, char *fn)
     struct buf *t;
     if ((t = init_buf()) == NULL)
         return NULL;
+
+#ifndef F_OK
+#define F_OK 0
+#endif
 
     if (fn != NULL) {
         if (!access(fn, F_OK)) {
@@ -1174,6 +1259,8 @@ int main(int argc, char **argv)
     struct buf *cl = NULL;      /* Command line buffer */
     struct buf *z;              /* Shortcut to the active buffer */
     struct buf *p = NULL;       /* Paste buffer */
+    char *sb = NULL;            /* Status bar */
+    size_t sb_s = 0;            /* Status bar size */
     int req_centre = 0;         /* User requests cursor centreing */
     int req_clear = 0;          /* User requests screen clearing */
     int cl_active = 0;          /* Command line is being used */
@@ -1218,7 +1305,8 @@ int main(int argc, char **argv)
 
     while (running) {
       top:
-        if (draw_screen(b, cl, cl_active, rv, req_centre, req_clear)) {
+        if (draw_screen
+            (b, cl, cl_active, &sb, &sb_s, rv, req_centre, req_clear)) {
             ret = 1;
             goto clean_up;
         }
@@ -1266,6 +1354,10 @@ int main(int argc, char **argv)
         /* mult cannot be zero */
         if (!mult)
             mult = 1;
+
+        /* Map Carriage Returns to Line Feeds */
+        if (x == '\r')
+            x = '\n';
 
         if (cl_active && x == '\n') {
             switch (operation) {
@@ -1484,7 +1576,7 @@ int main(int argc, char **argv)
     free_buf_list(b);
     free_buf_list(cl);
     free_buf_list(p);
-
+    free(sb);
     if (stdscr != NULL)
         if (endwin() == ERR)
             ret = 1;
