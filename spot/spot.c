@@ -40,6 +40,8 @@
  * The keybindings are shown below the #include statements.
  */
 
+#define USE_CURSES
+
 #ifdef __linux__
 #define _GNU_SOURCE
 #endif
@@ -54,9 +56,12 @@
 #include <unistd.h>
 #endif
 
+#ifdef USE_CURSES
+#include <curses.h>
+#endif
+
 #include <fcntl.h>
 #include <errno.h>
-#include <curses.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -68,7 +73,7 @@
 "^ means the control key, RK is the right key, and LK is the left key.", \
 "Commands with descriptions ending with * take an optional command", \
 "multiplier prefix ^U n (where n is a positive number).", \
-"^[ ?   Display keybindings in new buffer", \
+"^[ ?   Display keybindings in new gap buffer", \
 "^b     Backward char (left)*", \
 "^f     Forward char (right)*", \
 "^p     Previous line (up)*", \
@@ -82,16 +87,16 @@
 "^q hh  Quote two digit hexadecimal value*", \
 "^a     Start of line (home)", \
 "^e     End of line", \
-"^[ <   Start of buffer", \
-"^[ >   End of buffer", \
+"^[ <   Start of gap buffer", \
+"^[ >   End of gap buffer", \
 "^[ m   Match bracket", \
 "^l     Level cursor and redraw screen", \
 "^2     Set the mark", \
 "^g     Clear the mark or escape the command line", \
 "^w     Wipe (cut) region", \
-"^c     Cut region appending to paste buffer", \
+"^c     Cut region appending to paste gap buffer", \
 "^[ w   Soft wipe (copy) region", \
-"^[ c   Copy region appending to paste buffer", \
+"^[ c   Copy region appending to paste gap buffer", \
 "^k     Kill (cut) to end of line", \
 "^[ k   Kill (cut) to start of line", \
 "^y     Yank (paste)", \
@@ -99,18 +104,18 @@
 "^s     Search", \
 "^[ n   Search without editing the command line", \
 "^x i   Insert file at cursor", \
-"^x ^F  Open file in new buffer", \
-"^r     Rename buffer", \
-"^x ^s  Save current buffer", \
-"^x LK  Move left one buffer", \
-"^x RK  Move right one buffer", \
-"^[ !   Close current buffer without saving", \
-"^x ^c  Close editor without saving any buffers", \
+"^x ^F  Open file in new gap buffer", \
+"^r     Rename gap buffer", \
+"^x ^s  Save current gap buffer", \
+"^x LK  Move left one gap buffer", \
+"^x RK  Move right one gap buffer", \
+"^[ !   Close current gap buffer without saving", \
+"^x ^c  Close editor without saving any gap buffers", \
 NULL \
 }
 
-/* Initial buffer size */
-#define INIT_BUF_SIZE BUFSIZ
+/* Initial gap buffer size */
+#define INIT_GAPBUF_SIZE BUFSIZ
 
 /* size_t Addition OverFlow test */
 #define AOF(a, b) ((a) > SIZE_MAX - (b))
@@ -139,11 +144,11 @@ NULL \
 #define INDEX_TO_POINTER(b, i) (b->a + b->i < b->g ? b->a + b->i \
 				: b->c + b->i - (b->g - b->a))
 
-/* Delete buffer */
-#define DELETEBUF(b) do {b->g = b->a; b->c = b->e; b->r = 1; b->d = 0; \
+/* Delete gap buffer */
+#define DELETEGAPBUF(b) do {b->g = b->a; b->c = b->e; b->r = 1; b->d = 0; \
              b->m = 0; b->mr = 1; b->m_set = 0; b->mod = 1;} while (0)
 
-/* Update settings when a buffer is modified */
+/* Update settings when a gap buffer is modified */
 #define SETMOD(b) do {b->m = 0; b->mr = 1; b->m_set = 0; b->mod = 1;} while (0)
 
 /* No bound or gap size checks are performed */
@@ -154,13 +159,13 @@ NULL \
 #define RIGHTCH(b) do {if (*b->c == '\n') ++b->r; *b->g++ = *b->c++;} while (0)
 
 /* gap buffer */
-struct buf {
-    struct buf *prev;           /* Previous buffer node */
+struct gapbuf {
+    struct gapbuf *prev;        /* Previous gap buffer node */
     char *fn;                   /* Filename */
-    char *a;                    /* Start of buffer */
+    char *a;                    /* Start of gap buffer */
     char *g;                    /* Start of gap */
     char *c;                    /* Cursor (to the right of the gap) */
-    char *e;                    /* End of buffer */
+    char *e;                    /* End of gap buffer */
     size_t r;                   /* Row number (starting from 1) */
     size_t sc;                  /* Sticky column number (starting from 0) */
     int sc_set;                 /* Sticky column is set */
@@ -168,22 +173,22 @@ struct buf {
     size_t m;                   /* Mark index (ignores the gap) */
     size_t mr;                  /* Row number at the mark */
     int m_set;                  /* Mark is set */
-    int mod;                    /* Buffer text has been modified */
-    struct buf *next;           /* Next buffer node */
+    int mod;                    /* Gap buffer text has been modified */
+    struct gapbuf *next;        /* Next gap buffer node */
 };
 
-struct buf *init_buf(void)
+struct gapbuf *init_gapbuf(void)
 {
-    /* Initialises a buffer */
-    struct buf *b;
-    if ((b = malloc(sizeof(struct buf))) == NULL)
+    /* Initialises a gap buffer */
+    struct gapbuf *b;
+    if ((b = malloc(sizeof(struct gapbuf))) == NULL)
         return NULL;
-    if ((b->a = malloc(INIT_BUF_SIZE)) == NULL)
+    if ((b->a = malloc(INIT_GAPBUF_SIZE)) == NULL)
         return NULL;
-    b->e = b->a + INIT_BUF_SIZE - 1;
+    b->e = b->a + INIT_GAPBUF_SIZE - 1;
     b->g = b->a;
     b->c = b->e;
-    /* End of buffer char. Cannot be deleted. */
+    /* End of gap buffer char. Cannot be deleted. */
     *b->e = '\0';
     b->r = 1;
     b->sc = 0;
@@ -233,10 +238,10 @@ char *memmatch(char *big, size_t big_len, char *little, size_t little_len)
     return NULL;
 }
 
-void free_buf_list(struct buf *b)
+void free_gapbuf_list(struct gapbuf *b)
 {
-    /* Frees a buffer doubly linked list (can be a single buffer) */
-    struct buf *t = b, *next;
+    /* Frees a gap buffer doubly linked list (can be a single gap buffer) */
+    struct gapbuf *t = b, *next;
     if (b == NULL)
         return;
     /* Move to start of list */
@@ -252,25 +257,25 @@ void free_buf_list(struct buf *b)
     }
 }
 
-int grow_gap(struct buf *b, size_t will_use)
+int grow_gap(struct gapbuf *b, size_t will_use)
 {
-    /* Grows the gap size of a buffer */
+    /* Grows the gap size of a gap buffer */
     char *t, *new_e;
-    size_t buf_size = b->e - b->a + 1;
-    if (MOF(buf_size, 2))
+    size_t gapbuf_size = b->e - b->a + 1;
+    if (MOF(gapbuf_size, 2))
         return 1;
-    buf_size *= 2;
-    if (AOF(buf_size, will_use))
+    gapbuf_size *= 2;
+    if (AOF(gapbuf_size, will_use))
         return 1;
-    buf_size += will_use;
-    if ((t = malloc(buf_size)) == NULL)
+    gapbuf_size += will_use;
+    if ((t = malloc(gapbuf_size)) == NULL)
         return 1;
     /* Copy text before the gap */
     memcpy(t, b->a, b->g - b->a);
-    /* Copy text after the gap, excluding the end of buffer character */
-    new_e = t + buf_size - 1;
+    /* Copy text after the gap, excluding the end of gap buffer character */
+    new_e = t + gapbuf_size - 1;
     memcpy(new_e - (b->e - b->c), b->c, b->e - b->c);
-    /* Set end of buffer character */
+    /* Set end of gap buffer character */
     *new_e = '\0';
     /* Update pointers, indices do not need to be changed */
     b->g = t + (b->g - b->a);
@@ -282,9 +287,9 @@ int grow_gap(struct buf *b, size_t will_use)
     return 0;
 }
 
-int insert_ch(struct buf *b, char c, size_t mult)
+int insert_ch(struct gapbuf *b, char c, size_t mult)
 {
-    /* Inserts a char mult times into the buffer */
+    /* Inserts a char mult times into the gap buffer */
     if (GAPSIZE(b) < mult)
         if (grow_gap(b, mult))
             return 1;
@@ -294,9 +299,9 @@ int insert_ch(struct buf *b, char c, size_t mult)
     return 0;
 }
 
-int delete_ch(struct buf *b, size_t mult)
+int delete_ch(struct gapbuf *b, size_t mult)
 {
-    /* Deletes mult chars in a buffer */
+    /* Deletes mult chars in a gap buffer */
     if (mult > (size_t) (b->e - b->c))
         return 1;
     while (mult--)
@@ -305,9 +310,9 @@ int delete_ch(struct buf *b, size_t mult)
     return 0;
 }
 
-int backspace_ch(struct buf *b, size_t mult)
+int backspace_ch(struct gapbuf *b, size_t mult)
 {
-    /* Backspaces mult chars in a buffer */
+    /* Backspaces mult chars in a gap buffer */
     if (mult > CURSOR_INDEX(b))
         return 1;
     while (mult--)
@@ -316,7 +321,7 @@ int backspace_ch(struct buf *b, size_t mult)
     return 0;
 }
 
-int left_ch(struct buf *b, size_t mult)
+int left_ch(struct gapbuf *b, size_t mult)
 {
     /* Move the cursor left mult positions */
     if (mult > CURSOR_INDEX(b))
@@ -326,7 +331,7 @@ int left_ch(struct buf *b, size_t mult)
     return 0;
 }
 
-int right_ch(struct buf *b, size_t mult)
+int right_ch(struct gapbuf *b, size_t mult)
 {
     /* Move the cursor right mult positions */
     if (mult > (size_t) (b->e - b->c))
@@ -336,31 +341,31 @@ int right_ch(struct buf *b, size_t mult)
     return 0;
 }
 
-void start_of_buf(struct buf *b)
+void start_of_gapbuf(struct gapbuf *b)
 {
     while (b->a != b->g)
         LEFTCH(b);
 }
 
-void end_of_buf(struct buf *b)
+void end_of_gapbuf(struct gapbuf *b)
 {
     while (b->c != b->e)
         RIGHTCH(b);
 }
 
-void start_of_line(struct buf *b)
+void start_of_line(struct gapbuf *b)
 {
     while (b->a != b->g && *(b->g - 1) != '\n')
         LEFTCH(b);
 }
 
-void end_of_line(struct buf *b)
+void end_of_line(struct gapbuf *b)
 {
     while (b->c != b->e && *b->c != '\n')
         RIGHTCH(b);
 }
 
-size_t col_num(struct buf *b)
+size_t col_num(struct gapbuf *b)
 {
     /* Returns the column number, which starts from zero */
     char *q = b->g;
@@ -369,7 +374,7 @@ size_t col_num(struct buf *b)
     return b->g - q;
 }
 
-int up_line(struct buf *b, size_t mult)
+int up_line(struct gapbuf *b, size_t mult)
 {
     /* Moves the cursor up mult lines */
     size_t col;
@@ -398,7 +403,7 @@ int up_line(struct buf *b, size_t mult)
     return 0;
 }
 
-int down_line(struct buf *b, size_t mult)
+int down_line(struct gapbuf *b, size_t mult)
 {
     /* Moves the cursor down mult lines */
     size_t col;
@@ -442,7 +447,7 @@ int down_line(struct buf *b, size_t mult)
     return 0;
 }
 
-void forward_word(struct buf *b, int mode, size_t mult)
+void forward_word(struct gapbuf *b, int mode, size_t mult)
 {
     /*
      * Moves forward up to mult words. If mode is 0 then no editing
@@ -480,7 +485,7 @@ void forward_word(struct buf *b, int mode, size_t mult)
         SETMOD(b);
 }
 
-void backward_word(struct buf *b, size_t mult)
+void backward_word(struct gapbuf *b, size_t mult)
 {
     /* Moves back a maximum of mult words */
     while (b->g != b->a && mult--) {
@@ -496,7 +501,7 @@ void backward_word(struct buf *b, size_t mult)
     }
 }
 
-int insert_hex(struct buf *b, size_t mult)
+int insert_hex(struct gapbuf *b, size_t mult)
 {
     /*
      * Inserts a character mult times that was typed as its two digit
@@ -523,7 +528,7 @@ int insert_hex(struct buf *b, size_t mult)
     return 0;
 }
 
-void trim_clean(struct buf *b)
+void trim_clean(struct gapbuf *b)
 {
     /*
      * Trims trailing whitespace and deletes any character that is
@@ -535,7 +540,7 @@ void trim_clean(struct buf *b)
     int at_eol = 0;
     int mod = 0;
 
-    end_of_buf(b);
+    end_of_gapbuf(b);
 
     /* Delete to end of text, sparing the first newline character */
     while (b->g != b->a) {
@@ -581,10 +586,10 @@ void trim_clean(struct buf *b)
     }
 }
 
-void str_buf(struct buf *b)
+void str_gapbuf(struct gapbuf *b)
 {
-    /* Prepares a buffer so that b->c can be used as a string */
-    end_of_buf(b);
+    /* Prepares a gap buffer so that b->c can be used as a string */
+    end_of_gapbuf(b);
     while (b->a != b->g) {
         LEFTCH(b);
         if (*b->c == '\0')
@@ -592,23 +597,23 @@ void str_buf(struct buf *b)
     }
 }
 
-void set_mark(struct buf *b)
+void set_mark(struct gapbuf *b)
 {
     b->m = CURSOR_INDEX(b);
     b->mr = b->r;
     b->m_set = 1;
 }
 
-void clear_mark(struct buf *b)
+void clear_mark(struct gapbuf *b)
 {
     b->m = 0;
     b->mr = 1;
     b->m_set = 0;
 }
 
-int search(struct buf *b, char *p, size_t n)
+int search(struct gapbuf *b, char *p, size_t n)
 {
-    /* Forward search buffer b for memory p (n chars long) */
+    /* Forward search gap buffer b for memory p (n chars long) */
     char *q;
     if (b->c == b->e)
         return 1;
@@ -619,7 +624,7 @@ int search(struct buf *b, char *p, size_t n)
     return 0;
 }
 
-int match_bracket(struct buf *b)
+int match_bracket(struct gapbuf *b)
 {
     /* Moves the cursor to the corresponding nested bracket */
     int right;
@@ -693,11 +698,11 @@ int match_bracket(struct buf *b)
     return 1;
 }
 
-int copy_region(struct buf *b, struct buf *p)
+int copy_region(struct gapbuf *b, struct gapbuf *p)
 {
     /*
-     * Copies the region from buffer b into buffer p.
-     * The cursor is moved to the end of buffer p first.
+     * Copies the region from gap buffer b into gap buffer p.
+     * The cursor is moved to the end of gap buffer p first.
      */
     char *m_pointer;
     size_t s;
@@ -708,7 +713,7 @@ int copy_region(struct buf *b, struct buf *p)
     if (b->m == CURSOR_INDEX(b))
         return 1;
     /* Make sure that the cursor is at the end of p */
-    end_of_buf(p);
+    end_of_gapbuf(p);
     m_pointer = INDEX_TO_POINTER(b, m);
     /* Mark before cursor */
     if (b->m < CURSOR_INDEX(b)) {
@@ -737,7 +742,7 @@ int copy_region(struct buf *b, struct buf *p)
     return 0;
 }
 
-int delete_region(struct buf *b)
+int delete_region(struct gapbuf *b)
 {
     /* Deletes the region */
     /* Region does not exist */
@@ -759,11 +764,11 @@ int delete_region(struct buf *b)
     return 0;
 }
 
-int cut_region(struct buf *b, struct buf *p)
+int cut_region(struct gapbuf *b, struct gapbuf *p)
 {
     /*
-     * Copies the region from buffer b into buffer p.
-     * The cursor is moved to the end of buffer p first.
+     * Copies the region from gap buffer b into gap buffer p.
+     * The cursor is moved to the end of gap buffer p first.
      */
     if (copy_region(b, p))
         return 1;
@@ -772,16 +777,16 @@ int cut_region(struct buf *b, struct buf *p)
     return 0;
 }
 
-int paste(struct buf *b, struct buf *p, size_t mult)
+int paste(struct gapbuf *b, struct gapbuf *p, size_t mult)
 {
     /*
-     * Pastes (inserts) buffer p into buffer b mult times.
-     * Moves the cursor to the end of buffer p first.
+     * Pastes (inserts) gap buffer p into gap buffer b mult times.
+     * Moves the cursor to the end of gap buffer p first.
      */
     size_t num = mult;
     size_t s, ts;
     char *q;
-    end_of_buf(p);
+    end_of_gapbuf(p);
     s = p->g - p->a;
     if (!s)
         return 1;
@@ -803,7 +808,7 @@ int paste(struct buf *b, struct buf *p, size_t mult)
     return 0;
 }
 
-int insert_help_line(struct buf *b, char *str)
+int insert_help_line(struct gapbuf *b, char *str)
 {
     char ch;
     while ((ch = *str++))
@@ -814,7 +819,7 @@ int insert_help_line(struct buf *b, char *str)
     return 0;
 }
 
-int cut_to_eol(struct buf *b, struct buf *p)
+int cut_to_eol(struct gapbuf *b, struct gapbuf *p)
 {
     /* Cut to the end of the line */
     if (*b->c == '\n')
@@ -826,7 +831,7 @@ int cut_to_eol(struct buf *b, struct buf *p)
     return 0;
 }
 
-int cut_to_sol(struct buf *b, struct buf *p)
+int cut_to_sol(struct gapbuf *b, struct gapbuf *p)
 {
     /* Cut to the start of the line */
     set_mark(b);
@@ -855,7 +860,7 @@ int filesize(char *fn, size_t * fs)
     return 0;
 }
 
-int insert_file(struct buf *b, char *fn)
+int insert_file(struct gapbuf *b, char *fn)
 {
     /* Inserts a file into the righthand side of the gap */
     size_t fs;
@@ -880,9 +885,9 @@ int insert_file(struct buf *b, char *fn)
     return 0;
 }
 
-int write_file(struct buf *b)
+int write_file(struct gapbuf *b)
 {
-    /* Writes a buffer to file */
+    /* Writes a gap buffer to file */
     char *tmp_fn;
     FILE *fp;
     size_t n, b_fn_len;
@@ -972,7 +977,7 @@ int init_ncurses(void)
     return 0;
 }
 
-void centre_cursor(struct buf *b, int text_height)
+void centre_cursor(struct gapbuf *b, int text_height)
 {
     /*
      * Sets draw start so that the cursor might be in the middle
@@ -1001,10 +1006,11 @@ void centre_cursor(struct buf *b, int text_height)
     b->d = q - b->a;
 }
 
-int draw_screen(struct buf *b, struct buf *cl, int cl_active, char **sb,
-                size_t * sb_s, int rv, int req_centre, int req_clear)
+int draw_screen(struct gapbuf *b, struct gapbuf *cl, int cl_active,
+                char **sb, size_t * sb_s, int rv, int req_centre,
+                int req_clear)
 {
-    /* Draws a buffer to the screen, including the command line buffer */
+    /* Draws a gap buffer to the screen, including the command line gap buffer */
     char *q, ch;
     int height, width;          /* Screen size */
     size_t w;                   /* Screen width as size_t */
@@ -1126,7 +1132,7 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active, char **sb,
         if (mvchgat(height - 2, 0, width, A_STANDOUT, 0, NULL) == ERR)
             return 1;
 
-        /* Command line buffer */
+        /* Command line gap buffer */
         if (move(height - 1, 0) == ERR)
             return 1;
 
@@ -1193,9 +1199,9 @@ int draw_screen(struct buf *b, struct buf *cl, int cl_active, char **sb,
     return 0;
 }
 
-int rename_buf(struct buf *b, char *new_fn)
+int rename_gapbuf(struct gapbuf *b, char *new_fn)
 {
-    /* Sets the filename fn associated with buffer b to new_fn */
+    /* Sets the filename fn associated with gap buffer b to new_fn */
     char *t;
     if ((t = strdup(new_fn)) == NULL)
         return 1;
@@ -1204,15 +1210,15 @@ int rename_buf(struct buf *b, char *new_fn)
     return 0;
 }
 
-struct buf *new_buf(struct buf *b, char *fn)
+struct gapbuf *new_gapbuf(struct gapbuf *b, char *fn)
 {
     /*
-     * Creates a new buffer to the right of buffer b in the doubly linked list
+     * Creates a new gap buffer to the right of gap buffer b in the doubly linked list
      * and sets the associated filename to fn. The file will be loaded into
-     * the buffer if it exists.
+     * the gap buffer if it exists.
      */
-    struct buf *t;
-    if ((t = init_buf()) == NULL)
+    struct gapbuf *t;
+    if ((t = init_gapbuf()) == NULL)
         return NULL;
 
 #ifndef F_OK
@@ -1223,14 +1229,14 @@ struct buf *new_buf(struct buf *b, char *fn)
         if (!access(fn, F_OK)) {
             /* File exists */
             if (insert_file(t, fn)) {
-                free_buf_list(t);
+                free_gapbuf_list(t);
                 return NULL;
             }
             /* Clear modification indicator */
             t->mod = 0;
         }
-        if (rename_buf(t, fn)) {
-            free_buf_list(t);
+        if (rename_gapbuf(t, fn)) {
+            free_gapbuf_list(t);
             return NULL;
         }
     }
@@ -1247,13 +1253,13 @@ struct buf *new_buf(struct buf *b, char *fn)
     return t;
 }
 
-struct buf *kill_buf(struct buf *b)
+struct gapbuf *kill_gapbuf(struct gapbuf *b)
 {
     /*
-     * Kills (frees and unlinks) buffer b from the doubly linked list and
-     * returns the buffer to the left (if present) or right (if present).
+     * Kills (frees and unlinks) gap buffer b from the doubly linked list and
+     * returns the gap buffer to the left (if present) or right (if present).
      */
-    struct buf *t = NULL;
+    struct gapbuf *t = NULL;
     if (b == NULL)
         return NULL;
     /* Unlink b */
@@ -1271,7 +1277,7 @@ struct buf *kill_buf(struct buf *b)
     b->next = NULL;
 
     /* Free b */
-    free_buf_list(b);
+    free_gapbuf_list(b);
 
     return t;
 }
@@ -1282,11 +1288,11 @@ int main(int argc, char **argv)
     int rv = 0;                 /* Internal function return value */
     int running = 1;            /* Text editor is on */
     int x;                      /* Read char */
-    /* Current buffer of the doubly linked list of text buffers */
-    struct buf *b = NULL;
-    struct buf *cl = NULL;      /* Command line buffer */
-    struct buf *z;              /* Shortcut to the active buffer */
-    struct buf *p = NULL;       /* Paste buffer */
+    /* Current gap buffer of the doubly linked list of text gap buffers */
+    struct gapbuf *b = NULL;
+    struct gapbuf *cl = NULL;   /* Command line gap buffer */
+    struct gapbuf *z;           /* Shortcut to the active gap buffer */
+    struct gapbuf *p = NULL;    /* Paste gap buffer */
     char *sb = NULL;            /* Status bar */
     size_t sb_s = 0;            /* Status bar size */
     int req_centre = 0;         /* User requests cursor centreing */
@@ -1303,25 +1309,25 @@ int main(int argc, char **argv)
     char **h;
 
     if (argc <= 1) {
-        if ((b = new_buf(NULL, NULL)) == NULL) {
+        if ((b = new_gapbuf(NULL, NULL)) == NULL) {
             ret = 1;
             goto clean_up;
         }
     } else {
         for (i = 1; i < argc; ++i) {
-            if ((b = new_buf(b, *(argv + i))) == NULL) {
+            if ((b = new_gapbuf(b, *(argv + i))) == NULL) {
                 ret = 1;
                 goto clean_up;
             }
         }
     }
 
-    if ((cl = init_buf()) == NULL) {
+    if ((cl = init_gapbuf()) == NULL) {
         ret = 1;
         goto clean_up;
     }
 
-    if ((p = init_buf()) == NULL) {
+    if ((p = init_gapbuf()) == NULL) {
         ret = 1;
         goto clean_up;
     }
@@ -1344,7 +1350,7 @@ int main(int argc, char **argv)
         /* Clear internal return value */
         rv = 0;
 
-        /* Active buffer */
+        /* Active gap buffer */
         if (cl_active)
             z = cl;
         else
@@ -1390,20 +1396,20 @@ int main(int argc, char **argv)
         if (cl_active && x == '\n') {
             switch (operation) {
             case 'i':
-                str_buf(cl);
+                str_gapbuf(cl);
                 rv = insert_file(b, cl->c);
                 break;
             case 's':
-                start_of_buf(cl);
+                start_of_gapbuf(cl);
                 rv = search(b, cl->c, cl->e - cl->c);
                 break;
             case 'r':
-                str_buf(cl);
-                rv = rename_buf(b, cl->c);
+                str_gapbuf(cl);
+                rv = rename_gapbuf(b, cl->c);
                 break;
             case 'n':
-                str_buf(cl);
-                if (new_buf(b, cl->c) == NULL) {
+                str_gapbuf(cl);
+                if (new_gapbuf(b, cl->c) == NULL) {
                     rv = 1;
                 } else {
                     b = b->next;
@@ -1469,29 +1475,29 @@ int main(int argc, char **argv)
             break;
         case CTRL('s'):
             /* Search */
-            DELETEBUF(cl);
+            DELETEGAPBUF(cl);
             operation = 's';
             cl_active = 1;
             break;
         case CTRL('r'):
-            /* Rename buffer */
-            DELETEBUF(cl);
+            /* Rename gap buffer */
+            DELETEGAPBUF(cl);
             operation = 'r';
             cl_active = 1;
             break;
         case CTRL('w'):
-            DELETEBUF(p);
+            DELETEGAPBUF(p);
             rv = cut_region(z, p);
             break;
         case CTRL('c'):
-            /* Cut, inserting at end of paste buffer */
+            /* Cut, inserting at end of paste gap buffer */
             rv = cut_region(z, p);
             break;
         case CTRL('y'):
             rv = paste(z, p, mult);
             break;
         case CTRL('k'):
-            DELETEBUF(p);
+            DELETEGAPBUF(p);
             rv = cut_to_eol(z, p);
             break;
         case CTRL('t'):
@@ -1510,13 +1516,13 @@ int main(int argc, char **argv)
                 break;
             case 'i':
                 /* Insert file at the cursor */
-                DELETEBUF(cl);
+                DELETEGAPBUF(cl);
                 operation = 'i';
                 cl_active = 1;
                 break;
             case CTRL('f'):
-                /* New buffer */
-                DELETEBUF(cl);
+                /* New gap buffer */
+                DELETEGAPBUF(cl);
                 operation = 'n';
                 cl_active = 1;
                 break;
@@ -1538,28 +1544,28 @@ int main(int argc, char **argv)
             switch (x = getch()) {
             case 'n':
                 /* Search without editing the command line */
-                start_of_buf(cl);
+                start_of_gapbuf(cl);
                 rv = search(z, cl->c, cl->e - cl->c);
                 break;
             case 'm':
                 rv = match_bracket(z);
                 break;
             case 'w':
-                DELETEBUF(p);
+                DELETEGAPBUF(p);
                 rv = copy_region(z, p);
                 clear_mark(z);
                 break;
             case 'c':
-                /* Copy, inserting at end of paste buffer */
+                /* Copy, inserting at end of paste gap buffer */
                 rv = copy_region(z, p);
                 break;
             case '!':
-                /* Close editor if last buffer is killed */
-                if ((b = kill_buf(b)) == NULL)
+                /* Close editor if last gap buffer is killed */
+                if ((b = kill_gapbuf(b)) == NULL)
                     running = 0;
                 break;
             case 'k':
-                DELETEBUF(p);
+                DELETEGAPBUF(p);
                 rv = cut_to_sol(z, p);
                 break;
             case 'b':
@@ -1575,13 +1581,13 @@ int main(int argc, char **argv)
                 forward_word(z, 2, mult);
                 break;
             case '<':
-                start_of_buf(z);
+                start_of_gapbuf(z);
                 break;
             case '>':
-                end_of_buf(z);
+                end_of_gapbuf(z);
                 break;
             case '?':
-                if (new_buf(b, NULL) == NULL) {
+                if (new_gapbuf(b, NULL) == NULL) {
                     rv = 1;
                 } else {
                     b = b->next;
@@ -1603,9 +1609,9 @@ int main(int argc, char **argv)
     }
 
   clean_up:
-    free_buf_list(b);
-    free_buf_list(cl);
-    free_buf_list(p);
+    free_gapbuf_list(b);
+    free_gapbuf_list(cl);
+    free_gapbuf_list(p);
     free(sb);
     if (stdscr != NULL)
         if (endwin() == ERR)
