@@ -34,7 +34,7 @@
  * cool(goat, mice)
  * undefine([cool])
  * define(cool, wow)
- * dumpdef([cool], [y])
+ * dumpdef([cool], [y], [define])
  * hello dnl this will be removed
  * divnum
  * divert(2)
@@ -104,7 +104,7 @@
 #define getch(b, read_stdin) (b->i ? *(b->a + --b->i) \
     : (read_stdin ? getchar() : EOF))
 
-#define GAP_SIZE(b) (b->s - b->i)
+#define BUF_FREE_SIZE(b) (b->s - b->i)
 
 struct buf {
     char *a;
@@ -162,7 +162,7 @@ int grow_buf(struct buf *b, size_t will_use)
     char *t;
     size_t new_s;
     /* Gap is big enough, nothing to do */
-    if (will_use <= GAP_SIZE(b))
+    if (will_use <= BUF_FREE_SIZE(b))
         return 0;
     if (MOF(b->s, 2))
         return 1;
@@ -212,7 +212,7 @@ int include(struct buf *b, char *fn)
 
     if (filesize(fn, &fs))
         return 1;
-    if (fs > GAP_SIZE(b) && grow_buf(b, fs))
+    if (fs > BUF_FREE_SIZE(b) && grow_buf(b, fs))
         return 1;
     if ((fp = fopen(fn, "rb")) == NULL)
         return 1;
@@ -365,22 +365,26 @@ size_t hash_str(char *s)
     return h % HASH_TABLE_SIZE;
 }
 
-void htdist(struct entry **ht) {
-   struct entry *e;
-   size_t freq[101] = {0}, count, k;
-   for (k = 0; k < HASH_TABLE_SIZE; ++k) {
+void htdist(struct entry **ht)
+{
+    struct entry *e;
+    size_t freq[101] = { 0 }, count, k;
+    for (k = 0; k < HASH_TABLE_SIZE; ++k) {
         e = *(ht + k);
         count = 0;
         while (e != NULL) {
-             e = e->next;
-             ++count;
+            e = e->next;
+            ++count;
         }
         count < 100 ? ++*(freq + count) : ++*(freq + 100);
-   }
-   fprintf(stderr, "entries_per_bucket number_of_buckets\n");
-   for (k = 0; k < 100; k++)
-       if (*(freq + k)) fprintf(stderr, "%lu %lu\n", k, *(freq + k));
-   if (*(freq + 100)) fprintf(stderr, ">=100 %lu\n", *(freq + 100));
+    }
+    fprintf(stderr, "entries_per_bucket number_of_buckets\n");
+    for (k = 0; k < 100; k++)
+        if (*(freq + k))
+            fprintf(stderr, "%lu %lu\n", (unsigned long) k,
+                    (unsigned long) *(freq + k));
+    if (*(freq + 100))
+        fprintf(stderr, ">=100 %lu\n", (unsigned long) *(freq + 100));
 }
 
 struct entry *lookup_entry(struct entry **ht, char *name)
@@ -551,7 +555,7 @@ void free_stack(struct mcall *stack)
 int put_str(struct buf *b, char *s)
 {
     size_t len = strlen(s);
-    if (len > GAP_SIZE(b) && grow_buf(b, len))
+    if (len > BUF_FREE_SIZE(b) && grow_buf(b, len))
         return 1;
     memcpy(b->a + b->i, s, len);
     b->i += len;
@@ -569,7 +573,7 @@ int sub_args(struct buf *result, struct mcall *stack)
             dollar_enc = 1;
         } else if (dollar_enc && isdigit(ch) && ch != '0') {
             b = *(stack->arg_buf + (ch - '0'));
-            if (b->i > GAP_SIZE(result) && grow_buf(result, b->i))
+            if (b->i > BUF_FREE_SIZE(result) && grow_buf(result, b->i))
                 return 1;
             memcpy(result->a + result->i, b->a, b->i);
             result->i += b->i;
@@ -644,7 +648,7 @@ int str_to_num(char *s, size_t * num)
 
 int buf_dump_buf(struct buf *dst, struct buf *src)
 {
-    if (src->i > GAP_SIZE(dst) && grow_buf(dst, src->i))
+    if (src->i > BUF_FREE_SIZE(dst) && grow_buf(dst, src->i))
         return 1;
     memcpy(dst->a + dst->i, src->a, src->i);
     dst->i += src->i;
@@ -742,6 +746,12 @@ int main(int argc, char **argv)
     if (upsert_entry(ht, "htdist", NULL))
         QUIT;
     if (upsert_entry(ht, "dirsep", NULL))
+        QUIT;
+    if (upsert_entry(ht, "add", NULL))
+        QUIT;
+    if (upsert_entry(ht, "mult", NULL))
+        QUIT;
+    if (upsert_entry(ht, "sub", NULL))
         QUIT;
 
     if (argc > 1) {
@@ -1028,6 +1038,20 @@ int main(int argc, char **argv)
         htdist(ht); \
     } else if (!strcmp(SN, "dirsep")) { \
         if (ungetstr(input, DIRSEP)) \
+            QUIT; \
+    } else if (!strcmp(SN, "add")) { \
+        w = 0; \
+        for (k = 1; k < 10; ++k) { \
+            if (*ARG(k) != '\0') { \
+                if (str_to_num(ARG(k), &n)) \
+                    EQUIT("add: Invalid number"); \
+                if (AOF(w, n)) \
+                    EQUIT("add: Integer overflow"); \
+                w += n; \
+            } \
+        } \
+        snprintf(num, NUM_SIZE, "%lu", (unsigned long) w); \
+        if (ungetstr(input, num)) \
             QUIT; \
     } \
 } while (0)
