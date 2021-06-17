@@ -205,6 +205,7 @@ struct gapbuf {
     (unsigned long) (x))
 #define PHY_ATTR_OFF printf("\033[m")
 #define PHY_INVERSE_VIDEO printf("\033[7m")
+/* #define PHY_INVERSE_VIDEO printf("\033[1m") */
 
 #define BUF_FREE_SIZE(b) (b->s - b->i)
 
@@ -225,7 +226,7 @@ struct graph {
     size_t sa;                  /* Screen area (real) */
     size_t v;                   /* Virtual index */
     int hard;                   /* Clear the physical screen */
-  int iv;                       /* Inverse video mode */
+    int iv;                      /* Inverse video mode */
     struct buf *input;            /* Keyboard input buffer */
 #ifndef _WIN32
     struct termios t_orig;      /* Original terminal attributes */
@@ -261,11 +262,14 @@ WINDOW *stdscr = NULL;
 
 #define STANDOUT_TO_EOL() do { \
     if (stdscr->v < stdscr->sa) { \
-        do { \
+        *(stdscr->ns + stdscr->v) \
+	    = (char) (*(stdscr->ns + stdscr->v) | 0x80); \
+        ++stdscr->v; \
+	while (stdscr->v < stdscr->sa && stdscr->v % stdscr->w) { \
             *(stdscr->ns + stdscr->v) \
 	        = (char) (*(stdscr->ns + stdscr->v) | 0x80); \
             ++stdscr->v; \
-        } while (stdscr->v < stdscr->sa && stdscr->v % stdscr->w); \
+	} \
         ret = OK; \
     } else { \
         ret = ERR; \
@@ -554,7 +558,7 @@ void diff_draw(void)
 	    /* Inverse video mode */
 	    if (IVON(ch) && !IVON(k)) PHY_INVERSE_VIDEO;
 	    else if (!IVON(ch) && IVON(k)) PHY_ATTR_OFF;
-            putchar(ch);
+            putchar(ch & 0x7F);
         } else {
             in_pos = 0;
         }
