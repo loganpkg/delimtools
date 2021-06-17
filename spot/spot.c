@@ -27,7 +27,7 @@
  * $ cc -ansi -g -O3 -Wall -Wextra -pedantic spot.c -lncurses && mv a.out spot
  * or:
  *
- * > cd C:\Users\logan\Documents\PDCurses-3.9\PDCurses-3.9\wincon 
+ * > cd C:\Users\logan\Documents\PDCurses-3.9\PDCurses-3.9\wincon
  * > nmake -f Makefile.vc
  * > cd C:\Users\logan\Documents\spot
  * > cl spot.c pdcurses.lib User32.Lib AdvAPI32.Lib ^
@@ -40,7 +40,7 @@
  * The keybindings are shown below the #include statements.
  */
 
-#define USE_CURSES
+/* #define USE_CURSES */
 
 #ifdef __linux__
 #define _GNU_SOURCE
@@ -52,12 +52,16 @@
 #ifdef _WIN32
 #include <io.h>
 #else
+#include <sys/ioctl.h>
 #include <sys/wait.h>
+#include <termios.h>
 #include <unistd.h>
 #endif
 
 #ifdef USE_CURSES
 #include <curses.h>
+#else
+#include <stdio.h>
 #endif
 
 #include <fcntl.h>
@@ -126,10 +130,10 @@ NULL \
 #define ISASCII(x) ((x) >= 0 && (x) <= 127)
 
 /* Converts a lowercase letter to it's control value */
-#define CTRL(l) ((l) - 'a' + 1)
+#define C(l) ((l) - 'a' + 1)
 
 /* Control spacebar or control @ */
-#define CTRL_SPC 0
+#define C_2 0
 
 /* Escape key */
 #define ESC 27
@@ -176,6 +180,437 @@ struct gapbuf {
     int mod;                    /* Gap buffer text has been modified */
     struct gapbuf *next;        /* Next gap buffer node */
 };
+
+#ifdef USE_CURSES
+#define PRINTCH(ch) ret = addch(ch)
+#define MOVE_CURSOR(y, x) ret = move(y, x)
+#define GET_CURSOR(y, x) getyx(stdscr, y, x)
+#define GET_MAX(y, x) getmaxyx(stdscr, y, x)
+#define CLEAR_DOWN() ret = clrtobot()
+#define STANDOUT_TO_EOL() ret = chgat(width, A_STANDOUT, 0, NULL)
+#else
+
+
+/*
+ * Double buffering terminal graphics
+ */
+
+#define ERR -1
+#define OK 0
+
+/* ANSI escape sequences */
+#define PHY_CLEAR_SCREEN() printf("\033[2J")
+/* Index starts at one. Top left is (1, 1) */
+#define PHY_MOVE_CURSOR(y, x) printf("\033[%lu;%luH", (unsigned long) (y), \
+    (unsigned long) (x))
+#define PHY_ATTR_OFF printf("\033[m")
+#define PHY_INVERSE_VIDEO printf("\033[7m")
+
+#define BUF_FREE_SIZE(b) (b->s - b->i)
+
+struct buf {
+    char *a;
+    size_t i;
+    size_t s;
+};
+
+#define INIT_BUF_SIZE 512
+
+struct graph {
+    char *ns;                   /* Next screen (virtual) */
+    char *cs;                   /* Current screen (virtual) */
+    size_t vms;                 /* Virtual memory size */
+    size_t h;                   /* Screen height (real) */
+    size_t w;                   /* Screen width (real) */
+    size_t sa;                  /* Screen area (real) */
+    size_t v;                   /* Virtual index */
+    int hard;                   /* Clear the physical screen */
+  int iv;                       /* Inverse video mode */
+    struct buf *input;            /* Keyboard input buffer */
+#ifndef _WIN32
+    struct termios t_orig;      /* Original terminal attributes */
+#endif
+};
+
+typedef struct graph WINDOW;
+
+/* Global */
+WINDOW *stdscr = NULL;
+
+/* Number of spaces used to display a tab (must be at least 1) */
+#define TABSIZE 4
+
+/* Index starts from zero. Top left is (0, 0). Sets ret. */
+#define MOVE_CURSOR(y, x) do { \
+    if ((y) < stdscr->h && (x) < stdscr->w) { \
+        stdscr->v = (y) * stdscr->w + (x); \
+        ret = OK; \
+    } else { \
+        ret = ERR; \
+    } \
+} while (0)
+
+#define CLEAR_DOWN() do { \
+    if (stdscr->v < stdscr->sa) { \
+        memset(stdscr->ns + stdscr->v, ' ', stdscr->sa - stdscr->v); \
+        ret = 0; \
+    } else { \
+        ret = 1; \
+    } \
+} while (0)
+
+#define STANDOUT_TO_EOL() do { \
+    if (stdscr->v < stdscr->sa) { \
+        do { \
+            *(stdscr->ns + stdscr->v) \
+	        = (char) (*(stdscr->ns + stdscr->v) | 0x80); \
+            ++stdscr->v; \
+        } while (stdscr->v < stdscr->sa && stdscr->v % stdscr->w); \
+        ret = OK; \
+    } else { \
+        ret = ERR; \
+    } \
+} while (0)
+
+
+#define GET_CURSOR_Y(y) y = stdscr->v / stdscr->w
+
+#define GET_CURSOR_X(x) x = stdscr->v % stdscr->w
+
+#define GET_CURSOR(y, x) do { \
+    GET_CURSOR_Y(y); \
+    GET_CURSOR_X(x); \
+} while (0)
+
+#define GET_MAX(y, x) do { \
+    y = stdscr->h; \
+    x = stdscr->w; \
+} while (0)
+
+/*
+ * Prints a character to the virtual screen.
+ * Evaluates ch more than once. Sets ret.
+ */
+
+/* Will not equal ERR */
+#define standout() (stdscr->iv = 1)
+#define standend() (stdscr->iv = 0)
+
+/* If inverse video mode is on then set the highest bit on the char */
+#define IVCH(ch) (stdscr->iv ? (char) ((ch) | 0x80) : (ch))
+
+#define IVON(ch) ((ch) & 0x80)
+
+#define PRINTCH(ch) do { \
+    if (stdscr->v < stdscr->sa) { \
+        if (isgraph(ch) || ch == ' ') { \
+	  *(stdscr->ns + stdscr->v++) = IVCH(ch); \
+        } else if (ch == '\n') { \
+	  *(stdscr->ns + stdscr->v++) = IVCH(' '); \
+            if (stdscr->v % stdscr->w) \
+                stdscr->v = (stdscr->v / stdscr->w + 1) * stdscr->w; \
+        } else if (ch == '\t') { \
+	  memset(stdscr->ns + stdscr->v, IVCH(' '), TABSIZE); \
+            stdscr->v += TABSIZE; \
+        } else { \
+            *(stdscr->ns + stdscr->v++) = IVCH('?'); \
+        } \
+        ret = OK; \
+	} else {   \
+        ret = ERR; \
+	  }	   \
+} while (0)
+
+int addnstr(char *str, int n) {
+  char ch;
+  int ret;
+  while (n-- && (ch = *str++)) {
+    PRINTCH(ch);
+    if (ret == ERR) return ERR;
+  }
+  return OK;
+}
+
+struct buf *init_buf(void)
+{
+    struct buf *b;
+    if ((b = malloc(sizeof(struct buf))) == NULL)
+        return NULL;
+    if ((b->a = malloc(INIT_BUF_SIZE)) == NULL) {
+        free(b);
+        return NULL;
+    }
+    b->s = INIT_BUF_SIZE;
+    b->i = 0;
+    return b;
+}
+
+void free_buf(struct buf *b)
+{
+    if (b != NULL) {
+        free(b->a);
+        free(b);
+    }
+}
+
+int grow_buf(struct buf *b, size_t will_use)
+{
+    char *t;
+    size_t new_s;
+    /* Gap is big enough, nothing to do */
+    if (will_use <= BUF_FREE_SIZE(b))
+        return 0;
+    if (MOF(b->s, 2))
+        return 1;
+    new_s = b->s * 2;
+    if (AOF(new_s, will_use))
+        new_s += will_use;
+    if ((t = realloc(b->a, new_s)) == NULL)
+        return 1;
+    b->a = t;
+    b->s = new_s;
+    return 0;
+}
+
+int get_screen_size(size_t * height, size_t * width)
+{
+    /* Gets the screen size */
+#ifdef _WIN32
+    HANDLE out;
+    CONSOLE_SCREEN_BUFFER_INFO info;
+    if ((out = GetStdHandle(STD_OUTPUT_HANDLE)) == INVALID_HANDLE_VALUE)
+        return 1;
+    if (!GetConsoleScreenBufferInfo(out, &info))
+        return 1;
+    *height = info.srWindow.Bottom - info.srWindow.Top + 1;
+    *width = info.srWindow.Right - info.srWindow.Left + 1;
+    return 0;
+#else
+    struct winsize ws;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1)
+        return 1;
+    *height = ws.ws_row;
+    *width = ws.ws_col;
+    return 0;
+#endif
+}
+
+int erase(void)
+{
+    size_t new_h, new_w, req_vms;
+    char *tmp_ns, *tmp_cs;
+    if (get_screen_size(&new_h, &new_w))
+        return ERR;
+
+    /* Reset virtual index */
+    stdscr->v = 0;
+
+    /* Clear hard or change in screen dimensions */
+    if (stdscr->hard || new_h != stdscr->h || new_w != stdscr->w) {
+        stdscr->h = new_h;
+        stdscr->w = new_w;
+        if (MOF(stdscr->h, stdscr->w))
+            return ERR;
+        stdscr->sa = stdscr->h * stdscr->w;
+        /*
+         * Add TABSIZE to the end of the virtual screen to
+         * allow for characters to be printed off the screen.
+         * Assumes that tab consumes the most screen space
+         * out of all the characters.
+         */
+        if (AOF(stdscr->sa, TABSIZE))
+            return ERR;
+        req_vms = stdscr->sa + TABSIZE;
+        /* Bigger screen */
+        if (stdscr->vms < req_vms) {
+            if ((tmp_ns = malloc(req_vms)) == NULL)
+                return ERR;
+            if ((tmp_cs = malloc(req_vms)) == NULL) {
+                free(tmp_ns);
+                return ERR;
+            }
+            free(stdscr->ns);
+            stdscr->ns = tmp_ns;
+            free(stdscr->cs);
+            stdscr->cs = tmp_cs;
+            stdscr->vms = req_vms;
+        }
+        /*
+         * Clear the virtual current screen. No need to erase the
+         * virtual screen beyond the physical screen size.
+         */
+        memset(stdscr->cs, ' ', stdscr->sa);
+        PHY_CLEAR_SCREEN();
+	stdscr->hard = 0;
+    }
+    /* Clear the virtual next screen */
+    memset(stdscr->ns, ' ', stdscr->sa);
+    return OK;
+}
+
+int clear(void)
+{
+  stdscr->hard = 1;
+  return erase();
+}
+
+int endwin(void)
+{
+   int ret = OK;
+    /* Screen is not initialised */
+    if (stdscr == NULL) return ERR;
+    PHY_CLEAR_SCREEN();
+#ifndef _WIN32
+    if (tcsetattr(STDIN_FILENO, TCSANOW, &stdscr->t_orig))
+        ret = ERR;
+#endif
+        free(stdscr->ns);
+        free(stdscr->cs);
+	free_buf(stdscr->input);
+        free(stdscr);
+    return ret;
+}
+
+WINDOW *initscr(void) {
+#ifdef _WIN32
+    HANDLE out;
+    DWORD mode;
+#else
+    struct termios term_orig, term_new;
+#endif
+
+        /* Error, screen is already initialised */
+    if (stdscr != NULL) return NULL;
+
+#ifdef _WIN32
+    /* Check input is from a terminal */
+    if (!_isatty(_fileno(stdin)))
+        return NULL;
+    /* Turn on interpretation of VT100-like escape sequences */
+    if ((out = GetStdHandle(STD_OUTPUT_HANDLE)) == INVALID_HANDLE_VALUE)
+        return NULL;
+    if (!GetConsoleMode(out, &mode))
+        return NULL;
+    if (!SetConsoleMode(out, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING))
+        return NULL;
+#else
+    if (!isatty(STDIN_FILENO))
+        return NULL;
+    /* Change terminal input to raw and no echo */
+    if (tcgetattr(STDIN_FILENO, &term_orig))
+        return NULL;
+    term_new = term_orig;
+    cfmakeraw(&term_new);
+    if (tcsetattr(STDIN_FILENO, TCSANOW, &term_new))
+        return NULL;
+#endif
+
+  if ((stdscr = calloc(1, sizeof(WINDOW))) == NULL) {
+#ifndef _WIN32
+    tcsetattr(STDIN_FILENO, TCSANOW, &term_orig);
+#endif
+        return NULL;
+  }
+
+    if ((stdscr->input = init_buf()) == NULL) {
+#ifndef _WIN32
+    tcsetattr(STDIN_FILENO, TCSANOW, &term_orig);
+#endif
+    free(stdscr);
+    stdscr = NULL;
+    return NULL;
+    }
+
+    if (clear()) {
+#ifndef _WIN32
+    tcsetattr(STDIN_FILENO, TCSANOW, &term_orig);
+#endif
+    free_buf(stdscr->input);
+    free(stdscr);
+    stdscr = NULL;
+    return NULL;
+    }
+
+#ifndef _WIN32
+    stdscr->t_orig = term_orig;
+#endif
+
+    return stdscr;
+}
+
+void diff_draw(void)
+{
+    /* Physically draw the screen where the virtual screens differ */
+    int in_pos = 0;             /* In position for printing */
+    char ch, k;
+    size_t i;
+    for (i = 0; i < stdscr->sa; ++i) {
+      if ((ch = *(stdscr->ns + i)) != (k = *(stdscr->cs + i))) {
+            if (!in_pos) {
+                /* Top left corner is (1, 1) not (0, 0) so need to add one */
+                PHY_MOVE_CURSOR(i / stdscr->w + 1, i % stdscr->w + 1);
+                in_pos = 1;
+            }
+	    /* Inverse video mode */
+	    if (IVON(ch) && !IVON(k)) PHY_INVERSE_VIDEO;
+	    else if (!IVON(ch) && IVON(k)) PHY_ATTR_OFF;
+            putchar(ch);
+        } else {
+            in_pos = 0;
+        }
+    }
+}
+
+int refresh(void)
+{
+    char *t;
+    diff_draw();
+    /* Set physical cursor to the position of the virtual cursor */
+    if (stdscr->v < stdscr->sa)
+        PHY_MOVE_CURSOR(stdscr->v / stdscr->w + 1, stdscr->v % stdscr->w + 1);
+    else
+        PHY_MOVE_CURSOR(stdscr->h, stdscr->w);
+    /* Swap virtual screens */
+    t = stdscr->cs;
+    stdscr->cs = stdscr->ns;
+    stdscr->ns = t;
+    return OK;
+}
+
+
+#ifdef _WIN32
+#define GETCH_RAW() _getch()
+#else
+#define GETCH_RAW() getchar()
+#endif
+
+#define GETCH() (stdscr->input->i ? *(stdscr->input->a + --stdscr->input->i) : GETCH_RAW())
+
+int ungetch(int ch)
+{
+    if (stdscr->input->i == stdscr->input->s)
+        if (grow_buf(stdscr->input, 1))
+            return EOF;
+    return *(stdscr->input->a + stdscr->input->i++) = ch;
+}
+
+#define KEY_ENTER 343
+#define KEY_DC 330
+#define KEY_BACKSPACE 263
+#define KEY_LEFT 260
+#define KEY_RIGHT 261
+#define KEY_UP 259
+#define KEY_DOWN 258
+#define KEY_HOME 262
+#define KEY_END 360
+
+int getch(void) {
+  /* Todo: Process multi-char keys */
+  return GETCH();
+}
+
+#endif
+
 
 struct gapbuf *init_gapbuf(void)
 {
@@ -962,6 +1397,8 @@ int init_ncurses(void)
     /* Starts ncurses */
     if (initscr() == NULL)
         return 1;
+
+#ifdef USE_CURSES
     if (raw() == ERR) {
         endwin();
         return 1;
@@ -974,6 +1411,8 @@ int init_ncurses(void)
         endwin();
         return 1;
     }
+#endif
+
     return 0;
 }
 
@@ -1013,16 +1452,18 @@ int draw_screen(struct gapbuf *b, struct gapbuf *cl, int cl_active,
     /* Draws a gap buffer to the screen, including the command line gap buffer */
     char *q, ch;
     int height, width;          /* Screen size */
-    size_t w;                   /* Screen width as size_t */
+    size_t h, w;                /* Screen size as size_t */
     int cy, cx;                 /* Final cursor position */
     int y, x;                   /* Changing cursor position */
     int centred = 0;            /* Indicates if centreing has occurred */
-    int rv_a = 0;               /* Return value of addch */
+    int ret = 0;                /* Macro "return value" */
 
-    getmaxyx(stdscr, height, width);
+    GET_MAX(height, width);
 
     if (height < 1 || width < 1)
         return 1;
+    h = (size_t) height;
+    w = (size_t) width;
 
     /* Cursor is above the screen */
     if (req_centre || b->c < INDEX_TO_POINTER(b, d)) {
@@ -1058,9 +1499,10 @@ int draw_screen(struct gapbuf *b, struct gapbuf *cl, int cl_active,
     ? ch : (ch == '\0' ? '~' : '?'))
 
         ch = *q;
-        rv_a = addch(DISPLAYCH(ch));
-        getyx(stdscr, y, x);
-        if ((height >= 3 && y >= height - 2) || rv_a == ERR) {
+	ch = DISPLAYCH(ch);
+        PRINTCH(ch);
+        GET_CURSOR(y, x);
+        if ((height >= 3 && y >= height - 2) || ret == ERR) {
             /* Cursor out of text portion of the screen */
             if (!centred) {
                 centre_cursor(b, height >= 3 ? height - 2 : height);
@@ -1089,7 +1531,7 @@ int draw_screen(struct gapbuf *b, struct gapbuf *cl, int cl_active,
 
     /* Record cursor position */
     if (!cl_active)
-        getyx(stdscr, cy, cx);
+        GET_CURSOR(cy, cx);
     /* After gap */
     q = b->c;
     while (q <= b->e) {
@@ -1098,18 +1540,20 @@ int draw_screen(struct gapbuf *b, struct gapbuf *cl, int cl_active,
             if (standend() == ERR)
                 return 1;
         ch = *q;
-        rv_a = addch(DISPLAYCH(ch));
-        getyx(stdscr, y, x);
-        if ((height >= 3 && y >= height - 2) || rv_a == ERR)
+	ch = DISPLAYCH(ch);
+        PRINTCH(ch);
+        GET_CURSOR(y, x);
+        if ((height >= 3 && y >= height - 2) || ret == ERR)
             break;
         ++q;
     }
 
     if (height >= 3) {
         /* Status bar */
-        if (move(height - 2, 0) == ERR)
+        MOVE_CURSOR(h - 2, 0);
+        if (ret == ERR)
             return 1;
-        w = (size_t) width;
+
         /* sb_s needs to include the '\0' terminator */
         if (w >= *sb_s) {
             free(*sb);
@@ -1129,15 +1573,21 @@ int draw_screen(struct gapbuf *b, struct gapbuf *cl, int cl_active,
         if (addnstr(*sb, width) == ERR)
             return 1;
         /* Highlight status bar */
-        if (mvchgat(height - 2, 0, width, A_STANDOUT, 0, NULL) == ERR)
+        MOVE_CURSOR(h - 2, 0);
+        if (ret == ERR)
+            return 1;
+	STANDOUT_TO_EOL();
+        if (ret == ERR)
             return 1;
 
         /* Command line gap buffer */
-        if (move(height - 1, 0) == ERR)
+	MOVE_CURSOR(h - 1, 0);
+        if (ret == ERR)
             return 1;
 
       cl_draw_start:
-        if (clrtobot() == ERR)
+	CLEAR_DOWN();
+        if (ret == ERR)
             return 1;
 
         /* Commence from draw start */
@@ -1154,7 +1604,9 @@ int draw_screen(struct gapbuf *b, struct gapbuf *cl, int cl_active,
                 if (standout() == ERR)
                     return 1;
             ch = *q;
-            if (addch(DISPLAYCH(ch)) == ERR) {
+	    ch = DISPLAYCH(ch);
+	    PRINTCH(ch);
+            if (ret == ERR) {
                 /* Draw from the cursor */
                 cl->d = cl->g - cl->a;
                 goto cl_draw_start;
@@ -1176,7 +1628,7 @@ int draw_screen(struct gapbuf *b, struct gapbuf *cl, int cl_active,
 
         /* Record cursor position */
         if (cl_active)
-            getyx(stdscr, cy, cx);
+            GET_CURSOR(cy, cx);
         /* After gap */
         q = cl->c;
         while (q <= cl->e) {
@@ -1185,14 +1637,17 @@ int draw_screen(struct gapbuf *b, struct gapbuf *cl, int cl_active,
                 if (standend() == ERR)
                     return 1;
             ch = *q;
-            if (addch(DISPLAYCH(ch)) == ERR)
+	    ch = DISPLAYCH(ch);
+	    PRINTCH(ch);
+            if (ret == ERR)
                 break;
             ++q;
         }
     }
 
     /* Position cursor */
-    if (move(cy, cx) == ERR)
+    MOVE_CURSOR((size_t) cy, (size_t) cx);
+    if (ret == ERR)
         return 1;
     if (refresh() == ERR)
         return 1;
@@ -1369,7 +1824,7 @@ int main(int argc, char **argv)
         x = getch();
 
         mult = 0;
-        if (x == CTRL('u')) {
+        if (x == C('u')) {
             x = getch();
             while (ISASCII(x) && isdigit(x)) {
                 if (MOF(mult, 10)) {
@@ -1422,10 +1877,10 @@ int main(int argc, char **argv)
             goto top;
         }
         switch (x) {
-        case CTRL_SPC:
+        case C_2:
             set_mark(z);
             break;
-        case CTRL('g'):
+        case C('g'):
             if (z->m_set) {
                 /* Clear mark if set */
                 clear_mark(z);
@@ -1435,83 +1890,83 @@ int main(int argc, char **argv)
                 operation = ' ';
             }
             break;
-        case CTRL('h'):
+        case C('h'):
         case KEY_BACKSPACE:
             rv = backspace_ch(z, mult);
             break;
-        case CTRL('b'):
+        case C('b'):
         case KEY_LEFT:
             rv = left_ch(z, mult);
             break;
-        case CTRL('f'):
+        case C('f'):
         case KEY_RIGHT:
             rv = right_ch(z, mult);
             break;
-        case CTRL('p'):
+        case C('p'):
         case KEY_UP:
             rv = up_line(z, mult);
             persist_sc = 1;
             break;
-        case CTRL('n'):
+        case C('n'):
         case KEY_DOWN:
             rv = down_line(z, mult);
             persist_sc = 1;
             break;
-        case CTRL('a'):
+        case C('a'):
         case KEY_HOME:
             start_of_line(z);
             break;
-        case CTRL('e'):
+        case C('e'):
         case KEY_END:
             end_of_line(z);
             break;
-        case CTRL('d'):
+        case C('d'):
         case KEY_DC:
             rv = delete_ch(z, mult);
             break;
-        case CTRL('l'):
+        case C('l'):
             req_centre = 1;
             req_clear = 1;
             break;
-        case CTRL('s'):
+        case C('s'):
             /* Search */
             DELETEGAPBUF(cl);
             operation = 's';
             cl_active = 1;
             break;
-        case CTRL('r'):
+        case C('r'):
             /* Rename gap buffer */
             DELETEGAPBUF(cl);
             operation = 'r';
             cl_active = 1;
             break;
-        case CTRL('w'):
+        case C('w'):
             DELETEGAPBUF(p);
             rv = cut_region(z, p);
             break;
-        case CTRL('c'):
+        case C('c'):
             /* Cut, inserting at end of paste gap buffer */
             rv = cut_region(z, p);
             break;
-        case CTRL('y'):
+        case C('y'):
             rv = paste(z, p, mult);
             break;
-        case CTRL('k'):
+        case C('k'):
             DELETEGAPBUF(p);
             rv = cut_to_eol(z, p);
             break;
-        case CTRL('t'):
+        case C('t'):
             trim_clean(z);
             break;
-        case CTRL('q'):
+        case C('q'):
             rv = insert_hex(z, mult);
             break;
-        case CTRL('x'):
+        case C('x'):
             switch (x = getch()) {
-            case CTRL('c'):
+            case C('c'):
                 running = 0;
                 break;
-            case CTRL('s'):
+            case C('s'):
                 rv = write_file(z);
                 break;
             case 'i':
@@ -1520,7 +1975,7 @@ int main(int argc, char **argv)
                 operation = 'i';
                 cl_active = 1;
                 break;
-            case CTRL('f'):
+            case C('f'):
                 /* New gap buffer */
                 DELETEGAPBUF(cl);
                 operation = 'n';
