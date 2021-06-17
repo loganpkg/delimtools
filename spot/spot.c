@@ -40,6 +40,7 @@
  * The keybindings are shown below the #include statements.
  */
 
+/* Uncomment this to build with ncurses or PDCurses */
 /* #define USE_CURSES */
 
 #ifdef __linux__
@@ -50,7 +51,7 @@
 #include <sys/stat.h>
 
 #ifdef _WIN32
-#include <io.h>
+#include <windows.h>
 #else
 #include <sys/ioctl.h>
 #include <sys/wait.h>
@@ -190,11 +191,9 @@ struct gapbuf {
 #define STANDOUT_TO_EOL() ret = chgat(width, A_STANDOUT, 0, NULL)
 #else
 
-
 /*
  * Double buffering terminal graphics
  */
-
 #define ERR -1
 #define OK 0
 
@@ -205,7 +204,6 @@ struct gapbuf {
     (unsigned long) (x))
 #define PHY_ATTR_OFF printf("\033[m")
 #define PHY_INVERSE_VIDEO printf("\033[7m")
-/* #define PHY_INVERSE_VIDEO printf("\033[1m") */
 
 #define BUF_FREE_SIZE(b) (b->s - b->i)
 
@@ -226,9 +224,9 @@ struct graph {
     size_t sa;                  /* Screen area (real) */
     size_t v;                   /* Virtual index */
     int hard;                   /* Clear the physical screen */
-    int iv;                      /* Inverse video mode (virtual) */
-  int phy_iv;                    /* Mirrors the physical inverse video mode */
-    struct buf *input;            /* Keyboard input buffer */
+    int iv;                     /* Inverse video mode (virtual) */
+    int phy_iv;                 /* Mirrors the physical inverse video mode */
+    struct buf *input;          /* Keyboard input buffer */
 #ifndef _WIN32
     struct termios t_orig;      /* Original terminal attributes */
 #endif
@@ -277,7 +275,6 @@ WINDOW *stdscr = NULL;
     } \
 } while (0)
 
-
 #define GET_CURSOR_Y(y) y = stdscr->v / stdscr->w
 
 #define GET_CURSOR_X(x) x = stdscr->v % stdscr->w
@@ -297,7 +294,7 @@ WINDOW *stdscr = NULL;
  * Evaluates ch more than once. Sets ret.
  */
 
-/* Will not equal ERR */
+/* Will not equal ERR, so there is no problem in testing against ERR */
 #define standout() (stdscr->iv = 1)
 #define standend() (stdscr->iv = 0)
 
@@ -326,14 +323,16 @@ WINDOW *stdscr = NULL;
 	  }	   \
 } while (0)
 
-int addnstr(char *str, int n) {
-  char ch;
-  int ret;
-  while (n-- && (ch = *str++)) {
-    PRINTCH(ch);
-    if (ret == ERR) return ERR;
-  }
-  return OK;
+int addnstr(char *str, int n)
+{
+    char ch;
+    int ret;
+    while (n-- && (ch = *str++)) {
+        PRINTCH(ch);
+        if (ret == ERR)
+            return ERR;
+    }
+    return OK;
 }
 
 struct buf *init_buf(void)
@@ -445,10 +444,10 @@ int erase(void)
          * virtual screen beyond the physical screen size.
          */
         memset(stdscr->cs, ' ', stdscr->sa);
+        PHY_ATTR_OFF;
+        stdscr->phy_iv = 0;
         PHY_CLEAR_SCREEN();
-	stdscr->hard = 0;
-	PHY_ATTR_OFF;
-	stdscr->phy_iv = 0;
+        stdscr->hard = 0;
     }
     /* Clear the virtual next screen */
     memset(stdscr->ns, ' ', stdscr->sa);
@@ -457,29 +456,31 @@ int erase(void)
 
 int clear(void)
 {
-  stdscr->hard = 1;
-  return erase();
+    stdscr->hard = 1;
+    return erase();
 }
 
 int endwin(void)
 {
-   int ret = OK;
+    int ret = OK;
     /* Screen is not initialised */
-    if (stdscr == NULL) return ERR;
-    PHY_CLEAR_SCREEN();
+    if (stdscr == NULL)
+        return ERR;
     PHY_ATTR_OFF;
+    PHY_CLEAR_SCREEN();
 #ifndef _WIN32
     if (tcsetattr(STDIN_FILENO, TCSANOW, &stdscr->t_orig))
         ret = ERR;
 #endif
-        free(stdscr->ns);
-        free(stdscr->cs);
-	free_buf(stdscr->input);
-        free(stdscr);
+    free(stdscr->ns);
+    free(stdscr->cs);
+    free_buf(stdscr->input);
+    free(stdscr);
     return ret;
 }
 
-WINDOW *initscr(void) {
+WINDOW *initscr(void)
+{
 #ifdef _WIN32
     HANDLE out;
     DWORD mode;
@@ -487,8 +488,9 @@ WINDOW *initscr(void) {
     struct termios term_orig, term_new;
 #endif
 
-        /* Error, screen is already initialised */
-    if (stdscr != NULL) return NULL;
+    /* Error, screen is already initialised */
+    if (stdscr != NULL)
+        return NULL;
 
 #ifdef _WIN32
     /* Check input is from a terminal */
@@ -513,32 +515,31 @@ WINDOW *initscr(void) {
         return NULL;
 #endif
 
-  if ((stdscr = calloc(1, sizeof(WINDOW))) == NULL) {
+    if ((stdscr = calloc(1, sizeof(WINDOW))) == NULL) {
 #ifndef _WIN32
-    tcsetattr(STDIN_FILENO, TCSANOW, &term_orig);
+        tcsetattr(STDIN_FILENO, TCSANOW, &term_orig);
 #endif
         return NULL;
-  }
+    }
 
     if ((stdscr->input = init_buf()) == NULL) {
 #ifndef _WIN32
-    tcsetattr(STDIN_FILENO, TCSANOW, &term_orig);
+        tcsetattr(STDIN_FILENO, TCSANOW, &term_orig);
 #endif
-    free(stdscr);
-    stdscr = NULL;
-    return NULL;
+        free(stdscr);
+        stdscr = NULL;
+        return NULL;
     }
 
     if (clear()) {
 #ifndef _WIN32
-    tcsetattr(STDIN_FILENO, TCSANOW, &term_orig);
+        tcsetattr(STDIN_FILENO, TCSANOW, &term_orig);
 #endif
-    free_buf(stdscr->input);
-    free(stdscr);
-    stdscr = NULL;
-    return NULL;
+        free_buf(stdscr->input);
+        free(stdscr);
+        stdscr = NULL;
+        return NULL;
     }
-
 #ifndef _WIN32
     stdscr->t_orig = term_orig;
 #endif
@@ -553,20 +554,20 @@ void draw_diff(void)
     char ch;
     size_t i;
     for (i = 0; i < stdscr->sa; ++i) {
-      if ((ch = *(stdscr->ns + i)) != *(stdscr->cs + i)) {
+        if ((ch = *(stdscr->ns + i)) != *(stdscr->cs + i)) {
             if (!in_pos) {
                 /* Top left corner is (1, 1) not (0, 0) so need to add one */
                 PHY_MOVE_CURSOR(i / stdscr->w + 1, i % stdscr->w + 1);
                 in_pos = 1;
             }
-	    /* Inverse video mode */
-	    if (IVON(ch) && !stdscr->phy_iv) {
-	      PHY_INVERSE_VIDEO;
-	      stdscr->phy_iv = 1;
-	    } else if (!IVON(ch) && stdscr->phy_iv) {
-	      PHY_ATTR_OFF;
-	      stdscr->phy_iv = 0;
-	    }
+            /* Inverse video mode */
+            if (IVON(ch) && !stdscr->phy_iv) {
+                PHY_INVERSE_VIDEO;
+                stdscr->phy_iv = 1;
+            } else if (!IVON(ch) && stdscr->phy_iv) {
+                PHY_ATTR_OFF;
+                stdscr->phy_iv = 0;
+            }
             putchar(ch & 0x7F);
         } else {
             in_pos = 0;
@@ -580,7 +581,8 @@ int refresh(void)
     draw_diff();
     /* Set physical cursor to the position of the virtual cursor */
     if (stdscr->v < stdscr->sa)
-        PHY_MOVE_CURSOR(stdscr->v / stdscr->w + 1, stdscr->v % stdscr->w + 1);
+        PHY_MOVE_CURSOR(stdscr->v / stdscr->w + 1,
+                        stdscr->v % stdscr->w + 1);
     else
         PHY_MOVE_CURSOR(stdscr->h, stdscr->w);
     /* Swap virtual screens */
@@ -597,7 +599,8 @@ int refresh(void)
 #define GETCH_RAW() getchar()
 #endif
 
-#define GETCH() (stdscr->input->i ? *(stdscr->input->a + --stdscr->input->i) : GETCH_RAW())
+#define GETCH() (stdscr->input->i ? *(stdscr->input->a + --stdscr->input->i) \
+    : GETCH_RAW())
 
 int ungetch(int ch)
 {
@@ -617,9 +620,10 @@ int ungetch(int ch)
 #define KEY_HOME 262
 #define KEY_END 360
 
-int getch(void) {
-  /* Todo: Process multi-char keys */
-  return GETCH();
+int getch(void)
+{
+    /* Todo: Process multi-char keys */
+    return GETCH();
 }
 
 #endif
@@ -1462,11 +1466,11 @@ int draw_screen(struct gapbuf *b, struct gapbuf *cl, int cl_active,
                 char **sb, size_t * sb_s, int rv, int req_centre,
                 int req_clear)
 {
-    /* Draws a gap buffer to the screen, including the command line gap buffer */
+    /* Draws the text and command line gap buffers to the screen */
     char *q, ch;
     int height, width;          /* Screen size */
     size_t h, w;                /* Screen size as size_t */
-    int cy, cx;                 /* Final cursor position */
+    int cy = 0, cx = 0;         /* Final cursor position */
     int y, x;                   /* Changing cursor position */
     int centred = 0;            /* Indicates if centreing has occurred */
     int ret = 0;                /* Macro "return value" */
@@ -1512,7 +1516,7 @@ int draw_screen(struct gapbuf *b, struct gapbuf *cl, int cl_active,
     ? ch : (ch == '\0' ? '~' : '?'))
 
         ch = *q;
-	ch = DISPLAYCH(ch);
+        ch = DISPLAYCH(ch);
         PRINTCH(ch);
         GET_CURSOR(y, x);
         if ((height >= 3 && y >= height - 2) || ret == ERR) {
@@ -1553,7 +1557,7 @@ int draw_screen(struct gapbuf *b, struct gapbuf *cl, int cl_active,
             if (standend() == ERR)
                 return 1;
         ch = *q;
-	ch = DISPLAYCH(ch);
+        ch = DISPLAYCH(ch);
         PRINTCH(ch);
         GET_CURSOR(y, x);
         if ((height >= 3 && y >= height - 2) || ret == ERR)
@@ -1589,17 +1593,17 @@ int draw_screen(struct gapbuf *b, struct gapbuf *cl, int cl_active,
         MOVE_CURSOR(h - 2, 0);
         if (ret == ERR)
             return 1;
-	STANDOUT_TO_EOL();
+        STANDOUT_TO_EOL();
         if (ret == ERR)
             return 1;
 
         /* Command line gap buffer */
-	MOVE_CURSOR(h - 1, 0);
+        MOVE_CURSOR(h - 1, 0);
         if (ret == ERR)
             return 1;
 
       cl_draw_start:
-	CLEAR_DOWN();
+        CLEAR_DOWN();
         if (ret == ERR)
             return 1;
 
@@ -1617,8 +1621,8 @@ int draw_screen(struct gapbuf *b, struct gapbuf *cl, int cl_active,
                 if (standout() == ERR)
                     return 1;
             ch = *q;
-	    ch = DISPLAYCH(ch);
-	    PRINTCH(ch);
+            ch = DISPLAYCH(ch);
+            PRINTCH(ch);
             if (ret == ERR) {
                 /* Draw from the cursor */
                 cl->d = cl->g - cl->a;
@@ -1650,8 +1654,8 @@ int draw_screen(struct gapbuf *b, struct gapbuf *cl, int cl_active,
                 if (standend() == ERR)
                     return 1;
             ch = *q;
-	    ch = DISPLAYCH(ch);
-	    PRINTCH(ch);
+            ch = DISPLAYCH(ch);
+            PRINTCH(ch);
             if (ret == ERR)
                 break;
             ++q;
@@ -1681,9 +1685,9 @@ int rename_gapbuf(struct gapbuf *b, char *new_fn)
 struct gapbuf *new_gapbuf(struct gapbuf *b, char *fn)
 {
     /*
-     * Creates a new gap buffer to the right of gap buffer b in the doubly linked list
-     * and sets the associated filename to fn. The file will be loaded into
-     * the gap buffer if it exists.
+     * Creates a new gap buffer to the right of gap buffer b in the doubly
+     * linked list and sets the associated filename to fn. The file will be
+     * loaded into the gap buffer if it exists.
      */
     struct gapbuf *t;
     if ((t = init_gapbuf()) == NULL)
