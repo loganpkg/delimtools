@@ -226,7 +226,8 @@ struct graph {
     size_t sa;                  /* Screen area (real) */
     size_t v;                   /* Virtual index */
     int hard;                   /* Clear the physical screen */
-    int iv;                      /* Inverse video mode */
+    int iv;                      /* Inverse video mode (virtual) */
+  int phy_iv;                    /* Mirrors the physical inverse video mode */
     struct buf *input;            /* Keyboard input buffer */
 #ifndef _WIN32
     struct termios t_orig;      /* Original terminal attributes */
@@ -446,6 +447,8 @@ int erase(void)
         memset(stdscr->cs, ' ', stdscr->sa);
         PHY_CLEAR_SCREEN();
 	stdscr->hard = 0;
+	PHY_ATTR_OFF;
+	stdscr->phy_iv = 0;
     }
     /* Clear the virtual next screen */
     memset(stdscr->ns, ' ', stdscr->sa);
@@ -464,6 +467,7 @@ int endwin(void)
     /* Screen is not initialised */
     if (stdscr == NULL) return ERR;
     PHY_CLEAR_SCREEN();
+    PHY_ATTR_OFF;
 #ifndef _WIN32
     if (tcsetattr(STDIN_FILENO, TCSANOW, &stdscr->t_orig))
         ret = ERR;
@@ -542,22 +546,27 @@ WINDOW *initscr(void) {
     return stdscr;
 }
 
-void diff_draw(void)
+void draw_diff(void)
 {
     /* Physically draw the screen where the virtual screens differ */
     int in_pos = 0;             /* In position for printing */
-    char ch, k;
+    char ch;
     size_t i;
     for (i = 0; i < stdscr->sa; ++i) {
-      if ((ch = *(stdscr->ns + i)) != (k = *(stdscr->cs + i))) {
+      if ((ch = *(stdscr->ns + i)) != *(stdscr->cs + i)) {
             if (!in_pos) {
                 /* Top left corner is (1, 1) not (0, 0) so need to add one */
                 PHY_MOVE_CURSOR(i / stdscr->w + 1, i % stdscr->w + 1);
                 in_pos = 1;
             }
 	    /* Inverse video mode */
-	    if (IVON(ch) && !IVON(k)) PHY_INVERSE_VIDEO;
-	    else if (!IVON(ch) && IVON(k)) PHY_ATTR_OFF;
+	    if (IVON(ch) && !stdscr->phy_iv) {
+	      PHY_INVERSE_VIDEO;
+	      stdscr->phy_iv = 1;
+	    } else if (!IVON(ch) && stdscr->phy_iv) {
+	      PHY_ATTR_OFF;
+	      stdscr->phy_iv = 0;
+	    }
             putchar(ch & 0x7F);
         } else {
             in_pos = 0;
@@ -568,7 +577,7 @@ void diff_draw(void)
 int refresh(void)
 {
     char *t;
-    diff_draw();
+    draw_diff();
     /* Set physical cursor to the position of the virtual cursor */
     if (stdscr->v < stdscr->sa)
         PHY_MOVE_CURSOR(stdscr->v / stdscr->w + 1, stdscr->v % stdscr->w + 1);
