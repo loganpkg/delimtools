@@ -21,22 +21,27 @@
 
 /*
  * README:
- * To install:
- * 1. Download this file.
- * 2. Compile. This requires ncurses or pdcurses. For example:
- * $ cc -ansi -g -O3 -Wall -Wextra -pedantic spot.c -lncurses && mv a.out spot
- * or:
+ * To compile simple run:
+ * $ cc -ansi -g -O3 -Wall -Wextra -pedantic spot.c && mv a.out spot
+ * or
+ * > cl spot.c
+ * and place the executable somewhere in your PATH.
  *
+ * spot can optionally be compiled with a curses library by uncommenting
+ * #define USE_CURSES
+ * followed by:
+ * $ cc -ansi -g -O3 -Wall -Wextra -pedantic spot.c -lncurses && mv a.out spot
+ * or
  * > cd C:\Users\logan\Documents\PDCurses-3.9\PDCurses-3.9\wincon
  * > nmake -f Makefile.vc
  * > cd C:\Users\logan\Documents\spot
  * > cl spot.c pdcurses.lib User32.Lib AdvAPI32.Lib ^
  *   /I C:\Users\logan\Documents\PDCurses-3.9\PDCurses-3.9 ^
  *   /link /LIBPATH:C:\Users\logan\Documents\PDCurses-3.9\PDCurses-3.9\wincon
- * 3. Place somewhere in your PATH. For example:
- * $ mv spot ~/bin/
+ *
  * To use:
  * $ spot [file...]
+ *
  * The keybindings are shown below the #include statements.
  */
 
@@ -622,8 +627,81 @@ int ungetch(int ch)
 
 int getch(void)
 {
-    /* Todo: Process multi-char keys */
-    return GETCH();
+    /* Process multi-char keys */
+
+#ifdef _WIN32
+    int x;
+    if ((x = GETCH()) != 0xE0)
+        return x;
+    switch (x = GETCH()) {
+    case 'G':
+        return KEY_HOME;
+    case 'H':
+        return KEY_UP;
+    case 'K':
+        return KEY_LEFT;
+    case 'M':
+        return KEY_RIGHT;
+    case 'O':
+        return KEY_END;
+    case 'P':
+        return KEY_DOWN;
+    case 'S':
+        return KEY_DC;
+    default:
+        if (ungetch(x) == EOF)
+            return EOF;
+        return 0xE0;
+    }
+
+#else
+    int x, z;
+    if ((x = GETCH()) != 27)
+        return x;
+    if ((x = GETCH()) != '[') {
+        if (ungetch(x) == EOF)
+            return EOF;
+        return 27;
+    }
+    x = GETCH();
+    if (x != 'A' && x != 'B' && x != 'C' && x != 'D' && x != 'F'
+        && x != 'H' && x != '1' && x != '3' && x != '4') {
+        if (ungetch(x) == EOF)
+            return EOF;
+        if (ungetch('[') == EOF)
+            return EOF;
+        return 27;
+    }
+    switch (x) {
+    case 'A':
+        return KEY_UP;
+    case 'B':
+        return KEY_DOWN;
+    case 'C':
+        return KEY_RIGHT;
+    case 'D':
+        return KEY_LEFT;
+    }
+    if ((z = GETCH()) != '~') {
+        if (ungetch(z) == EOF)
+            return EOF;
+        if (ungetch(x) == EOF)
+            return EOF;
+        if (ungetch('[') == EOF)
+            return EOF;
+        return 27;
+    }
+    switch (x) {
+    case '1':
+        return KEY_HOME;
+    case '3':
+        return KEY_DC;
+    case '4':
+        return KEY_END;
+    }
+#endif
+
+    return EOF;
 }
 
 #endif
@@ -1908,6 +1986,7 @@ int main(int argc, char **argv)
             }
             break;
         case C('h'):
+        case 127:
         case KEY_BACKSPACE:
             rv = backspace_ch(z, mult);
             break;
