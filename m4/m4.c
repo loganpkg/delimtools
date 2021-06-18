@@ -19,16 +19,16 @@
  * Assumes NULL pointers are zero.
  *
  * README:
- * To install:
- * 1. Download this file.
- * 2. Compile:
+ * To compile:
  * $ cc -ansi -g -O3 -Wall -Wextra -pedantic m4.c && mv a.out m4
- * 3. Place somewhere in your PATH. For example:
- * $ mv m4 ~/bin/
+ * or
+ * > cl m4.c
+ * and place the executable somewhere in your PATH.
+ *
  * To use:
  * $ m4 [file...]
  *
- * Built-in macros, presented as a mini-tutorial:
+ * These are the built-in macros, presented as a mini-tutorial:
  * changequote([, ])
  * define(cool, $1 and $2)
  * cool(goat, mice)
@@ -753,6 +753,10 @@ int main(int argc, char **argv)
         QUIT;
     if (upsert_entry(ht, "sub", NULL))
         QUIT;
+    if (upsert_entry(ht, "div", NULL))
+        QUIT;
+    if (upsert_entry(ht, "mod", NULL))
+        QUIT;
 
     if (argc > 1) {
         /* Do not read stdin if there are command line files */
@@ -1048,6 +1052,20 @@ int main(int argc, char **argv)
                 if (AOF(w, n)) \
                     EQUIT("add: Integer overflow"); \
                 w += n; \
+            } \
+        } \
+        snprintf(num, NUM_SIZE, "%lu", (unsigned long) w); \
+        if (ungetstr(input, num)) \
+            QUIT; \
+    } else if (!strcmp(SN, "mult")) { \
+        w = 1; \
+        for (k = 1; k < 10; ++k) { \
+            if (*ARG(k) != '\0') { \
+                if (str_to_num(ARG(k), &n)) \
+                    EQUIT("add: Invalid number"); \
+                if (MOF(w, n)) \
+                    EQUIT("add: Integer overflow"); \
+                w *= n; \
             } \
         } \
         snprintf(num, NUM_SIZE, "%lu", (unsigned long) w); \
