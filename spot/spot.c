@@ -27,8 +27,7 @@
  * > cl spot.c
  * and place the executable somewhere in your PATH.
  *
- * spot can optionally be compiled with a curses library by setting:
- * #define USE_CURSES 1
+ * spot can optionally be compiled with a curses library by setting USE_CURSES to 1.
  * followed by:
  * $ cc -ansi -g -O3 -Wall -Wextra -pedantic spot.c -lncurses && mv a.out spot
  * or
@@ -46,7 +45,7 @@
  */
 
 /* Change this to 1 to compile with ncurses or PDCurses */
-#define USE_CURSES 1
+#define USE_CURSES 0
 
 #ifdef __linux__
 #define _GNU_SOURCE
