@@ -27,8 +27,8 @@
  * > cl spot.c
  * and place the executable somewhere in your PATH.
  *
- * spot can optionally be compiled with a curses library by uncommenting
- * #define USE_CURSES
+ * spot can optionally be compiled with a curses library by setting:
+ * #define USE_CURSES 1
  * followed by:
  * $ cc -ansi -g -O3 -Wall -Wextra -pedantic spot.c -lncurses && mv a.out spot
  * or
@@ -45,8 +45,8 @@
  * The keybindings are shown below the #include statements.
  */
 
-/* Uncomment this to build with ncurses or PDCurses */
-/* #define USE_CURSES */
+/* Change this to 1 to compile with ncurses or PDCurses */
+#define USE_CURSES 1
 
 #ifdef __linux__
 #define _GNU_SOURCE
@@ -56,15 +56,21 @@
 #include <sys/stat.h>
 
 #ifdef _WIN32
-#include <windows.h>
+#if USE_CURSES
+#include <io.h>
 #else
+#include <windows.h>
+#endif
+#else
+#if !USE_CURSES
 #include <sys/ioctl.h>
-#include <sys/wait.h>
 #include <termios.h>
+#endif
+#include <sys/wait.h>
 #include <unistd.h>
 #endif
 
-#ifdef USE_CURSES
+#if USE_CURSES
 #include <curses.h>
 #else
 #include <stdio.h>
@@ -187,7 +193,7 @@ struct gapbuf {
     struct gapbuf *next;        /* Next gap buffer node */
 };
 
-#ifdef USE_CURSES
+#if USE_CURSES
 #define PRINTCH(ch) ret = addch(ch)
 #define MOVE_CURSOR(y, x) ret = move(y, x)
 #define GET_CURSOR(y, x) getyx(stdscr, y, x)
@@ -1493,7 +1499,7 @@ int init_ncurses(void)
     if (initscr() == NULL)
         return 1;
 
-#ifdef USE_CURSES
+#if USE_CURSES
     if (raw() == ERR) {
         endwin();
         return 1;
