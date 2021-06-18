@@ -27,8 +27,8 @@
  * > cl spot.c
  * and place the executable somewhere in your PATH.
  *
- * spot can optionally be compiled with a curses library by setting USE_CURSES to 1.
- * followed by:
+ * spot can optionally be compiled with a curses library by setting
+ * USE_CURSES to 1 followed by:
  * $ cc -ansi -g -O3 -Wall -Wextra -pedantic spot.c -lncurses && mv a.out spot
  * or
  * > cd C:\Users\logan\Documents\PDCurses-3.9\PDCurses-3.9\wincon
@@ -157,11 +157,11 @@ NULL \
 
 /* Converts an index to a pointer */
 #define INDEX_TO_POINTER(b, i) (b->a + b->i < b->g ? b->a + b->i \
-				: b->c + b->i - (b->g - b->a))
+    : b->c + b->i - (b->g - b->a))
 
 /* Delete gap buffer */
 #define DELETEGAPBUF(b) do {b->g = b->a; b->c = b->e; b->r = 1; b->d = 0; \
-             b->m = 0; b->mr = 1; b->m_set = 0; b->mod = 1;} while (0)
+    b->m = 0; b->mr = 1; b->m_set = 0; b->mod = 1;} while (0)
 
 /* Update settings when a gap buffer is modified */
 #define SETMOD(b) do {b->m = 0; b->mr = 1; b->m_set = 0; b->mod = 1;} while (0)
@@ -272,13 +272,13 @@ WINDOW *stdscr = NULL;
 #define STANDOUT_TO_EOL() do { \
     if (stdscr->v < stdscr->sa) { \
         *(stdscr->ns + stdscr->v) \
-	    = (char) (*(stdscr->ns + stdscr->v) | 0x80); \
+            = (char) (*(stdscr->ns + stdscr->v) | 0x80); \
         ++stdscr->v; \
-	while (stdscr->v < stdscr->sa && stdscr->v % stdscr->w) { \
+        while (stdscr->v < stdscr->sa && stdscr->v % stdscr->w) { \
             *(stdscr->ns + stdscr->v) \
-	        = (char) (*(stdscr->ns + stdscr->v) | 0x80); \
+                = (char) (*(stdscr->ns + stdscr->v) | 0x80); \
             ++stdscr->v; \
-	} \
+        } \
         ret = OK; \
     } else { \
         ret = ERR; \
@@ -316,21 +316,21 @@ WINDOW *stdscr = NULL;
 #define PRINTCH(ch) do { \
     if (stdscr->v < stdscr->sa) { \
         if (isgraph(ch) || ch == ' ') { \
-	  *(stdscr->ns + stdscr->v++) = IVCH(ch); \
+            *(stdscr->ns + stdscr->v++) = IVCH(ch); \
         } else if (ch == '\n') { \
-	  *(stdscr->ns + stdscr->v++) = IVCH(' '); \
+            *(stdscr->ns + stdscr->v++) = IVCH(' '); \
             if (stdscr->v % stdscr->w) \
                 stdscr->v = (stdscr->v / stdscr->w + 1) * stdscr->w; \
         } else if (ch == '\t') { \
-	  memset(stdscr->ns + stdscr->v, IVCH(' '), TABSIZE); \
+            memset(stdscr->ns + stdscr->v, IVCH(' '), TABSIZE); \
             stdscr->v += TABSIZE; \
         } else { \
             *(stdscr->ns + stdscr->v++) = IVCH('?'); \
         } \
         ret = OK; \
-	} else {   \
+    } else { \
         ret = ERR; \
-	  }	   \
+    } \
 } while (0)
 
 int addnstr(char *str, int n)
@@ -602,7 +602,6 @@ int refresh(void)
     return OK;
 }
 
-
 #ifdef _WIN32
 #define GETCH_RAW() _getch()
 #else
@@ -633,7 +632,6 @@ int ungetch(int ch)
 int getch(void)
 {
     /* Process multi-char keys */
-
 #ifdef _WIN32
     int x;
     if ((x = GETCH()) != 0xE0)
@@ -658,7 +656,6 @@ int getch(void)
             return EOF;
         return 0xE0;
     }
-
 #else
     int x, z;
     if ((x = GETCH()) != 27)
@@ -705,7 +702,6 @@ int getch(void)
         return KEY_END;
     }
 #endif
-
     return EOF;
 }
 
