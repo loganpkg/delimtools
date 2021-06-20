@@ -492,12 +492,14 @@ void free_hash_table(struct entry **ht)
 
 void free_mcall(struct mcall *m)
 {
-    size_t j;
+    size_t j = 1;
     if (m != NULL) {
         free(m->name);
         free(m->def);
-        for (j = 1; j < 10; ++j)
+        while (*(m->arg_buf + j) != NULL && j < 10) {
             free_buf(*(m->arg_buf + j));
+            ++j;
+        }
         free(m);
     }
 }
@@ -505,15 +507,16 @@ void free_mcall(struct mcall *m)
 struct mcall *init_mcall(void)
 {
     struct mcall *m;
-    size_t j;
     if ((m = calloc(1, sizeof(struct mcall))) == NULL)
         return NULL;
-    /* Arg 0 is not used */
-    for (j = 1; j < 10; ++j)
-        if ((*(m->arg_buf + j) = init_buf()) == NULL) {
-            free_mcall(m);
-            return NULL;
-        }
+    /*
+     * Arg 0 is not used. Only allocate the buffer for arg 1.
+     * The others will be allocated on demand.
+     */
+    if ((*(m->arg_buf + 1) = init_buf()) == NULL) {
+        free_mcall(m);
+        return NULL;
+    }
     m->act_arg = 1;
     return m;
 }
@@ -572,11 +575,12 @@ int sub_args(struct buf *result, struct mcall *stack)
         if (ch == '$') {
             dollar_enc = 1;
         } else if (dollar_enc && isdigit(ch) && ch != '0') {
-            b = *(stack->arg_buf + (ch - '0'));
-            if (b->i > BUF_FREE_SIZE(result) && grow_buf(result, b->i))
-                return 1;
-            memcpy(result->a + result->i, b->a, b->i);
-            result->i += b->i;
+            if ((b = *(stack->arg_buf + (ch - '0'))) != NULL) {
+                if (b->i > BUF_FREE_SIZE(result) && grow_buf(result, b->i))
+                    return 1;
+                memcpy(result->a + result->i, b->a, b->i);
+                result->i += b->i;
+            }
             dollar_enc = 0;
         } else {
             if (dollar_enc && ungetch(result, '$') == EOF)
@@ -614,10 +618,12 @@ char *strip_def(char *def)
 
 int terminate_args(struct mcall *stack)
 {
-    size_t j;
-    for (j = 1; j < 10; j++)
+    size_t j = 1;
+    while (*(stack->arg_buf + j) != NULL && j < 10) {
         if (ungetch(*(stack->arg_buf + j), '\0'))
             return 1;
+        ++j;
+    }
     return 0;
 }
 
@@ -827,7 +833,7 @@ int main(int argc, char **argv)
 } while (0)
 
 /* Stack macro collected argument number n */
-#define ARG(n) (*(stack->arg_buf + n))->a
+#define ARG(n) (*(stack->arg_buf + n) == NULL ? "" : (*(stack->arg_buf + n))->a)
 
 #define READ_TOKEN(t) do { \
     err = 0; \
@@ -1182,7 +1188,10 @@ int main(int argc, char **argv)
         } else if (ARG_COMMA) {
             if (stack->act_arg == 9)
                 EQUIT("Macro call has too many arguments");
-            ++stack->act_arg;
+            /* Allocate buffer for argument collection */
+            if ((*(stack->arg_buf + ++stack->act_arg) =
+                 init_buf()) == NULL)
+                QUIT;
             SET_OUTPUT;
             EAT_WS;
         } else if (NESTED_CB) {
