@@ -21,14 +21,14 @@
 
 /*
  * README:
- * To compile simple run:
+ * To compile simply run:
  * $ cc -ansi -g -O3 -Wall -Wextra -pedantic spot.c && mv a.out spot
  * or
  * > cl spot.c
  * and place the executable somewhere in your PATH.
  *
  * spot can optionally be compiled with a curses library by setting
- * USE_CURSES to 1 followed by:
+ * USE_CURSES to 1, followed by:
  * $ cc -ansi -g -O3 -Wall -Wextra -pedantic spot.c -lncurses && mv a.out spot
  * or
  * > cd C:\Users\logan\Documents\PDCurses-3.9\PDCurses-3.9\wincon
@@ -109,9 +109,9 @@
 "^2     Set the mark", \
 "^g     Clear the mark or escape the command line", \
 "^w     Wipe (cut) region", \
-"^c     Cut region appending to paste gap buffer", \
+"^o     Wipe region appending on the paste gap buffer", \
 "^[ w   Soft wipe (copy) region", \
-"^[ c   Copy region appending to paste gap buffer", \
+"^[ o   Soft wipe region appending on the paste gap buffer", \
 "^k     Kill (cut) to end of line", \
 "^[ k   Kill (cut) to start of line", \
 "^y     Yank (paste)", \
@@ -140,10 +140,10 @@ NULL \
 /* Takes signed input */
 #define ISASCII(x) ((x) >= 0 && (x) <= 127)
 
-/* Converts a lowercase letter to it's control value */
+/* Converts a lowercase letter to the corresponding control value */
 #define C(l) ((l) - 'a' + 1)
 
-/* Control spacebar or control @ */
+/* Control 2 (control spacebar or control @ may work too) */
 #define C_2 0
 
 /* Escape key */
@@ -166,7 +166,7 @@ NULL \
 /* Update settings when a gap buffer is modified */
 #define SETMOD(b) do {b->m = 0; b->mr = 1; b->m_set = 0; b->mod = 1;} while (0)
 
-/* No bound or gap size checks are performed */
+/* No out of bounds or gap size checks are performed */
 #define INSERTCH(b, x) do {*b->g++ = x; if (x == '\n') ++b->r;} while(0)
 #define DELETECH(b) ++b->c
 #define BACKSPACECH(b) if (*--b->g == '\n') --b->r
@@ -658,12 +658,12 @@ int getch(void)
     }
 #else
     int x, z;
-    if ((x = GETCH()) != 27)
+    if ((x = GETCH()) != ESC)
         return x;
     if ((x = GETCH()) != '[') {
         if (ungetch(x) == EOF)
             return EOF;
-        return 27;
+        return ESC;
     }
     x = GETCH();
     if (x != 'A' && x != 'B' && x != 'C' && x != 'D' && x != 'F'
@@ -672,7 +672,7 @@ int getch(void)
             return EOF;
         if (ungetch('[') == EOF)
             return EOF;
-        return 27;
+        return ESC;
     }
     switch (x) {
     case 'A':
@@ -691,7 +691,7 @@ int getch(void)
             return EOF;
         if (ungetch('[') == EOF)
             return EOF;
-        return 27;
+        return ESC;
     }
     switch (x) {
     case '1':
@@ -2041,7 +2041,7 @@ int main(int argc, char **argv)
             DELETEGAPBUF(p);
             rv = cut_region(z, p);
             break;
-        case C('c'):
+        case C('o'):
             /* Cut, inserting at end of paste gap buffer */
             rv = cut_region(z, p);
             break;
@@ -2107,7 +2107,7 @@ int main(int argc, char **argv)
                 rv = copy_region(z, p);
                 clear_mark(z);
                 break;
-            case 'c':
+            case 'o':
                 /* Copy, inserting at end of paste gap buffer */
                 rv = copy_region(z, p);
                 break;
