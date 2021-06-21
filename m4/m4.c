@@ -60,6 +60,11 @@
  * maketemp(XXXXXX)
  * errprint(oops there is an error)
  * htdist
+ * add(8, 2, 4)
+ * mult( , 5, , 3)
+ * sub(80, 20, 5)
+ * div(5, 2)
+ * mod(5, 2)
  */
 
 #ifdef __linux__
@@ -1068,10 +1073,61 @@ int main(int argc, char **argv)
         for (k = 1; k < 10; ++k) { \
             if (*ARG(k) != '\0') { \
                 if (str_to_num(ARG(k), &n)) \
-                    EQUIT("add: Invalid number"); \
+                    EQUIT("mult: Invalid number"); \
                 if (MOF(w, n)) \
-                    EQUIT("add: Integer overflow"); \
+                    EQUIT("mult: Integer overflow"); \
                 w *= n; \
+            } \
+        } \
+        snprintf(num, NUM_SIZE, "%lu", (unsigned long) w); \
+        if (ungetstr(input, num)) \
+            QUIT; \
+    } else if (!strcmp(SN, "sub")) { \
+        if (*ARG(1) == '\0') \
+            EQUIT("sub: Argument 1 must be used"); \
+        if (str_to_num(ARG(1), &w)) \
+            EQUIT("sub: Invalid number"); \
+        for (k = 2; k < 10; ++k) { \
+            if (*ARG(k) != '\0') { \
+                if (str_to_num(ARG(k), &n)) \
+                    EQUIT("sub: Invalid number"); \
+                if (n > w) \
+                    EQUIT("sub: Integer underflow"); \
+                w -= n; \
+            } \
+        } \
+        snprintf(num, NUM_SIZE, "%lu", (unsigned long) w); \
+        if (ungetstr(input, num)) \
+            QUIT; \
+    } else if (!strcmp(SN, "div")) { \
+        if (*ARG(1) == '\0') \
+            EQUIT("div: Argument 1 must be used"); \
+        if (str_to_num(ARG(1), &w)) \
+            EQUIT("div: Invalid number"); \
+        for (k = 2; k < 10; ++k) { \
+            if (*ARG(k) != '\0') { \
+                if (str_to_num(ARG(k), &n)) \
+                    EQUIT("div: Invalid number"); \
+                if (!n) \
+                    EQUIT("div: Divide by zero"); \
+                w /= n; \
+            } \
+        } \
+        snprintf(num, NUM_SIZE, "%lu", (unsigned long) w); \
+        if (ungetstr(input, num)) \
+            QUIT; \
+    } else if (!strcmp(SN, "mod")) { \
+        if (*ARG(1) == '\0') \
+            EQUIT("mod: Argument 1 must be used"); \
+        if (str_to_num(ARG(1), &w)) \
+            EQUIT("mod: Invalid number"); \
+        for (k = 2; k < 10; ++k) { \
+            if (*ARG(k) != '\0') { \
+                if (str_to_num(ARG(k), &n)) \
+                    EQUIT("mod: Invalid number"); \
+                if (!n) \
+                    EQUIT("mod: Modulo by zero"); \
+                w %= n; \
             } \
         } \
         snprintf(num, NUM_SIZE, "%lu", (unsigned long) w); \
