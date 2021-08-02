@@ -1,4 +1,4 @@
-```
+<!--
 Copyright (c) 2021 Logan Ryan McLintock
 
 Permission to use, copy, modify, and distribute this software for any
@@ -12,54 +12,26 @@ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
 WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-```
 
+-->
 spot text editor
 ================
 
 spot is a fast text editor with many advanced features:
 
-* Built-in flicker-free terminal graphics, no curses library is required.
-* Can optionally build with a cursors library.
+* Flicker-free terminal graphics with no external linking to a curses library.
 * Can copy and paste between multiple buffers.
 * Atomic file saving on POSIX systems.
 * Command multiplier prefix.
 * Row and column numbers.
 * Trim trailing whitespace.
 * Region highlighting.
-* ANSI C, easy to compile, single file, source code.
+* Regex replace region.
+* ANSI C.
 
-The built-in graphics use the double-buffering method to make smooth screen
+The graphics uses the double-buffering method to make smooth screen
 changes. The text memory uses the gap buffer method for efficient editing.
 
-Install
--------
-
-To compile simply run:
-```
-$ cc -g -O3 spot.c && mv a.out spot
-```
-or
-```
-> cl /Ot spot.c
-```
-and place the executable somewhere in your PATH.
-
-spot can optionally be compiled with a curses library by setting
-`USE_CURSES` to 1, followed by:
-```
-$ cc -g -O3 spot.c -lncurses && mv a.out spot
-```
-or by commands similar to this, after downloading and extracting PDCurses:
-```
-> cd C:\Users\logan\Documents\PDCurses-3.9\PDCurses-3.9\wincon
-> nmake -f Makefile.vc
-> cd C:\Users\logan\Documents\spot
-> cl /Ot spot.c pdcurses.lib User32.Lib AdvAPI32.Lib ^
-  /I C:\Users\logan\Documents\PDCurses-3.9\PDCurses-3.9 ^
-  /link /LIBPATH:C:\Users\logan\Documents\PDCurses-3.9\PDCurses-3.9\wincon
-```
-Please note that PDCurses does not handle terminal size changes.
 
 To use
 ------
@@ -99,6 +71,7 @@ multiplier prefix ^U n (where n is a positive number).
 ^l     Level cursor and redraw screen
 ^2     Set the mark
 ^g     Clear the mark or escape the command line
+^x ^x  Switch cursor and mark
 ^w     Wipe (cut) region
 ^o     Wipe region appending on the paste gap buffer
 ^[ w   Soft wipe (copy) region
@@ -109,9 +82,12 @@ multiplier prefix ^U n (where n is a positive number).
 ^t     Trim trailing whitespace and clean
 ^s     Search
 ^[ n   Search without editing the command line
+^r     Regex replace region, where the first character is the delimiter, e.g:
+           |find|replace
+^[ r   Regex replace region, newline insensitive
 ^x i   Insert file at cursor
 ^x ^F  Open file in new gap buffer
-^r     Rename gap buffer
+^[ =   Rename gap buffer
 ^x ^s  Save current gap buffer
 ^x LK  Move left one gap buffer
 ^x RK  Move right one gap buffer

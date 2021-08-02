@@ -1,4 +1,4 @@
-```
+<!--
 Copyright (c) 2021 Logan Ryan McLintock
 
 Permission to use, copy, modify, and distribute this software for any
@@ -12,36 +12,29 @@ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
 WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-```
 
+-->
 m4 macro processor
 ==================
 
 A cross-platform implementation of the m4 macro processor.
 It has many nice features:
 
-* A single file of source code written in ANSI C that is easy to compile.
-* High performance hash table with the built-in macro `htdist` that shows the
-  distribution.
-* Stack depth only limited by random-access memory (RAM).
-* Can be used interactively.
-* Implements all the original m4 built-in commands, except that `syscmd` is
+* Written in ANSI C,
+* Has a built-in macro `htdist` that shows the hash table distribution,
+* Stack depth only limited by random-access memory (RAM),
+* Can be used interactively,
+* and implements all of the original m4 built-in commands, except that `syscmd` is
   replaced by `esyscmd` and `eval` is replaced by `add`, `mult`, `sub`, `div`
-  and `mod`. Does not follow the POSIX standards.
+  and `mod`.
 
-Install
--------
+This implementation does not follow the POSIX standards in regards to m4.
+
+Configuration
+-------------
+
 By default the esyscmd and maketemp built-in macros are excluded.
-Set `ESYSCMD_MAKETEMP` to 1 to include them.
-To compile:
-```
-$ cc -g -O3 m4.c && mv a.out m4
-```
-or
-```
-> cl /Ot m4.c
-```
-and place the executable somewhere in your PATH.
+Set `ESYSCMD_MAKETEMP` to 1 in m4.c before building to include them.
 
 To use
 ------
@@ -55,15 +48,6 @@ References
 * Brian W. Kernighan and Dennis M. Ritchie, The M4 Macro Processor,
   Bell Laboratories, Murray Hill, New Jersey 07974, July 1, 1977.
 
-Section 6.6 of:
-
-* Brian W. Kernighan and Dennis M. Ritchie, The C Programming Language,
-  Second Edition, Prentice Hall Software Series, New Jersey, 1988.
-* Clovis L. Tondo and Scott E. Gimpel, The C Answer Book, Second Edition,
-  PTR Prentice Hall Software Series, New Jersey, 1989.
-
-Daniel J. Bernstein's djb2 algorithm from:
- * Hash Functions, http://www.cse.yorku.ca/~oz/hash.html
 
 Mini-tutorial
 -------------
