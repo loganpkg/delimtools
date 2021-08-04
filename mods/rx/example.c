@@ -15,7 +15,7 @@
  */
 
 /*
-   $ cc -ansi -g -O3 -Wall -Wextra -pedantic -DRR_DEBUG ../gen/gen.c \
+   $ cc -ansi -g -O3 -Wall -Wextra -pedantic -DRR_DEBUG -DNDEBUG ../gen/gen.c \
      ../buf/buf.c ../regex/regcomp.c ../regex/regerror.c ../regex/regexec.c \
      ../regex/regfree.c rx.c example.c
  */
