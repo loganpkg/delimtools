@@ -26,6 +26,8 @@
 
 #define NUM_UCHAR (UCHAR_MAX + 1)
 
+#define match_atom(atom, ch) (atom->set[(unsigned char) ch] != atom->negate)
+
 
 struct atom {
     char set[NUM_UCHAR];        /* Character set */
@@ -94,7 +96,7 @@ char *match_regex_here(struct atom *find, char *str)
     if (find->end)
         return str;
     if (find->min_occ == 1 && find->max_occ == 1
-        && find->set[(unsigned char) *str] && *str != '\0')
+        && match_atom(find, *str) && *str != '\0')
         return match_regex_here(++find, ++str);
     if (!(find->min_occ == 1 && find->max_occ == 1) && *str != '\0')
         return match_regex_mult(find, str);
@@ -103,12 +105,14 @@ char *match_regex_here(struct atom *find, char *str)
     return NULL;
 }
 
+
+
 char *match_regex_mult(struct atom *find, char *str)
 {
     char *t = str, *r;
     printf("match_regex_mult: str: %s\n", str);
     /* Find the most repeats that possible */
-    while (find->set[(unsigned char) *t]
+    while (match_atom(find, *t)
            && (find->max_occ == -1 ? 1 : t - str < find->max_occ)
            && *t != '\0')
         ++t;
@@ -130,7 +134,7 @@ int main(void)
 {
     struct atom *cr;
     char *find = "abc";
-    char *str = "xxxaaaaaaaaaabc";
+    char *str = "xxxaaaaaaaaaaaefgbcuuu";
     char *p;
     size_t len;
 
@@ -143,7 +147,8 @@ int main(void)
 
 
     cr[0].min_occ = 1;
-    cr[0].max_occ = 3;
+    cr[0].max_occ = -1;
+    cr->negate = 'Y';
 
 
     if ((p = match_regex(cr, str, &len)) == NULL)
