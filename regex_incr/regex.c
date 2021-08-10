@@ -39,10 +39,13 @@ struct atom {
     size_t num;                 /* Number of matches. Default is 1. */
 };
 
-/* Capture group */
+/*
+ * Capture group.
+ * An atom_start or atom_end value of -1 signifys that it is not used.
+ */
 struct cap_grp {
-    ssize_t atom_start;         /* Start index of capture group (inclusive). -1 means not used. */
-    ssize_t atom_end;           /* End index of capture group (exclusive). -1 means not used. */
+    ssize_t atom_start;         /* Start index of capture group (inclusive) */
+    ssize_t atom_end;           /* End index of capture group (exclusive) */
     char *p;                    /* Pointer to start of captured text */
     size_t len;                 /* Length of captured text */
 };
@@ -55,7 +58,7 @@ struct cap_grp {
 struct atom *compile_regex(char *find, struct cap_grp *cg)
 {
     struct atom *cr;
-    unsigned char u;
+    unsigned char u, e;
     size_t i, j, atom_index = 0;
     int in_set = 0;
     size_t cap_grp_index = 0;   /* Capture group index of open bracket */
@@ -162,9 +165,23 @@ struct atom *compile_regex(char *find, struct cap_grp *cg)
             }
             break;
         default:
-            cr[atom_index].set[u] = 'Y';
-            if (!in_set)
+            if (in_set) {
+                /* Look ahead for range */
+                if (*find == '-' && (e = *(find + 1))) {
+                    if (e < u)
+                        CR_BAIL;
+                    for (i = u; i <= e; ++i)
+                        cr[atom_index].set[i] = 'Y';
+                    /* Eat chars */
+                    find += 2;
+                } else {
+                    /* Just add the char to the set */
+                    cr[atom_index].set[u] = 'Y';
+                }
+            } else {
+                cr[atom_index].set[u] = 'Y';
                 ++atom_index;
+            }
             break;
         }
     }
@@ -298,8 +315,8 @@ int main(void)
 {
     struct atom *cr;
     struct cap_grp cg[NUM_CAP_GRP];
-    char *find = "(([^x*[(y]+)b)(c)";
-    char *str = "xxxaaaaaaaaaaaefgjbcuuu";
+    char *find = "(([^x*[(y]+)b)([c-f0-9])";
+    char *str = "xxxaaaaaaaaaaaefgjbduuu";
     char *p;
     size_t len;
 
