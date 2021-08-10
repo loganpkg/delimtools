@@ -16,7 +16,6 @@
 
 /* Regular expression module */
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -225,7 +224,9 @@ char *match_regex(struct atom *find, char *str, size_t * len)
 {
     char *end_p;
     do {
-        printf("match_regex: str: %s\n", str);
+#ifdef REGEX_DBUG
+        printf("match_regex     : str: %s\n", str);
+#endif
         end_p = match_regex_here(find, str);
     } while (end_p == NULL && *str++ != '\0');
 
@@ -239,8 +240,9 @@ char *match_regex(struct atom *find, char *str, size_t * len)
 char *match_regex_mult(struct atom *find, char *str);
 char *match_regex_here(struct atom *find, char *str)
 {
-    /* print_compiled_regex(find); */
+#ifdef REGEX_DBUG
     printf("match_regex_here: str: %s\n", str);
+#endif
 
     /* Match */
     if (find->end)
@@ -255,12 +257,12 @@ char *match_regex_here(struct atom *find, char *str)
     return NULL;
 }
 
-
-
 char *match_regex_mult(struct atom *find, char *str)
 {
     char *t = str, *r;
+#ifdef REGEX_DBUG
     printf("match_regex_mult: str: %s\n", str);
+#endif
     /* Find the most repeats that possible */
     while (match_atom(find, *t)
            && (find->max_occ == -1 ? 1 : t - str < find->max_occ)
