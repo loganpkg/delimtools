@@ -56,8 +56,11 @@ struct atom *compile_regex(char *find, struct cap_grp *cg)
 {
     struct atom *cr;
     unsigned char u;
-    size_t i, j, cap_grp_index = 0, atom_index = 0;
+    size_t i, j, atom_index = 0;
     int in_set = 0;
+    size_t cap_grp_index = 0;   /* Capture group index of open bracket */
+    size_t stack[NUM_CAP_GRP] = { 0 };  /* Stack for nested capture groups */
+    size_t si = 0;              /* Stack index */
     size_t len = strlen(find);
 
     /* Addition is OK as this size is already in memory */
@@ -81,25 +84,47 @@ struct atom *compile_regex(char *find, struct cap_grp *cg)
 
     while ((u = *find++)) {
         switch (u) {
-        case '(':
-            ++cap_grp_index;
-            if (cap_grp_index >= NUM_CAP_GRP)
+        case '\\':
+            /* Escaping. Next char is considered a literal in any context. */
+            if (!*find)
                 CR_BAIL;
-            cg[cap_grp_index].atom_start = atom_index;
+            cr[atom_index].set[(unsigned char) *find] = 'Y';
+            if (!in_set)
+                ++atom_index;
+            /* Eat char */
+            ++find;
+            break;
+        case '(':
+            if (in_set) {
+                cr[atom_index].set[u] = 'Y';
+            } else {
+                ++cap_grp_index;
+                if (cap_grp_index >= NUM_CAP_GRP)
+                    CR_BAIL;
+                cg[cap_grp_index].atom_start = atom_index;
+                stack[si++] = cap_grp_index;
+            }
             break;
         case ')':
-            if (!cap_grp_index)
-                CR_BAIL;
-            cg[cap_grp_index].atom_end = atom_index;
-            --cap_grp_index;
+            if (in_set) {
+                cr[atom_index].set[u] = 'Y';
+            } else {
+                if (!cap_grp_index || !si)
+                    CR_BAIL;
+                cg[stack[--si]].atom_end = atom_index;
+            }
             break;
         case '[':
-            in_set = 1;
-            /* Look ahead for negation operator */
-            if (*find == '^') {
-                cr[atom_index].negate = 'Y';
-                /* Eat char */
-                ++find;
+            if (in_set) {
+                cr[atom_index].set[u] = 'Y';
+            } else {
+                in_set = 1;
+                /* Look ahead for negation operator */
+                if (*find == '^') {
+                    cr[atom_index].negate = 'Y';
+                    /* Eat char */
+                    ++find;
+                }
             }
             break;
         case ']':
@@ -107,22 +132,34 @@ struct atom *compile_regex(char *find, struct cap_grp *cg)
             ++atom_index;
             break;
         case '*':
-            if (!atom_index)
-                CR_BAIL;
-            cr[atom_index - 1].min_occ = 0;
-            cr[atom_index - 1].max_occ = -1;
+            if (in_set) {
+                cr[atom_index].set[u] = 'Y';
+            } else {
+                if (!atom_index)
+                    CR_BAIL;
+                cr[atom_index - 1].min_occ = 0;
+                cr[atom_index - 1].max_occ = -1;
+            }
             break;
         case '+':
-            if (!atom_index)
-                CR_BAIL;
-            cr[atom_index - 1].min_occ = 1;
-            cr[atom_index - 1].max_occ = -1;
+            if (in_set) {
+                cr[atom_index].set[u] = 'Y';
+            } else {
+                if (!atom_index)
+                    CR_BAIL;
+                cr[atom_index - 1].min_occ = 1;
+                cr[atom_index - 1].max_occ = -1;
+            }
             break;
         case '?':
-            if (!atom_index)
-                CR_BAIL;
-            cr[atom_index - 1].min_occ = 0;
-            cr[atom_index - 1].max_occ = 1;
+            if (in_set) {
+                cr[atom_index].set[u] = 'Y';
+            } else {
+                if (!atom_index)
+                    CR_BAIL;
+                cr[atom_index - 1].min_occ = 0;
+                cr[atom_index - 1].max_occ = 1;
+            }
             break;
         default:
             cr[atom_index].set[u] = 'Y';
@@ -134,6 +171,15 @@ struct atom *compile_regex(char *find, struct cap_grp *cg)
 
     /* Terminate atom array */
     cr[atom_index].end = 'Y';
+
+    /* Checks: */
+    /* Unclosed character group */
+    if (in_set)
+        CR_BAIL;
+    /* Unclosed capture group */
+    for (j = 0; j < NUM_CAP_GRP; ++j)
+        if (cg[j].atom_start != -1 && cg[j].atom_end == -1)
+            CR_BAIL;
 
     /* Set capture group zero */
     cg[0].atom_start = 0;
@@ -252,7 +298,7 @@ int main(void)
 {
     struct atom *cr;
     struct cap_grp cg[NUM_CAP_GRP];
-    char *find = "([^xy]+)bc";
+    char *find = "(([^x*[(y]+)b)(c)";
     char *str = "xxxaaaaaaaaaaaefgjbcuuu";
     char *p;
     size_t len;
