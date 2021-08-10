@@ -41,32 +41,103 @@ struct atom {
 
 /* Capture group */
 struct cap_grp {
-    size_t atom_start;          /* Start index of capture group (inclusive) */
-    size_t atom_end;            /* End index of capture group (exclusive) */
+    ssize_t atom_start;         /* Start index of capture group (inclusive). -1 means not used. */
+    ssize_t atom_end;           /* End index of capture group (exclusive). -1 means not used. */
     char *p;                    /* Pointer to start of captured text */
     size_t len;                 /* Length of captured text */
 };
 
+#define CR_BAIL do { \
+    free(cr); \
+    return NULL; \
+} while (0)
+
 struct atom *compile_regex(char *find, struct cap_grp *cg)
 {
-    struct atom *cr, *t;
+    struct atom *cr;
     unsigned char u;
+    size_t i, j, cap_grp_index = 0, atom_index = 0;
+    int in_set = 0;
     size_t len = strlen(find);
+
     /* Addition is OK as this size is already in memory */
     if ((cr = calloc(len + 1, sizeof(struct atom))) == NULL)
         return NULL;
-    t = cr;
-    while ((u = *find++)) {
-        t->set[u] = 'Y';
-        t->min_occ = 1;
-        t->max_occ = 1;
-        t->num = 1;
-        ++t;
-    }
-    t->end = 'Y';
 
-    /* Clear the capture groups. Multiplication OK as already in memory. */
-    memset(cg, '\0', NUM_CAP_GRP * sizeof(struct cap_grp));
+    /* Set defaults */
+    for (i = 0; i < len + 1; ++i) {
+        cr[i].min_occ = 1;
+        cr[i].max_occ = 1;
+        cr[i].num = 1;
+    }
+
+    /* Clear the capture groups */
+    for (j = 0; j < NUM_CAP_GRP; ++j) {
+        cg[j].atom_start = -1;
+        cg[j].atom_end = -1;
+        cg[j].p = NULL;
+        cg[j].len = 0;
+    }
+
+    while ((u = *find++)) {
+        switch (u) {
+        case '(':
+            ++cap_grp_index;
+            if (cap_grp_index >= NUM_CAP_GRP)
+                CR_BAIL;
+            cg[cap_grp_index].atom_start = atom_index;
+            break;
+        case ')':
+            if (!cap_grp_index)
+                CR_BAIL;
+            cg[cap_grp_index].atom_end = atom_index;
+            --cap_grp_index;
+            break;
+        case '[':
+            in_set = 1;
+            /* Look ahead for negation operator */
+            if (*find == '^') {
+                cr[atom_index].negate = 'Y';
+                /* Eat char */
+                ++find;
+            }
+            break;
+        case ']':
+            in_set = 0;
+            ++atom_index;
+            break;
+        case '*':
+            if (!atom_index)
+                CR_BAIL;
+            cr[atom_index - 1].min_occ = 0;
+            cr[atom_index - 1].max_occ = -1;
+            break;
+        case '+':
+            if (!atom_index)
+                CR_BAIL;
+            cr[atom_index - 1].min_occ = 1;
+            cr[atom_index - 1].max_occ = -1;
+            break;
+        case '?':
+            if (!atom_index)
+                CR_BAIL;
+            cr[atom_index - 1].min_occ = 0;
+            cr[atom_index - 1].max_occ = 1;
+            break;
+        default:
+            cr[atom_index].set[u] = 'Y';
+            if (!in_set)
+                ++atom_index;
+            break;
+        }
+    }
+
+    /* Terminate atom array */
+    cr[atom_index].end = 'Y';
+
+    /* Set capture group zero */
+    cg[0].atom_start = 0;
+    cg[0].atom_end = atom_index;
 
     return cr;
 }
@@ -152,7 +223,7 @@ char *match_regex_mult(struct atom *find, char *str)
 void fill_in_capture_groups(struct cap_grp *cg, char *match_p,
                             struct atom *find)
 {
-    size_t i = 0, j, running_total = 0;
+    ssize_t i = 0, j, running_total = 0;
     while (!find[i].end) {
         for (j = 0; j < NUM_CAP_GRP; ++j) {
             if (i == cg[j].atom_start)
@@ -165,29 +236,34 @@ void fill_in_capture_groups(struct cap_grp *cg, char *match_p,
     }
 }
 
+void print_capture_groups(struct cap_grp *cg)
+{
+    size_t j;
+    for (j = 0; j < NUM_CAP_GRP; ++j) {
+        printf("Capture group %lu (%ld, %ld): ", j, cg[j].atom_start,
+               cg[j].atom_end);
+        cg[j].p == NULL ? printf("NULL") : fwrite(cg[j].p, 1, cg[j].len,
+                                                  stdout);
+        putchar('\n');
+    }
+}
+
 int main(void)
 {
     struct atom *cr;
     struct cap_grp cg[NUM_CAP_GRP];
-    char *find = "abc";
-    char *str = "xxxaaaaaaaaaaaefgbcuuu";
+    char *find = "([^xy]+)bc";
+    char *str = "xxxaaaaaaaaaaaefgjbcuuu";
     char *p;
     size_t len;
 
     if ((cr = compile_regex(find, cg)) == NULL)
         return 1;
 
-    /* print_compiled_regex(cr); */
+    print_compiled_regex(cr);
+
 
     /* printf("Match: %c\n", match_regex_here(cr, str) == NULL ? 'N' : 'Y'); */
-
-
-    cr[0].min_occ = 1;
-    cr[0].max_occ = -1;
-    cr->negate = 'Y';
-    cg[1].atom_start = 0;
-    cg[1].atom_end = 1;
-
 
 
     if ((p = match_regex(cr, str, &len)) == NULL)
@@ -201,9 +277,8 @@ int main(void)
 
     fill_in_capture_groups(cg, p, cr);
 
-    printf("Capture group 1: ");
-    fwrite(cg[1].p, 1, cg[1].len, stdout);
-    putchar('\n');
+
+    print_capture_groups(cg);
 
 
     free(cr);
