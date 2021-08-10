@@ -28,6 +28,7 @@
 
 #define match_atom(atom, ch) (atom->set[(unsigned char) ch] != atom->negate)
 
+#define NUM_CAP_GRP 10
 
 struct atom {
     char set[NUM_UCHAR];        /* Character set */
@@ -35,9 +36,18 @@ struct atom {
     char end;                   /* End of atom sequence */
     ssize_t min_occ;            /* Minimum number of occurrences required */
     ssize_t max_occ;            /* Maximum (as above). -1 means no limit. */
+    size_t num;                 /* Number of matches. Default is 1. */
 };
 
-struct atom *compile_regex(char *find)
+/* Capture group */
+struct cap_grp {
+    size_t atom_start;          /* Start index of capture group (inclusive) */
+    size_t atom_end;            /* End index of capture group (exclusive) */
+    char *p;                    /* Pointer to start of captured text */
+    size_t len;                 /* Length of captured text */
+};
+
+struct atom *compile_regex(char *find, struct cap_grp *cg)
 {
     struct atom *cr, *t;
     unsigned char u;
@@ -50,9 +60,14 @@ struct atom *compile_regex(char *find)
         t->set[u] = 'Y';
         t->min_occ = 1;
         t->max_occ = 1;
+        t->num = 1;
         ++t;
     }
     t->end = 'Y';
+
+    /* Clear the capture groups. Multiplication OK as already in memory. */
+    memset(cg, '\0', NUM_CAP_GRP * sizeof(struct cap_grp));
+
     return cr;
 }
 
@@ -64,7 +79,8 @@ void print_compiled_regex(struct atom *find)
         for (i = 0; i < NUM_UCHAR; ++i)
             if (find->set[i])
                 putchar(i);
-        printf(", %ld, %ld)\n", find->min_occ, find->max_occ);
+        printf(", %ld, %ld, %lu)\n", find->min_occ, find->max_occ,
+               find->num);
         ++find;
     }
 }
@@ -122,23 +138,43 @@ char *match_regex_mult(struct atom *find, char *str)
     /* Work backwards to see if the rest of the pattern will match */
     while (t - str >= find->min_occ) {
         r = match_regex_here(find + 1, t);
-        if (r != NULL)
+        if (r != NULL) {
+            /* Record the number of times that this atom was matched */
+            find->num = t - str;
             return r;
+        }
         --t;
     }
     /* No match */
     return NULL;
 }
 
+void fill_in_capture_groups(struct cap_grp *cg, char *match_p,
+                            struct atom *find)
+{
+    size_t i = 0, j, running_total = 0;
+    while (!find[i].end) {
+        for (j = 0; j < NUM_CAP_GRP; ++j) {
+            if (i == cg[j].atom_start)
+                cg[j].p = match_p + running_total;
+            if (i >= cg[j].atom_start && i < cg[j].atom_end)
+                cg[j].len += find[i].num;
+        }
+        running_total += find[i].num;
+        ++i;
+    }
+}
+
 int main(void)
 {
     struct atom *cr;
+    struct cap_grp cg[NUM_CAP_GRP];
     char *find = "abc";
     char *str = "xxxaaaaaaaaaaaefgbcuuu";
     char *p;
     size_t len;
 
-    if ((cr = compile_regex(find)) == NULL)
+    if ((cr = compile_regex(find, cg)) == NULL)
         return 1;
 
     /* print_compiled_regex(cr); */
@@ -149,6 +185,9 @@ int main(void)
     cr[0].min_occ = 1;
     cr[0].max_occ = -1;
     cr->negate = 'Y';
+    cg[1].atom_start = 0;
+    cg[1].atom_end = 1;
+
 
 
     if ((p = match_regex(cr, str, &len)) == NULL)
@@ -156,6 +195,16 @@ int main(void)
 
     fwrite(p, 1, len, stdout);
     putchar('\n');
+
+
+    print_compiled_regex(cr);
+
+    fill_in_capture_groups(cg, p, cr);
+
+    printf("Capture group 1: ");
+    fwrite(cg[1].p, 1, cg[1].len, stdout);
+    putchar('\n');
+
 
     free(cr);
 
