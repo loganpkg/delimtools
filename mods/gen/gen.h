@@ -21,6 +21,12 @@
 /* For SIZE_MAX */
 #include <stdint.h>
 
+#ifdef _WIN32
+/* For SSIZE_T */
+#include <BaseTsd.h>
+#endif
+
+
 /* size_t Addition OverFlow test */
 #define aof(a, b) ((a) > SIZE_MAX - (b))
 /* size_t Multiplication OverFlow test */
@@ -52,6 +58,10 @@
     ret = 1; \
     goto clean_up; \
 } while (0)
+
+#ifdef _WIN32
+#define ssize_t SSIZE_T
+#endif
 
 #define strlcpy(dst, src, d_size) snprintf(dst, d_size, "%s", src)
 #define reallocarray(p, num, size) (mof(num, size) ? NULL : realloc(p, (num) * (size)))
