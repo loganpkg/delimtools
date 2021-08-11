@@ -14,7 +14,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-F = -ansi -g -O0 -Wall -Wextra -pedantic -DNDEBUG
+F = -ansi -g -O3 -Wall -Wextra -pedantic
 
 # Build fresh everytime
 .PHONY: all
@@ -23,11 +23,7 @@ all:
 		mods/gen/gen.c \
 		mods/buf/buf.c \
 		mods/minicurses/minicurses.c \
-        mods/regex/regcomp.c \
-		mods/regex/regerror.c \
-		mods/regex/regexec.c \
-		mods/regex/regfree.c \
-		mods/rx/rx.c \
+        mods/regex/regex.c \
 		mods/gapbuf/gapbuf.c \
 		apps/spot/spot.c
 	cc ${F} -o m4 \

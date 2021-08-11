@@ -14,9 +14,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/* Buffer module */
+
 /*
  * References:
- * Section 4.3 External Variables of:
+ * Section 4.3 External Variables:
  * Brian W. Kernighan and Dennis M. Ritchie, The C Programming Language,
  *     Second Edition, Prentice Hall Software Series, New Jersey, 1988.
  * Clovis L. Tondo and Scott E. Gimpel, The C Answer Book, Second Edition,
@@ -81,6 +83,15 @@ int unget_ch(struct buf *b, int ch)
         return 1;
     *(b->a + b->i++) = ch;
     return 0;
+}
+
+int del_ch(struct buf *b)
+{
+     if (b->i) {
+         --b->i;
+         return 0;
+     }
+     return 1;
 }
 
 int include(struct buf *b, char *fn)

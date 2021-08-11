@@ -15,22 +15,14 @@
 #
 
 all:
-	cl /Ot /Wall \
-		/wd4820 /wd4464 /wd4244 /wd4310 /wd4267 /wd4996 /wd4242 /wd4710 /wd4255 \
-		/wd5045 /wd4090 /wd4706 \
-		/DNDEBUG \
+	cl /Ot \
 		apps\spot\spot.c \
 		mods\gen\gen.c \
 		mods\buf\buf.c \
 		mods\minicurses\minicurses.c \
-        mods\regex\regcomp.c \
-		mods\regex\regerror.c \
-		mods\regex\regexec.c \
-		mods\regex\regfree.c \
-		mods\rx\rx.c \
+        mods\regex\regex.c \
 		mods\gapbuf\gapbuf.c
-	cl /Ot /Wall \
-		/wd4820 /wd4464 /wd4996 /wd4710 /wd5045 /wd4242 /wd4244 /wd4267 /wd4706 \
+	cl /Ot \
 		apps\m4\m4.c \
 		mods\gen\gen.c \
 		mods\buf\buf.c \

@@ -14,10 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/*  An implementation of the m4 macro processor */
+
 /*
- * m4 macro processor.
- *
- *
  * References:
  * Brian W. Kernighan and Dennis M. Ritchie, The M4 Macro Processor,
  *     Bell Laboratories, Murray Hill, New Jersey 07974, July 1, 1977.

@@ -34,7 +34,7 @@
 
 #include "../gen/gen.h"
 #include "../buf/buf.h"
-#include "../rx/rx.h"
+#include "../regex/regex.h"
 #include "gapbuf.h"
 
 /* Internal macros only */

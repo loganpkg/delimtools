@@ -29,8 +29,7 @@ toucan is a C development environment that has the following features:
 * Scalable, modular design,
 * and Consistent function return values.
 
-All code and documentation has an ISC or BSD-style license
-(see individual files or directories for details).
+All code and documentation has a free ISC license.
 
 Applications
 ------------
@@ -50,8 +49,7 @@ toucan has the following modules:
 * gapbuf: Gap buffer,
 * minicurses: Curses,
 * hashtable: Hash table,
-* regex: POSIX regex (written by Henry Spencer and obtained from the OpenBSD project),
-* and rx: Regex replace.
+* and regex: Regular expression engine.
 
 Mascot
 ------

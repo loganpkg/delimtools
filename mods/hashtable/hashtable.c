@@ -14,13 +14,17 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/* Hash table module */
+
 /*
  * References:
- * Section 6.6 Table Lookup of:
+ *
+ * Section 6.6 Table Lookup:
  * Brian W. Kernighan and Dennis M. Ritchie, The C Programming Language,
  *     Second Edition, Prentice Hall Software Series, New Jersey, 1988.
  * Clovis L. Tondo and Scott E. Gimpel, The C Answer Book, Second Edition,
  *     PTR Prentice Hall Software Series, New Jersey, 1989.
+ *
  * Daniel J. Bernstein's djb2 algorithm from:
  * Hash Functions, http://www.cse.yorku.ca/~oz/hash.html
  */
