@@ -29,7 +29,7 @@ toucan is a C development environment that has the following features:
 * Scalable, modular design,
 * and Consistent function return values.
 
-All code and documentation has a free ISC license.
+All code and documentation is released under the ISC license.
 
 Applications
 ------------
