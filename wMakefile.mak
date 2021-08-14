@@ -27,6 +27,11 @@ all:
 		mods\gen\gen.c \
 		mods\buf\buf.c \
 		mods\hashtable\hashtable.c
+	cl /Ot \
+		apps\regr\regr.c \
+		mods\gen\gen.c \
+		mods\buf\buf.c \
+		mods\regex\regex.c
 
 clean:
 	del *.exe *.obj

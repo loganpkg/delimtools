@@ -36,10 +36,6 @@
 #include "../gen/gen.h"
 #include "regex.h"
 
-/* #define REGEX_DBUG */
-
-#define NUM_UCHAR (UCHAR_MAX + 1)
-
 #define match_atom(atom, ch) (atom->set[(unsigned char) ch] != atom->negate)
 
 #define NUM_CAP_GRP 10
@@ -86,19 +82,13 @@ static char *match_regex_mult(struct atom *find, struct hook *hk,
 static void fill_in_capture_groups(struct cap_grp *cg, char *match_p,
                                    struct atom *find);
 
-#ifdef REGEX_DBUG
-static void print_compiled_regex(struct atom *find);
-static void print_hooks(struct hook *hk);
-static void print_capture_groups(struct cap_grp *cg);
-#endif
-
 
 static struct atom *compile_regex(char *find, struct cap_grp *cg,
                                   struct hook *hk)
 {
     struct atom *cr;
-    unsigned char u, e;
-    size_t i, j, atom_index = 0;
+    unsigned char u, w, e;
+    size_t i, j, k, n, atom_index = 0;
     int in_set = 0;
     size_t cap_grp_index = 0;   /* Capture group index of open bracket */
     size_t stack[NUM_CAP_GRP] = { 0 };  /* Stack for nested capture groups */
@@ -138,10 +128,51 @@ static struct atom *compile_regex(char *find, struct cap_grp *cg,
     while ((u = *find++)) {
         switch (u) {
         case '\\':
-            /* Escaping. Next char is considered a literal in any context. */
             if (!*find)
                 cr_bail();
-            cr[atom_index].set[(unsigned char) *find] = 'Y';
+            switch (*find) {
+                /* Process special character sets first */
+            case 'w':
+                /* Word set */
+                for (k = 0; k < NUM_ASCII; ++k)
+                    if (isalnum(k) || k == '_')
+                        cr[atom_index].set[k] = 'Y';
+                break;
+            case 'W':
+                /* Non-word set */
+                for (k = 0; k < NUM_ASCII; ++k)
+                    if (!(isalnum(k) || k == '_'))
+                        cr[atom_index].set[k] = 'Y';
+                break;
+            case 'd':
+                /* Digit set */
+                for (k = 0; k < NUM_ASCII; ++k)
+                    if (isdigit(k))
+                        cr[atom_index].set[k] = 'Y';
+                break;
+            case 'D':
+                /* Non-digit set */
+                for (k = 0; k < NUM_ASCII; ++k)
+                    if (!isdigit(k))
+                        cr[atom_index].set[k] = 'Y';
+                break;
+            case 's':
+                /* Whitespace set */
+                for (k = 0; k < NUM_ASCII; ++k)
+                    if (isspace(k))
+                        cr[atom_index].set[k] = 'Y';
+                break;
+            case 'S':
+                /* Non-whitespace set */
+                for (k = 0; k < NUM_ASCII; ++k)
+                    if (!isspace(k))
+                        cr[atom_index].set[k] = 'Y';
+                break;
+            default:
+                /* Escaping, the next char is considered a literal */
+                cr[atom_index].set[(unsigned char) *find] = 'Y';
+                break;
+            }
             if (!in_set)
                 ++atom_index;
             /* Eat char */
@@ -196,6 +227,64 @@ static struct atom *compile_regex(char *find, struct cap_grp *cg,
             in_set = 0;
             ++atom_index;
             break;
+        case '{':
+            if (in_set) {
+                cr[atom_index].set[u] = 'Y';
+            } else {
+                /* Range */
+                if (!atom_index)
+                    cr_bail();
+
+                /* Read first number (if any) */
+                n = 0;
+                while (isdigit(w = *find++)) {
+                    if (mof(n, 10))
+                        cr_bail();
+                    n *= 10;
+                    if (aof(n, w - '0'))
+                        cr_bail();
+                    n += w - '0';
+                }
+                /* Zero is the default here if no first number was given */
+                cr[atom_index - 1].min_occ = n;
+
+                if (w == '}') {
+                    /*
+                     * Only one number or empty braces. Cannot be zero here.
+                     * Set max_occ to the same number.
+                     */
+                    if (!n)
+                        cr_bail();
+                    cr[atom_index - 1].max_occ = n;
+                    break;      /* Done reading range */
+                } else if (w != ',') {
+                    /* Syntax error */
+                    cr_bail();
+                }
+
+                /* Read second number (if any) */
+                /* Deafult is -1 here if no second number is given */
+                cr[atom_index - 1].max_occ = -1;
+                n = 0;
+                while (isdigit(w = *find++)) {
+                    if (mof(n, 10))
+                        cr_bail();
+                    n *= 10;
+                    if (aof(n, w - '0'))
+                        cr_bail();
+                    n += w - '0';
+                    /* Update number */
+                    cr[atom_index - 1].max_occ = n;
+                }
+                /* The second number cannot be zero */
+                if (!cr[atom_index - 1].max_occ)
+                    cr_bail();
+
+                /* End range */
+                if (w != '}')
+                    cr_bail();
+            }
+            break;
         case '*':
             if (in_set) {
                 cr[atom_index].set[u] = 'Y';
@@ -231,8 +320,8 @@ static struct atom *compile_regex(char *find, struct cap_grp *cg,
                 cr[atom_index].set[u] = 'Y';
             } else {
                 /* All possible chars */
-                for (i = 0; i < NUM_UCHAR; ++i)
-                    cr[atom_index].set[i] = 'Y';
+                for (k = 0; k < NUM_UCHAR; ++k)
+                    cr[atom_index].set[k] = 'Y';
                 ++atom_index;
             }
             break;
@@ -296,9 +385,6 @@ static char *match_regex(struct atom *find, struct hook *hk, char *str,
     }
 
     do {
-#ifdef REGEX_DBUG
-        printf("match_regex     : str: %s\n", str);
-#endif
         end_p = match_regex_here(find, hk, str);
         /* Keep searching if there is no start hook ^ and no match */
     } while (!hk->start && end_p == NULL && *str++ != '\0');
@@ -313,9 +399,6 @@ static char *match_regex(struct atom *find, struct hook *hk, char *str,
 static char *match_regex_here(struct atom *find, struct hook *hk,
                               char *str)
 {
-#ifdef REGEX_DBUG
-    printf("match_regex_here: str: %s\n", str);
-#endif
     /* End of regex atom chain */
     if (find->end) {
         /* Failed end hook */
@@ -325,9 +408,9 @@ static char *match_regex_here(struct atom *find, struct hook *hk,
         return str;
     }
     if (find->min_occ == 1 && find->max_occ == 1
-        && match_atom(find, *str) && *str != '\0')
+        && *str != '\0' && match_atom(find, *str))
         return match_regex_here(++find, hk, ++str);
-    if (!(find->min_occ == 1 && find->max_occ == 1) && *str != '\0')
+    if (!(find->min_occ == 1 && find->max_occ == 1))
         return match_regex_mult(find, hk, str);
 
     /* No match */
@@ -338,13 +421,9 @@ static char *match_regex_mult(struct atom *find, struct hook *hk,
                               char *str)
 {
     char *t = str, *r;
-#ifdef REGEX_DBUG
-    printf("match_regex_mult: str: %s\n", str);
-#endif
-    /* Find the most repeats that possible */
-    while (match_atom(find, *t)
-           && (find->max_occ == -1 ? 1 : t - str < find->max_occ)
-           && *t != '\0')
+    /* Find the most repeats possible */
+    while (*t != '\0' && match_atom(find, *t)
+           && (find->max_occ == -1 ? 1 : t - str < find->max_occ))
         ++t;
     /* Too few matches */
     if (t - str < find->min_occ)
@@ -395,7 +474,8 @@ struct buf *regex_replace(char *find, char *replace, char *str, int nl_sen)
     int ret = 0;
     char *t = NULL, *line, *q = NULL;
     char *p;                    /* Pointer to regex match */
-    size_t len;                 /* Length of regex match */
+    size_t len = 0;             /* Length of regex match */
+    size_t prev_len = 0;        /* Length of previous regex match */
     char *rep, ch;
     size_t j;
     struct buf *result = NULL;
@@ -408,11 +488,6 @@ struct buf *regex_replace(char *find, char *replace, char *str, int nl_sen)
     /* Compile regex expression */
     if ((cr = compile_regex(find, cg, &hk)) == NULL)
         return NULL;
-
-#ifdef REGEX_DBUG
-    print_compiled_regex(cr);
-    print_hooks(&hk);
-#endif
 
     /*
      * Copy string if in newline sensitive mode as the \n chars will be
@@ -428,6 +503,13 @@ struct buf *regex_replace(char *find, char *replace, char *str, int nl_sen)
     if ((result = init_buf(init_buf_size)) == NULL)
         quit();
 
+    /*
+     * Do not process an empty string (but an in-the-middle line can be empty).
+     * Not an error.
+     */
+    if (!*str)
+        goto clean_up;
+
     line = str;
 
     /* Process line by line */
@@ -436,76 +518,95 @@ struct buf *regex_replace(char *find, char *replace, char *str, int nl_sen)
         if (nl_sen) {
             if ((q = strchr(line, '\n')) != NULL)
                 *q = '\0';
+            /* Do not process the last line if empty. Not an error. */
+            else if (!*line)
+                goto clean_up;
         }
+
         while (1) {
             /* Match regex as many times as possible on line */
             if ((p = match_regex(cr, &hk, line, sol, &len)) == NULL)
                 break;
+
             /* Turn off as there can be multiple matches on the same line */
             sol = 0;
             /* Fill in caputure group matches */
             fill_in_capture_groups(cg, p, cr);
 
-#ifdef REGEX_DBUG
-            print_capture_groups(cg);
-            printf("%s\n%lu\n", line, strlen(line));
-#endif
-
-            /* Copy text before the match */
+            /* Copy text before the match  */
             if (put_mem(result, line, p - line))
                 quit();
-            /* Copy replacement text */
-            rep = replace;
-            while ((ch = *rep++)) {
-                if (ch == '\\' && isdigit(*rep)) {
-                    /* Substitute backreferences to capture groups */
-                    j = *rep - '0';
-                    ++rep;      /* Eat the digit */
-                    /*
-                     * Backreference exceeds number of capture groups in the
-                     * orginal find regex.
-                     */
-                    if (cg[j].atom_start == -1)
-                        quit();
-                    if (cg[j].len && put_mem(result, cg[j].p, cg[j].len))
-                        quit();
-                } else {
-                    if (put_ch(result, ch))
-                        quit();
+
+            /*
+             * Skip putting the replacement text if a zero length match and the
+             * previous match was not a zero length match. This stops two
+             * replacements being put at the same location. Only has scope
+             * within a line.
+             */
+            if (!(!len && prev_len && p == line)) {
+                /* Copy replacement text */
+                rep = replace;
+                while ((ch = *rep++)) {
+                    if (ch == '\\' && isdigit(*rep)) {
+                        /* Substitute backreferences to capture groups */
+                        j = *rep - '0';
+                        ++rep;  /* Eat the digit */
+                        /*
+                         * Backreference exceeds number of capture groups in the
+                         * orginal find regex.
+                         */
+                        if (cg[j].atom_start == -1)
+                            quit();
+                        if (cg[j].len
+                            && put_mem(result, cg[j].p, cg[j].len))
+                            quit();
+                    } else {
+                        if (put_ch(result, ch))
+                            quit();
+                    }
                 }
             }
-            /*
-             * Move forward on the same line to after the end of the match.
-             * Don't need to worry about zero length matches here, as can only
-             * happen with the ^ and $ hooks by themselves in this regex
-             * engine.
-             */
+
+            /* Record prev len for the next iteration */
+            prev_len = len;
+
+            /* Move forward on the same line to after the end of the match */
             line = p + len;
             /* Break if at end of line */
             if (!*line)
                 break;
+            /*
+             * Move forward by one if a zero length match, and pass the skipped
+             * character through.
+             */
+            if (!len && put_ch(result, *line++))
+                quit();
         }
+
         /* Copy the rest of the line */
         if (put_str(result, line))
             quit();
-        /* Replace newline character */
+        /* Replace the newline character */
         if (nl_sen && q != NULL && put_ch(result, '\n'))
             quit();
 
+        /* Reset start of line indicator ready for the next line */
         sol = 1;
+        /* Clear previous match len as this does not carry from one line to the next */
+        prev_len = 0;
         /* Move to the next line if doing newline sensitive matching */
         if (nl_sen && q != NULL)
             line = q + 1;
     } while (nl_sen && q != NULL);
 
-    /* Terminate buf in case it is used as a string */
-    if (put_ch(result, '\0'))
-        quit();
-
   clean_up:
     free(cr);
     free(t);
 
+    /* Terminate buf in case it is used as a string */
+    if (!ret && put_ch(result, '\0'))
+        ret = 1;
+    /* Free buffer on failure */
     if (ret) {
         free_buf(result);
         return NULL;
@@ -513,60 +614,3 @@ struct buf *regex_replace(char *find, char *replace, char *str, int nl_sen)
 
     return result;
 }
-
-#ifdef REGEX_DBUG
-
-static void print_compiled_regex(struct atom *find)
-{
-    size_t i;
-    while (!find->end) {
-        putchar('(');
-        for (i = 0; i < NUM_UCHAR; ++i)
-            if (find->set[i]) {
-                if (isgraph(i))
-                    putchar(i);
-                else
-                    printf("%02X", (unsigned char) i);
-            }
-        printf(", %ld, %ld, %lu)\n", find->min_occ, find->max_occ,
-               find->num);
-        ++find;
-    }
-}
-
-static void print_hooks(struct hook *hk)
-{
-    printf("Start hook (^): %c\n", hk->start ? 'Y' : 'N');
-    printf("End hook   ($): %c\n", hk->end ? 'Y' : 'N');
-}
-
-static void print_capture_groups(struct cap_grp *cg)
-{
-    size_t j;
-    for (j = 0; j < NUM_CAP_GRP; ++j) {
-        printf("Capture group %lu (%ld, %ld): ", j, cg[j].atom_start,
-               cg[j].atom_end);
-        cg[j].p == NULL ? printf("NULL") : fwrite(cg[j].p, 1, cg[j].len,
-                                                  stdout);
-        putchar('\n');
-    }
-}
-
-int main(void)
-{
-    char *str = "hello world\n" "world hello";
-    char *find = "world";
-    char *replace = "\\0\\0";
-    struct buf *r;
-
-    printf("========\n%s\n========\n%s\n========\n%s\n", find, replace,
-           str);
-    if ((r = regex_replace(find, replace, str, 1)) == NULL)
-        return 1;
-    printf("========\n%s\n========\n", r->a);
-    free_buf(r);
-
-    return 0;
-}
-
-#endif

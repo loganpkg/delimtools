@@ -31,7 +31,12 @@ all:
 		mods/buf/buf.c \
 		mods/hashtable/hashtable.c \
 		apps/m4/m4.c
+	cc ${F} -o regr \
+		mods/gen/gen.c \
+		mods/buf/buf.c \
+		mods/regex/regex.c \
+		apps/regr/regr.c
 
 .PHONY: clean
 clean:
-	rm -f spot m4
+	rm -f spot m4 regr

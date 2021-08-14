@@ -54,6 +54,9 @@
 /* Escape key */
 #define ESC 27
 
+#define NUM_UCHAR (UCHAR_MAX + 1)
+#define NUM_ASCII 128
+
 #define quit() do { \
     ret = 1; \
     goto clean_up; \
@@ -69,5 +72,6 @@
 int str_to_num(char *s, size_t * num);
 char *memmatch(char *big, size_t big_len, char *little, size_t little_len);
 int filesize(char *fn, size_t * fs);
+char *file_to_str(char *fn);
 
 #endif

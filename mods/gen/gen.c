@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <limits.h>
 #include <ctype.h>
 
@@ -104,4 +105,33 @@ int filesize(char *fn, size_t * fs)
         return 1;
     *fs = st.st_size;
     return 0;
+}
+
+char *file_to_str(char *fn)
+{
+    /* Reads a file fn to a dynamically allocated string */
+    FILE *fp;
+    size_t fs;
+    char *str;
+    if (filesize(fn, &fs))
+        return NULL;
+    if (aof(fs, 1))
+        return NULL;
+    if ((fp = fopen(fn, "rb")) == NULL)
+        return NULL;
+    if ((str = malloc(fs + 1)) == NULL) {
+        fclose(fp);
+        return NULL;
+    }
+    if (fread(str, 1, fs, fp) != fs) {
+        fclose(fp);
+        free(str);
+        return NULL;
+    }
+    if (fclose(fp)) {
+        free(str);
+        return NULL;
+    }
+    *(str + fs) = '\0';
+    return str;
 }
