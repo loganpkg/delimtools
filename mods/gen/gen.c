@@ -58,7 +58,6 @@ char *memmatch(char *big, size_t big_len, char *little, size_t little_len)
      * Daniel M. Sunday, A Very Fast Substring Search Algorithm,
      *     Communications of the ACM, Vol.33, No.8, August 1990.
      */
-#define UCHAR_NUM (UCHAR_MAX + 1)
     unsigned char bad[UCHAR_NUM], *pattern, *q, *q_stop, *q_check;
     size_t to_match, j;
     if (!little_len)

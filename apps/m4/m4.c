@@ -270,7 +270,7 @@ int main(int argc, char **argv)
 #define NUM_SIZE 24
     char *sd = NULL, *tmp_str = NULL, num[NUM_SIZE], *p, *q;
     unsigned char uc, uc2;
-    int map[UCHAR_MAX], x;
+    int map[UCHAR_NUM], x;
 
     if (argc < 1)
         return 1;
@@ -563,7 +563,7 @@ int main(int argc, char **argv)
             quit(); \
     } else if (!strcmp(SN, "translit")) { \
         /* Set mapping to pass through (-1) */ \
-        for (k = 0; k < UCHAR_MAX; k++) \
+        for (k = 0; k < UCHAR_NUM; k++) \
             *(map + k) = -1; \
         p = arg(2); \
         q = arg(3); \

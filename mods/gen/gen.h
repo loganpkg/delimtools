@@ -54,8 +54,8 @@
 /* Escape key */
 #define ESC 27
 
-#define NUM_UCHAR (UCHAR_MAX + 1)
-#define NUM_ASCII 128
+#define UCHAR_NUM (UCHAR_MAX + 1)
+#define ASCII_NUM 128
 
 #define quit() do { \
     ret = 1; \

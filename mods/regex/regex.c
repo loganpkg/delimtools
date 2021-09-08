@@ -41,7 +41,7 @@
 #define NUM_CAP_GRP 10
 
 struct atom {
-    char set[NUM_UCHAR];        /* Character set */
+    char set[UCHAR_NUM];        /* Character set */
     char negate;                /* Negate the character set */
     char end;                   /* End of atom sequence */
     ssize_t min_occ;            /* Minimum number of occurrences required */
@@ -134,37 +134,37 @@ static struct atom *compile_regex(char *find, struct cap_grp *cg,
                 /* Process special character sets first */
             case 'w':
                 /* Word set */
-                for (k = 0; k < NUM_ASCII; ++k)
+                for (k = 0; k < ASCII_NUM; ++k)
                     if (isalnum(k) || k == '_')
                         cr[atom_index].set[k] = 'Y';
                 break;
             case 'W':
                 /* Non-word set */
-                for (k = 0; k < NUM_ASCII; ++k)
+                for (k = 0; k < ASCII_NUM; ++k)
                     if (!(isalnum(k) || k == '_'))
                         cr[atom_index].set[k] = 'Y';
                 break;
             case 'd':
                 /* Digit set */
-                for (k = 0; k < NUM_ASCII; ++k)
+                for (k = 0; k < ASCII_NUM; ++k)
                     if (isdigit(k))
                         cr[atom_index].set[k] = 'Y';
                 break;
             case 'D':
                 /* Non-digit set */
-                for (k = 0; k < NUM_ASCII; ++k)
+                for (k = 0; k < ASCII_NUM; ++k)
                     if (!isdigit(k))
                         cr[atom_index].set[k] = 'Y';
                 break;
             case 's':
                 /* Whitespace set */
-                for (k = 0; k < NUM_ASCII; ++k)
+                for (k = 0; k < ASCII_NUM; ++k)
                     if (isspace(k))
                         cr[atom_index].set[k] = 'Y';
                 break;
             case 'S':
                 /* Non-whitespace set */
-                for (k = 0; k < NUM_ASCII; ++k)
+                for (k = 0; k < ASCII_NUM; ++k)
                     if (!isspace(k))
                         cr[atom_index].set[k] = 'Y';
                 break;
@@ -320,7 +320,7 @@ static struct atom *compile_regex(char *find, struct cap_grp *cg,
                 cr[atom_index].set[u] = 'Y';
             } else {
                 /* All possible chars */
-                for (k = 0; k < NUM_UCHAR; ++k)
+                for (k = 0; k < UCHAR_NUM; ++k)
                     cr[atom_index].set[k] = 'Y';
                 ++atom_index;
             }
