@@ -51,6 +51,7 @@
 #include "../../mods/gen/gen.h"
 #include "../../mods/buf/buf.h"
 #include "../../mods/hashtable/hashtable.h"
+#include "../../mods/fs/fs.h"
 
 
 #if ESYSCMD_MAKETEMP && defined _WIN32

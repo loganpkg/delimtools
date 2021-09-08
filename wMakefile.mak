@@ -21,17 +21,25 @@ all:
 		mods\buf\buf.c \
 		mods\minicurses\minicurses.c \
         mods\regex\regex.c \
+		mods\fs\fs.c \
 		mods\gapbuf\gapbuf.c
 	cl /Ot \
 		apps\m4\m4.c \
 		mods\gen\gen.c \
 		mods\buf\buf.c \
+        mods\fs\fs.c \
 		mods\hashtable\hashtable.c
 	cl /Ot \
 		apps\regr\regr.c \
 		mods\gen\gen.c \
 		mods\buf\buf.c \
+		mods\fs\fs.c \
 		mods\regex\regex.c
+	cl /Ot \
+		apps\lsha256\lsha256.c \
+		mods\gen\gen.c \
+		mods\fs\fs.c \
+		mods\sha256\sha256.c
 
 clean:
 	del *.exe *.obj

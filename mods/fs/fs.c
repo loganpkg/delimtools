@@ -1,0 +1,293 @@
+/*
+ * Copyright (c) 2021 Logan Ryan McLintock
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+/* File system operations */
+
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#include <fcntl.h>
+#include <unistd.h>
+#include <libgen.h>
+#include <dirent.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "../gen/gen.h"
+#include "fs.h"
+
+
+
+int is_dir(char *dn)
+{
+    struct stat st;
+    if (stat(dn, &st))
+        return 1;
+
+#ifndef S_ISDIR
+#define S_ISDIR(m) ((m & S_IFMT) == S_IFDIR)
+#endif
+
+    if (S_ISDIR(st.st_mode))
+        return 1;               /* Yes. Is a directory. */
+    else
+        return 0;               /* No. Not a directory. */
+}
+
+int filesize(char *fn, size_t * fs)
+{
+    /* Gets the filesize of a filename */
+    struct stat st;
+    if (stat(fn, &st))
+        return 1;
+
+#ifndef S_ISREG
+#define S_ISREG(m) ((m & S_IFMT) == S_IFREG)
+#endif
+
+    if (!S_ISREG(st.st_mode))
+        return 1;
+    if (st.st_size < 0)
+        return 1;
+    *fs = st.st_size;
+    return 0;
+}
+
+char *file_to_str(char *fn)
+{
+    /* Reads a file fn to a dynamically allocated string */
+    FILE *fp;
+    size_t fs;
+    char *str;
+    if (filesize(fn, &fs))
+        return NULL;
+    if (aof(fs, 1))
+        return NULL;
+    if ((fp = fopen(fn, "rb")) == NULL)
+        return NULL;
+    if ((str = malloc(fs + 1)) == NULL) {
+        fclose(fp);
+        return NULL;
+    }
+    if (fread(str, 1, fs, fp) != fs) {
+        fclose(fp);
+        free(str);
+        return NULL;
+    }
+    if (fclose(fp)) {
+        free(str);
+        return NULL;
+    }
+    *(str + fs) = '\0';
+    return str;
+}
+
+int walk_dir(char *dir_name, void *info,
+             int (*process_file) (char *, void *))
+{
+    int ret = 0;
+    DIR *dirp = NULL;
+    struct dirent *entry;
+    char *fn = NULL, *path_name = NULL;
+    size_t dn_s;
+    unsigned char dt;
+
+    dn_s = strlen(dir_name);
+
+    if ((dirp = opendir(dir_name)) == NULL)
+        quit();
+
+    while ((entry = readdir(dirp)) != NULL) {
+        /* Copy variables */
+        if ((fn = strdup(entry->d_name)) == NULL)
+            quit();
+        dt = entry->d_type;
+        /* Concatenate file path */
+        if ((path_name = concat(dir_name, DIRSEP_STR, fn, NULL)) == NULL)
+            quit();
+        if (dt == DT_DIR) {
+            if (strcmp(fn, ".") && strcmp(fn, "..")
+                && walk_dir(path_name, info, process_file))
+                quit();
+        } else if (dt == DT_REG) {
+            if ((*process_file) (path_name, info))
+                quit();
+        } else {
+            /* Not a directory or regular file */
+            quit();
+        }
+        free(fn);
+        fn = NULL;
+        free(path_name);
+        path_name = NULL;
+    }
+
+  clean_up:
+    free(fn);
+    free(path_name);
+
+    if (closedir(dirp))
+        ret = 1;
+
+    return ret;
+}
+
+int atomic_write(char *fn, void *info,
+                 int (*write_details) (FILE *, void *))
+{
+    /* Performs atomic writes on POSIX systems */
+    int ret = 0;
+    char *fn_tilde = NULL;
+    FILE *fp = NULL;
+    size_t fn_len;
+
+#ifndef _WIN32
+    char *fn_copy = NULL;
+    char *dir;
+    int fd;
+    int d_fd = -1;
+    struct stat st;
+#endif
+
+    /* No filename */
+    if (fn == NULL || !(fn_len = strlen(fn)))
+        quit();
+    if (aof(fn_len, 2))
+        quit();
+    if ((fn_tilde = malloc(fn_len + 2)) == NULL)
+        quit();
+    memcpy(fn_tilde, fn, fn_len);
+    *(fn_tilde + fn_len) = '~';
+    *(fn_tilde + fn_len + 1) = '\0';
+    if ((fp = fopen(fn_tilde, "wb")) == NULL)
+        quit();
+
+    (*write_details) (fp, info);
+
+    if (fflush(fp))
+        quit();
+
+#ifndef _WIN32
+    /* If original file exists, then apply its permissions to the new file */
+    if (!stat(fn, &st) && S_ISREG(st.st_mode)
+        && chmod(fn_tilde, st.st_mode & 0777))
+        quit();
+    if ((fd = fileno(fp)) == -1)
+        quit();
+    if (fsync(fd))
+        quit();
+#endif
+
+    if (fclose(fp))
+        quit();
+    fp = NULL;
+
+#ifndef _WIN32
+    if ((fn_copy = strdup(fn)) == NULL)
+        quit();
+    if ((dir = dirname(fn_copy)) == NULL)
+        quit();
+    if ((d_fd = open(dir, O_RDONLY)) == -1)
+        quit();
+    if (fsync(d_fd))
+        quit();
+#endif
+
+#ifdef _WIN32
+    /* rename does not overwrite an existing file */
+    errno = 0;
+    if (remove(fn) && errno != ENOENT)
+        quit();
+#endif
+
+    /* Atomic on POSIX systems */
+    if (rename(fn_tilde, fn))
+        quit();
+
+#ifndef _WIN32
+    if (fsync(d_fd))
+        quit();
+#endif
+
+  clean_up:
+    if (fn_tilde != NULL)
+        free(fn_tilde);
+    if (fp != NULL && fclose(fp))
+        ret = 1;
+#ifndef _WIN32
+    if (fn_copy != NULL)
+        free(fn_copy);
+    if (d_fd != -1 && close(d_fd))
+        ret = 1;
+#endif
+
+    /* Fail */
+    if (ret)
+        return 1;
+
+    return 0;
+}
+
+int cp_file(char *from_file, char *to_file)
+{
+    int ret = 0;
+    FILE *fp_from = NULL;
+    FILE *fp_to = NULL;
+    size_t fs, fs_left, io_size;
+    char *p;
+
+    if (filesize(from_file, &fs))
+        return 1;
+
+    if ((p = malloc(fs > BUFSIZ ? BUFSIZ : fs)) == NULL)
+        return 1;
+
+    if ((fp_from = fopen(from_file, "rb")) == NULL) {
+        ret = 1;
+        goto clean_up;
+    }
+
+    if ((fp_to = fopen(to_file, "wb")) == NULL) {
+        ret = 1;
+        goto clean_up;
+    }
+
+    fs_left = fs;
+
+    while (fs_left) {
+        io_size = min(BUFSIZ, fs_left);
+        if (fread(p, 1, io_size, fp_from) != io_size) {
+            ret = 1;
+            goto clean_up;
+        }
+        if (fwrite(p, 1, io_size, fp_to) != io_size) {
+            ret = 1;
+            goto clean_up;
+        }
+        fs_left -= io_size;
+    }
+
+  clean_up:
+    free(p);
+    if (fclose(fp_from))
+        ret = 1;
+    if (fclose(fp_to))
+        ret = 1;
+
+    return ret;
+}

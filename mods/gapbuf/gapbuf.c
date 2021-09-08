@@ -35,6 +35,7 @@
 #include "../gen/gen.h"
 #include "../buf/buf.h"
 #include "../regex/regex.h"
+#include "../fs/fs.h"
 #include "gapbuf.h"
 
 /* Internal macros only */
@@ -825,105 +826,27 @@ int insert_file(struct gapbuf *b, char *fn)
     return 0;
 }
 
-int write_file(struct gapbuf *b)
-{
-    /* Writes a gap buffer to file */
-    int ret = 0;
-    char *fn_tilde = NULL;
-    FILE *fp = NULL;
-    size_t n, fn_len;
-
-#ifndef _WIN32
-    char *fn_copy = NULL;
-    char *dir;
-    int fd;
-    int d_fd = -1;
-    struct stat st;
-#endif
-
-    /* No filename */
-    if (b->fn == NULL || !(fn_len = strlen(b->fn)))
-        quit();
-    if (aof(fn_len, 2))
-        quit();
-    if ((fn_tilde = malloc(fn_len + 2)) == NULL)
-        quit();
-    memcpy(fn_tilde, b->fn, fn_len);
-    *(fn_tilde + fn_len) = '~';
-    *(fn_tilde + fn_len + 1) = '\0';
-    if ((fp = fopen(fn_tilde, "wb")) == NULL)
-        quit();
+int write_gapbuf_details(FILE *fp, void *x) {
+    /* Write details to be called via a function pointer in atomic_write */
+    struct gapbuf *b = x;
+    size_t n;
 
     /* Before gap */
     n = b->g - b->a;
     if (fwrite(b->a, 1, n, fp) != n)
-        quit();
+        return 1;
 
     /* After gap, excluding the last character */
     n = b->e - b->c;
     if (fwrite(b->c, 1, n, fp) != n)
-        quit();
-
-    if (fflush(fp))
-        quit();
-
-#ifndef _WIN32
-    /* If original file exists, then apply its permissions to the new file */
-    if (!stat(b->fn, &st) && S_ISREG(st.st_mode)
-        && chmod(fn_tilde, st.st_mode & 0777))
-        quit();
-    if ((fd = fileno(fp)) == -1)
-        quit();
-    if (fsync(fd))
-        quit();
-#endif
-
-    if (fclose(fp))
-        quit();
-    fp = NULL;
-
-#ifndef _WIN32
-    if ((fn_copy = strdup(b->fn)) == NULL)
-        quit();
-    if ((dir = dirname(fn_copy)) == NULL)
-        quit();
-    if ((d_fd = open(dir, O_RDONLY)) == -1)
-        quit();
-    if (fsync(d_fd))
-        quit();
-#endif
-
-#ifdef _WIN32
-    /* rename does not overwrite an existing file */
-    errno = 0;
-    if (remove(b->fn) && errno != ENOENT)
-        quit();
-#endif
-
-    /* Atomic on POSIX systems */
-    if (rename(fn_tilde, b->fn))
-        quit();
-
-#ifndef _WIN32
-    if (fsync(d_fd))
-        quit();
-#endif
-
-  clean_up:
-    if (fn_tilde != NULL)
-        free(fn_tilde);
-    if (fp != NULL && fclose(fp))
-        ret = 1;
-#ifndef _WIN32
-    if (fn_copy != NULL)
-        free(fn_copy);
-    if (d_fd != -1 && close(d_fd))
-        ret = 1;
-#endif
-
-    /* Fail */
-    if (ret)
         return 1;
+
+   return 0;
+}
+
+int write_file(struct gapbuf *b)
+{
+    if (atomic_write(b->fn, b, write_gapbuf_details)) return 1;
 
     /* Success */
     b->mod = 0;

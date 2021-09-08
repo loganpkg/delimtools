@@ -31,6 +31,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include "../gen/gen.h"
+#include "../fs/fs.h"
 #include "buf.h"
 
 #define buf_free_size(b) (b->s - b->i)
@@ -235,4 +236,19 @@ int buf_dump_buf(struct buf *dst, struct buf *src)
     dst->i += src->i;
     src->i = 0;
     return 0;
+}
+
+int write_buf_details(FILE *fp, void *x) {
+    /* Write details to be called via a function pointer in atomic_write */
+    struct buf *b = x;
+
+    if (fwrite(b->a, 1, b->i, fp) != b->i)
+        return 1;
+
+   return 0;
+}
+
+int write_buf(struct buf *b, char *fn)
+{
+    return atomic_write(fn, b, write_buf_details);
 }

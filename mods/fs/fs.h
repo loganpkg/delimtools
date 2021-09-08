@@ -14,39 +14,19 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* regr: Regular expression find and replace */
+#ifdef _WIN32
+#define DIRSEP_CH '\\'
+#define DIRSEP_STR "\\"
+#else
+#define DIRSEP_CH '/'
+#define DIRSEP_STR "/"
+#endif
 
-#include <stdio.h>
-#include <stdlib.h>
 
-#include "../../mods/gen/gen.h"
-#include "../../mods/regex/regex.h"
-#include "../../mods/fs/fs.h"
-
-int main(int argc, char **argv)
-{
-    int i;
-    char *find, *replace, *str;
-    struct buf *res;
-
-    if (argc < 4) {
-       fprintf(stderr, "Usage: %s find replace file...\n", *argv);
-       return 1;
-    }
-
-    find = *(argv + 1);
-    replace = *(argv + 2);
-
-    for (i = 3; i < argc; ++i) {
-        if ((str = file_to_str(*(argv + i))) == NULL) return 1;
-        if ((res = regex_replace(find, replace, str, 1)) == NULL) {
-            free(str);
-            return 1;
-        }
-        free(str);
-        printf("%s", res->a);
-        free_buf(res);
-    }
-    
-return 0;
-}
+int is_dir(char *dn);
+int filesize(char *fn, size_t * fs);
+char *file_to_str(char *fn);
+int concat_path(char *res_path, char *dn, char *fn);
+int walk_dir(char *dir_name, void *info, int (*process_file) (char *, void *));
+int atomic_write(char *fn, void *info, int (*write_details)(FILE *, void *));
+int cp_file(char *from_file, char *to_file);

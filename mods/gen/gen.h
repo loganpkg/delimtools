@@ -71,7 +71,6 @@
 
 int str_to_num(char *s, size_t * num);
 char *memmatch(char *big, size_t big_len, char *little, size_t little_len);
-int filesize(char *fn, size_t * fs);
-char *file_to_str(char *fn);
+char *concat(char *str0, ...);
 
 #endif

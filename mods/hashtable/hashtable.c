@@ -38,6 +38,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../gen/gen.h"
+#include "../fs/fs.h"
 #include "hashtable.h"
 
 struct hashtable *init_hashtable(size_t num_buckets)
@@ -200,4 +202,86 @@ int delete_entry(struct hashtable *ht, char *name)
 
     /* Not found */
     return 1;
+}
+
+int write_hashtable_details(FILE * fp, void *x)
+{
+    struct hashtable *ht = x;
+    struct entry *e, *ne;
+    size_t j;
+    if (ht != NULL) {
+        if (ht->b != NULL) {
+            for (j = 0; j < ht->n; ++j) {
+                e = *(ht->b + j);
+                while (e != NULL) {
+                    ne = e->next;
+                    if (e->name != NULL && fprintf(fp, "%s", e->name) < 0)
+                        return 1;
+                    if (putc('\0', fp) == EOF)
+                        return 1;
+                    if (e->def != NULL && fprintf(fp, "%s", e->def) < 0)
+                        return 1;
+                    if (putc('\0', fp) == EOF)
+                        return 1;
+                    e = ne;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+int write_hashtable(struct hashtable *ht, char *fn)
+{
+    /* Writes all the hash table entries to a file with a '\0' delimiter */
+    if (atomic_write(fn, ht, write_hashtable_details))
+        return 1;
+
+    return 0;
+}
+
+int load_file(struct hashtable *ht, char *fn)
+{
+    /* Load file with '\0' delimiter into hash table */
+    int ret = 0;
+    FILE *fp;
+    char *p = NULL, *q, *q_stop, *name, *def;
+    size_t fs;
+    if (filesize(fn, &fs))
+        return 1;
+    if (!fs)
+        return 0;               /* Nothing to do */
+    if ((fp = fopen(fn, "rb")) == NULL)
+        quit();
+    if ((p = malloc(fs)) == NULL)
+        quit();
+    if (fread(p, 1, fs, fp) != fs)
+        quit();
+
+    /* Test that data ends in '\0' */
+    if (*(p + fs - 1) != '\0')
+        quit();
+
+    q = p;
+    q_stop = p + fs - 1;
+
+    while (1) {
+        name = q;
+        if ((q = memchr(q, '\0', q_stop - q)) == q_stop)
+            quit();
+        ++q;
+        def = q;
+        if (upsert_entry(ht, name, def))
+            quit();
+        if ((q = memchr(q, '\0', q_stop - q)) == q_stop)
+            break;
+        ++q;
+    }
+
+  clean_up:
+    if (fp != NULL && fclose(fp))
+        ret = 1;
+    if (p != NULL)
+        free(p);
+    return ret;
 }

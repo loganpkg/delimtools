@@ -18,6 +18,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -88,50 +89,59 @@ char *memmatch(char *big, size_t big_len, char *little, size_t little_len)
     return NULL;
 }
 
-int filesize(char *fn, size_t * fs)
+#define INIT_STR_BUF 512
+
+char *concat(char *str0, ...)
 {
-    /* Gets the filesize of a filename */
-    struct stat st;
-    if (stat(fn, &st))
-        return 1;
-
-#ifndef S_ISREG
-#define S_ISREG(m) ((m & S_IFMT) == S_IFREG)
-#endif
-
-    if (!S_ISREG(st.st_mode))
-        return 1;
-    if (st.st_size < 0)
-        return 1;
-    *fs = st.st_size;
-    return 0;
-}
-
-char *file_to_str(char *fn)
-{
-    /* Reads a file fn to a dynamically allocated string */
-    FILE *fp;
-    size_t fs;
+/*
+ * Concatenate multiple strings. Last argument must be NULL.
+ * Returns NULL on error or a pointer to the concatenated string on success.
+ * Must free the concatenated string after use.
+ */
+    int ret = 0;
+    va_list arg_p;
     char *str;
-    if (filesize(fn, &fs))
+    char ch, *p, *q, *tmp;
+    size_t s, s_new, free_space, offset;
+
+    if ((p = malloc(INIT_STR_BUF)) == NULL)
         return NULL;
-    if (aof(fs, 1))
-        return NULL;
-    if ((fp = fopen(fn, "rb")) == NULL)
-        return NULL;
-    if ((str = malloc(fs + 1)) == NULL) {
-        fclose(fp);
+    s = INIT_STR_BUF;
+    free_space = s;
+
+    va_start(arg_p, str0);
+    str = str0;
+    q = p;
+    while (str != NULL) {
+        while ((ch = *str++)) {
+            /* Will use one with the terminating '\0' */
+            if (free_space == 1) {
+                /* Need to grow memory */
+                if (mof(s, 2))
+                    quit();
+                s_new = s * 2;
+                offset = q - p;
+                if ((tmp = realloc(p, s_new)) == NULL)
+                    quit();
+                p = tmp;
+                q = tmp + offset;
+                free_space += s_new - s;
+                s = s_new;
+            }
+            /* Copy char */
+            *q++ = ch;
+            --free_space;
+        }
+        str = va_arg(arg_p, char *);
+    }
+    *q = '\0';
+
+  clean_up:
+    va_end(arg_p);
+    if (ret) {
+        free(p);
         return NULL;
     }
-    if (fread(str, 1, fs, fp) != fs) {
-        fclose(fp);
-        free(str);
-        return NULL;
-    }
-    if (fclose(fp)) {
-        free(str);
-        return NULL;
-    }
-    *(str + fs) = '\0';
-    return str;
+
+    return p;
 }

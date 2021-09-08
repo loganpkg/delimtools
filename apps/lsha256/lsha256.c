@@ -14,39 +14,29 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* regr: Regular expression find and replace */
+/* SHA-256 utility */
 
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../../mods/gen/gen.h"
-#include "../../mods/regex/regex.h"
-#include "../../mods/fs/fs.h"
+#include "../../mods/sha256/sha256.h"
 
 int main(int argc, char **argv)
 {
+    char *hash;
     int i;
-    char *find, *replace, *str;
-    struct buf *res;
 
-    if (argc < 4) {
-       fprintf(stderr, "Usage: %s find replace file...\n", *argv);
-       return 1;
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s file ...\n", *argv);
+        return 1;
     }
 
-    find = *(argv + 1);
-    replace = *(argv + 2);
-
-    for (i = 3; i < argc; ++i) {
-        if ((str = file_to_str(*(argv + i))) == NULL) return 1;
-        if ((res = regex_replace(find, replace, str, 1)) == NULL) {
-            free(str);
+    for (i = 1; i < argc; ++i) {
+        if ((hash = sha256(*(argv + i))) == NULL)
             return 1;
-        }
-        free(str);
-        printf("%s", res->a);
-        free_buf(res);
+        printf("%s %s\n", hash, *(argv + i));
+        free(hash);
     }
-    
-return 0;
+
+    return 0;
 }

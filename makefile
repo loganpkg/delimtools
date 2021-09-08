@@ -24,18 +24,33 @@ all:
 		mods/buf/buf.c \
 		mods/minicurses/minicurses.c \
         mods/regex/regex.c \
+        mods/fs/fs.c \
 		mods/gapbuf/gapbuf.c \
 		apps/spot/spot.c
 	cc ${F} -o m4 \
 		mods/gen/gen.c \
 		mods/buf/buf.c \
+        mods/fs/fs.c \
 		mods/hashtable/hashtable.c \
 		apps/m4/m4.c
 	cc ${F} -o regr \
 		mods/gen/gen.c \
 		mods/buf/buf.c \
+        mods/fs/fs.c \
 		mods/regex/regex.c \
 		apps/regr/regr.c
+	cc ${F} -o lsha256 \
+		mods/gen/gen.c \
+        mods/fs/fs.c \
+		mods/sha256/sha256.c \
+        apps/lsha256/lsha256.c
+	cc ${F} -o capybara \
+		mods/gen/gen.c \
+        mods/fs/fs.c \
+		mods/sha256/sha256.c \
+		mods/hashtable/hashtable.c \
+		mods/buf/buf.c \
+        apps/capybara/capybara.c
 
 .PHONY: clean
 clean:

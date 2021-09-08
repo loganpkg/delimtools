@@ -39,5 +39,7 @@ struct entry *lookup_entry(struct hashtable *ht, char *name);
 char *get_def(struct hashtable *ht, char *name);
 int upsert_entry(struct hashtable *ht, char *name, char *def);
 int delete_entry(struct hashtable *ht, char *name);
+int write_hashtable(struct hashtable *ht, char *fn);
+int load_file(struct hashtable *ht, char *fn);
 
 #endif
