@@ -30,3 +30,4 @@ int concat_path(char *res_path, char *dn, char *fn);
 int walk_dir(char *dir_name, void *info, int (*process_file) (char *, void *));
 int atomic_write(char *fn, void *info, int (*write_details)(FILE *, void *));
 int cp_file(char *from_file, char *to_file);
+int exists(char *fn);

@@ -40,6 +40,7 @@
 #include "../../mods/buf/buf.h"
 #include "../../mods/minicurses/minicurses.h"
 #include "../../mods/gapbuf/gapbuf.h"
+#include "../../mods/fs/fs.h"
 
 #define HELP char *help[] = { \
 "spot keybindings", \
@@ -387,7 +388,7 @@ struct gapbuf *new_gapbuf(struct gapbuf *b, char *fn)
 #endif
 
     if (fn != NULL) {
-        if (!access(fn, F_OK)) {
+        if (exists(fn)) {
             /* File exists */
             if (insert_file(t, fn)) {
                 free_gapbuf_list(t);

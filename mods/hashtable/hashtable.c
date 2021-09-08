@@ -240,7 +240,7 @@ int write_hashtable(struct hashtable *ht, char *fn)
     return 0;
 }
 
-int load_file(struct hashtable *ht, char *fn)
+int load_file_into_ht(struct hashtable *ht, char *fn)
 {
     /* Load file with '\0' delimiter into hash table */
     int ret = 0;
@@ -267,13 +267,13 @@ int load_file(struct hashtable *ht, char *fn)
 
     while (1) {
         name = q;
-        if ((q = memchr(q, '\0', q_stop - q)) == q_stop)
+        if ((q = memchr(q, '\0', q_stop - q + 1)) == q_stop)
             quit();
         ++q;
         def = q;
         if (upsert_entry(ht, name, def))
             quit();
-        if ((q = memchr(q, '\0', q_stop - q)) == q_stop)
+        if ((q = memchr(q, '\0', q_stop - q + 1)) == q_stop)
             break;
         ++q;
     }

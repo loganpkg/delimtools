@@ -291,3 +291,8 @@ int cp_file(char *from_file, char *to_file)
 
     return ret;
 }
+
+int exists(char *fn)
+{
+    return !access(fn, F_OK);
+}

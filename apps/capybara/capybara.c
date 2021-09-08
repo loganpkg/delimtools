@@ -81,7 +81,7 @@ int process_file_capybara(char *fn, void *info)
 #define make_store_subdir(res, suffix) do { \
     if ((res = concat(pinfo.store_dir, DIRSEP_STR, suffix, NULL)) == NULL) \
         quit(); \
-    if (access(res, F_OK) && mkdir(res, 0700)) \
+    if (!exists(res) && mkdir(res, 0700)) \
         quit(); \
     if (!is_dir(res)) \
         quit(); \
@@ -111,26 +111,33 @@ int main(int argc, char **argv)
     if (!is_dir(search_dir) || !is_dir(pinfo.store_dir))
         quit();
 
-    if (!access(snapshot_name, F_OK))
-        quit();
-
-    make_store_subdir(pinfo.path_files, "files");
     make_store_subdir(snapshot_dir, "snapshots");
 
+    if ((snapshot_path =
+         concat(snapshot_dir, DIRSEP_STR, snapshot_name, NULL)) == NULL)
+        quit();
+
+    if (exists(snapshot_path)) {
+        fprintf(stderr, "%s: Error: snapshot already exists\n", *argv);
+        quit();
+    }
+
+    make_store_subdir(pinfo.path_files, "files");
+
     if ((pinfo.ht = init_hashtable(HASH_TABLE_SIZE)) == NULL)
+        quit();
+
+    if ((ht_path =
+         concat(pinfo.store_dir, DIRSEP_STR, "ht", NULL)) == NULL)
+        quit();
+
+    if (exists(ht_path) && load_file_into_ht(pinfo.ht, ht_path))
         quit();
 
     if ((pinfo.snapshot = init_buf(INIT_BUF_SIZE)) == NULL)
         quit();
 
     if (walk_dir(search_dir, &pinfo, process_file_capybara))
-        quit();
-
-    if ((ht_path =
-         concat(pinfo.store_dir, DIRSEP_STR, "ht", NULL)) == NULL)
-        quit();
-    if ((snapshot_path =
-         concat(snapshot_dir, DIRSEP_STR, snapshot_name, NULL)) == NULL)
         quit();
 
     /* Save hash table */
@@ -142,10 +149,10 @@ int main(int argc, char **argv)
         quit();
 
   clean_up:
-    free(pinfo.path_files);
     free(snapshot_dir);
-    free(ht_path);
     free(snapshot_path);
+    free(pinfo.path_files);
+    free(ht_path);
 
     free_hashtable(pinfo.ht);
     free_buf(pinfo.snapshot);
