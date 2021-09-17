@@ -240,48 +240,16 @@ int write_hashtable(struct hashtable *ht, char *fn)
     return 0;
 }
 
+int process_pair_ht(char *name, char *def, void *info)
+{
+    struct hashtable *ht = info;
+    if (upsert_entry(ht, name, def))
+        return 1;
+    return 0;
+}
+
 int load_file_into_ht(struct hashtable *ht, char *fn)
 {
     /* Load file with '\0' delimiter into hash table */
-    int ret = 0;
-    FILE *fp;
-    char *p = NULL, *q, *q_stop, *name, *def;
-    size_t fs;
-    if (filesize(fn, &fs))
-        return 1;
-    if (!fs)
-        return 0;               /* Nothing to do */
-    if ((fp = fopen(fn, "rb")) == NULL)
-        quit();
-    if ((p = malloc(fs)) == NULL)
-        quit();
-    if (fread(p, 1, fs, fp) != fs)
-        quit();
-
-    /* Test that data ends in '\0' */
-    if (*(p + fs - 1) != '\0')
-        quit();
-
-    q = p;
-    q_stop = p + fs - 1;
-
-    while (1) {
-        name = q;
-        if ((q = memchr(q, '\0', q_stop - q + 1)) == q_stop)
-            quit();
-        ++q;
-        def = q;
-        if (upsert_entry(ht, name, def))
-            quit();
-        if ((q = memchr(q, '\0', q_stop - q + 1)) == q_stop)
-            break;
-        ++q;
-    }
-
-  clean_up:
-    if (fp != NULL && fclose(fp))
-        ret = 1;
-    if (p != NULL)
-        free(p);
-    return ret;
+    return read_pair_file(fn, ht, process_pair_ht);
 }

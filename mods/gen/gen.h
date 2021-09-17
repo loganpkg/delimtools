@@ -62,6 +62,12 @@
     goto clean_up; \
 } while (0)
 
+#define mquit(msg) do { \
+    ret = 1; \
+    fprintf(stderr, "Error: " msg "\n"); \
+    goto clean_up; \
+} while (0)
+
 #ifdef _WIN32
 #define ssize_t SSIZE_T
 #endif

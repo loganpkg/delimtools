@@ -35,9 +35,13 @@
 
 int is_dir(char *dn)
 {
+    /*
+     * Returns 1 if dn is a directory.
+     * Returns 0 if there was an error, or dn is not a directory.
+     */
     struct stat st;
     if (stat(dn, &st))
-        return 1;
+        return 0;               /* Error */
 
 #ifndef S_ISDIR
 #define S_ISDIR(m) ((m & S_IFMT) == S_IFDIR)
@@ -249,7 +253,7 @@ int cp_file(char *from_file, char *to_file)
     FILE *fp_from = NULL;
     FILE *fp_to = NULL;
     size_t fs, fs_left, io_size;
-    char *p;
+    char *p = NULL;
 
     if (filesize(from_file, &fs))
         return 1;
@@ -284,9 +288,9 @@ int cp_file(char *from_file, char *to_file)
 
   clean_up:
     free(p);
-    if (fclose(fp_from))
+    if (fp_from != NULL && fclose(fp_from))
         ret = 1;
-    if (fclose(fp_to))
+    if (fp_to != NULL && fclose(fp_to))
         ret = 1;
 
     return ret;
@@ -295,4 +299,74 @@ int cp_file(char *from_file, char *to_file)
 int exists(char *fn)
 {
     return !access(fn, F_OK);
+}
+
+int read_pair_file(char *fn, void *info,
+                   int (*process_pair) (char *, char *, void *))
+{
+    /*
+     * Read file with '\0' delimiter and entries in pairs.
+     * Perform an operation on each pair {name, def}.
+     */
+    int ret = 0;
+    FILE *fp;
+    char *p = NULL, *q, *q_stop, *name, *def;
+    size_t fs;
+    if (filesize(fn, &fs))
+        return 1;
+    if (!fs)
+        return 0;               /* Nothing to do */
+    if ((fp = fopen(fn, "rb")) == NULL)
+        quit();
+    if ((p = malloc(fs)) == NULL)
+        quit();
+    if (fread(p, 1, fs, fp) != fs)
+        quit();
+
+    /* Test that data ends in '\0' */
+    if (*(p + fs - 1) != '\0')
+        quit();
+
+    q = p;
+    q_stop = p + fs - 1;
+
+    while (1) {
+        name = q;
+        if ((q = memchr(q, '\0', q_stop - q + 1)) == q_stop)
+            quit();
+        ++q;
+        def = q;
+        if ((*process_pair) (name, def, info))
+            quit();
+        if ((q = memchr(q, '\0', q_stop - q + 1)) == q_stop)
+            break;
+        ++q;
+    }
+
+  clean_up:
+    if (fp != NULL && fclose(fp))
+        ret = 1;
+    if (p != NULL)
+        free(p);
+    return ret;
+}
+
+int make_subdirs(char *file_path)
+{
+    /* Makes the subdirectories leading up to the file in file_path */
+    char *p, *q;
+    if ((p = strdup(file_path)) == NULL)
+        return 1;
+    q = p;
+    while ((q = strchr(q, DIRSEP_CH)) != NULL) {
+        *q = '\0';
+        if (!is_dir(p) && mkdir(p, 0700)) {
+            free(p);
+            return 1;
+        }
+        *q = DIRSEP_CH;
+        ++q;
+    }
+    free(p);
+    return 0;
 }

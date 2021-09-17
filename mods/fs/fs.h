@@ -27,7 +27,12 @@ int is_dir(char *dn);
 int filesize(char *fn, size_t * fs);
 char *file_to_str(char *fn);
 int concat_path(char *res_path, char *dn, char *fn);
-int walk_dir(char *dir_name, void *info, int (*process_file) (char *, void *));
-int atomic_write(char *fn, void *info, int (*write_details)(FILE *, void *));
+int walk_dir(char *dir_name, void *info,
+             int (*process_file) (char *, void *));
+int atomic_write(char *fn, void *info,
+                 int (*write_details) (FILE *, void *));
 int cp_file(char *from_file, char *to_file);
 int exists(char *fn);
+int read_pair_file(char *fn, void *info,
+                   int (*process_pair) (char *, char *, void *));
+int make_subdirs(char *file_path);

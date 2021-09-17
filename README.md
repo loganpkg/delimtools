@@ -72,19 +72,5 @@ nmake /f wMakefile.mak
 
 Then place the executables somewhere in your PATH.
 
-Function return values
-----------------------
-
-In general, functions that return an `int` return 1 upon failure
-and 0 upon success. Functions that return a pointer return `NULL`
-upon failure and non-NULL upon success.
-
-Some exceptions to these rules are:
-* `getch` in the minicurses module and `get_ch` in the buf module. These return
-  `EOF` upon failure and a value from the input upon success.
-* `get_word` from the buf module that returns 1 upon failure, and 2 upon `EOF`
-  (with no error), and 0 upon success.
-
-
 Enjoy,
 Logan =)_

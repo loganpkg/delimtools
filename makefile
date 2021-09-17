@@ -54,4 +54,4 @@ all:
 
 .PHONY: clean
 clean:
-	rm -f spot m4 regr
+	rm -f spot m4 regr lsha256 capybara
