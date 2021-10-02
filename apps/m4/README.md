@@ -82,7 +82,7 @@ dnl By default the esyscmd and maketemp built-in macros are excluded
 esyscmd(ifelse(dirsep, /, ls, dir))
 esyscmd(echo hello > .test)
 include(.test)
-maketemp(XXXXXX)
+maketemp()
 errprint(oops there is an error)
 htdist
 add(8, 2, 4)

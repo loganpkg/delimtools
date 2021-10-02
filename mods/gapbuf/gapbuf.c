@@ -446,7 +446,7 @@ void clear_mark(struct gapbuf *b)
     b->m_set = 0;
 }
 
-int search(struct gapbuf *b, char *p, size_t n)
+int forward_search(struct gapbuf *b, char *p, size_t n)
 {
     /* Forward search gap buffer b for memory p (n chars long) */
     char *q;
@@ -454,6 +454,24 @@ int search(struct gapbuf *b, char *p, size_t n)
         return 1;
     if ((q = memmatch(b->c + 1, b->e - b->c - 1, p, n)) == NULL)
         return 1;
+    while (b->c != q)
+        RIGHTCH(b);
+    return 0;
+}
+
+int regex_forward_search(struct gapbuf *b, char *find, int nl_insen)
+{
+    /*
+     * Forward search gap buffer b for regex find string.
+     * Will stop at the first embedded \0 char or at the End of Buffer \0 char.
+     * Embedded \0 chars can be stripped by calling trim_clean first.
+     */
+    int err = 0;
+    char *q;
+    if (b->c == b->e)
+        return 1;
+    if ((q = regex_search(b->c + 1, find, nl_insen, &err)) == NULL)
+        return 1; /* No match or error */
     while (b->c != q)
         RIGHTCH(b);
     return 0;
@@ -502,7 +520,7 @@ char *region_to_str(struct gapbuf *b)
     return str;
 }
 
-int regex_replace_region(struct gapbuf *b, char *dfdr, int nl_sen)
+int regex_replace_region(struct gapbuf *b, char *dfdr, int nl_insen)
 {
     /*
      * Regular expression replace region. dfdr is the regex find and replace
@@ -510,8 +528,10 @@ int regex_replace_region(struct gapbuf *b, char *dfdr, int nl_sen)
      * without the spaces, for example:
      * |cool|wow
      */
-    size_t ci, rs;
-    struct buf *res;
+    size_t ci; /* Cursor index */
+    size_t rs; /* Region size */
+    char *res;   /* Regex result string */
+    size_t res_len; /* Length of regex result string */
     char delim, *p, *find, *replace, *str;
 
     if (!b->m_set || dfdr == NULL || *dfdr == '\0')
@@ -534,23 +554,25 @@ int regex_replace_region(struct gapbuf *b, char *dfdr, int nl_sen)
     if ((str = region_to_str(b)) == NULL)
         return 1;
 
-    if ((res = regex_replace(find, replace, str, nl_sen)) == NULL) {
+    if ((res = regex_replace(str, find, replace, nl_insen)) == NULL) {
         free(str);
         return 1;
     }
 
     free(str);
 
+    res_len = strlen(res);
+
     /* Check space, as region will be deleted before the insert */
-    if (res->i > rs && GAPSIZE(b) < res->i - rs
-        && grow_gap(b, res->i - rs)) {
-        free_buf(res);
+    if (res_len > rs && GAPSIZE(b) < res_len - rs
+        && grow_gap(b, res_len - rs)) {
+        free(res);
         return 1;
     }
 
     /* Delete region */
     if (delete_region(b)) {
-        free_buf(res);
+        free(res);
         return 1;
     }
 
@@ -558,9 +580,9 @@ int regex_replace_region(struct gapbuf *b, char *dfdr, int nl_sen)
      * Right of gap insert.
      * Do not copy the terminating \0 char.
      */
-    memcpy(b->c - (res->i - 1), res->a, res->i - 1);
-    b->c -= res->i - 1;
-    free_buf(res);
+    memcpy(b->c - (res_len - 1), res, res_len - 1);
+    b->c -= res_len - 1;
+    free(res);
     SETMOD(b);
     return 0;
 }

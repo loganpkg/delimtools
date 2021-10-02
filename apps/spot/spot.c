@@ -77,8 +77,10 @@
 "^[ k   Kill (cut) to start of line", \
 "^y     Yank (paste)", \
 "^t     Trim trailing whitespace and clean", \
-"^s     Search", \
-"^[ n   Search without editing the command line", \
+"^s     Forward search", \
+"^z     Regex forward search", \
+"^[ z   Regex forward search, newline insensitive", \
+"^[ n   Repeat the last search type without editing the command line", \
 "^r     Regex replace region, where the first character is the delimiter, e.g:", \
 "           |find|replace", \
 "^[ r   Regex replace region, newline insensitive", \
@@ -465,6 +467,7 @@ int main(int argc, char **argv)
     size_t mult;                /* Command multiplier */
     /* Persist the sticky column (used for repeated up or down) */
     int persist_sc = 0;
+    char last_search_type = ' ';
     int i;
     /* For displaying keybindings help */
     HELP;
@@ -559,16 +562,29 @@ int main(int argc, char **argv)
                 rv = insert_file(b, cl->c);
                 break;
             case 's':
+                last_search_type = 's';
                 start_of_gapbuf(cl);
-                rv = search(b, cl->c, cl->e - cl->c);
+                rv = forward_search(b, cl->c, cl->e - cl->c);
                 break;
-            case 'x':
-                str_gapbuf(cl);
-                rv = regex_replace_region(b, cl->c, 1);
+            case 'z':
+                last_search_type = 'z';
+                start_of_gapbuf(cl);
+                rv = regex_forward_search(b, cl->c, 0);
+                break;
+            case 'Z':
+                last_search_type = 'Z';
+                start_of_gapbuf(cl);
+                /* newline insensitive */
+                rv = regex_forward_search(b, cl->c, 1);
                 break;
             case 'r':
                 str_gapbuf(cl);
                 rv = regex_replace_region(b, cl->c, 0);
+                break;
+            case 'R':
+                str_gapbuf(cl);
+                /* newline insensitive */
+                rv = regex_replace_region(b, cl->c, 1);
                 break;
             case '=':
                 str_gapbuf(cl);
@@ -648,10 +664,16 @@ int main(int argc, char **argv)
             operation = 's';
             cl_active = 1;
             break;
+        case c('z'):
+            /* Regex forward search, newline sensitive */
+            DELETEGAPBUF(cl);
+            operation = 'z';
+            cl_active = 1;
+            break;
         case c('r'):
             /* Regex replace region, newline sensitive */
             DELETEGAPBUF(cl);
-            operation = 'x';
+            operation = 'r';
             cl_active = 1;
             break;
         case c('w'):
@@ -721,10 +743,18 @@ int main(int argc, char **argv)
                 cl_active = 1;
                 break;
             case 'n':
-                /* Search without editing the command line */
+                /* Repeat the last search without editing the command line */
                 if (!cl_active) {
                     start_of_gapbuf(cl);
-                    rv = search(z, cl->c, cl->e - cl->c);
+                    switch(last_search_type) {
+                      case 's': rv = forward_search(z, cl->c, cl->e - cl->c);
+                            break;
+                      case 'z': rv = regex_forward_search(z, cl->c, 0);
+                            break;
+                      case 'Z': /* newline insensitive */
+                             rv = regex_forward_search(z, cl->c, 1);
+                            break;
+                     }
                 } else {
                     rv = 1;
                 }
@@ -765,7 +795,13 @@ int main(int argc, char **argv)
             case 'r':
                 /* Regex replace region, newline insensitive */
                 DELETEGAPBUF(cl);
-                operation = 'r';
+                operation = 'R';
+                cl_active = 1;
+                break;
+            case 'z':
+                /* Regex forward search, newline insensitive */
+                DELETEGAPBUF(cl);
+                operation = 'Z';
                 cl_active = 1;
                 break;
             case '<':

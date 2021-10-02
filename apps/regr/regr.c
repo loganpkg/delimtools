@@ -26,8 +26,7 @@
 int main(int argc, char **argv)
 {
     int i;
-    char *find, *replace, *str;
-    struct buf *res;
+    char *find, *replace, *str, *res;
 
     if (argc < 4) {
        fprintf(stderr, "Usage: %s find replace file...\n", *argv);
@@ -39,13 +38,13 @@ int main(int argc, char **argv)
 
     for (i = 3; i < argc; ++i) {
         if ((str = file_to_str(*(argv + i))) == NULL) return 1;
-        if ((res = regex_replace(find, replace, str, 1)) == NULL) {
+        if ((res = regex_replace(str, find, replace, 1)) == NULL) {
             free(str);
             return 1;
         }
         free(str);
-        printf("%s", res->a);
-        free_buf(res);
+        printf("%s", res);
+        free(res);
     }
     
 return 0;

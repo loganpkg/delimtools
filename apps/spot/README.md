@@ -80,8 +80,10 @@ multiplier prefix ^U n (where n is a positive number).
 ^[ k   Kill (cut) to start of line
 ^y     Yank (paste)
 ^t     Trim trailing whitespace and clean
-^s     Search
-^[ n   Search without editing the command line
+^s     Forward search
+^z     Regex forward search
+^[ z   Regex forward search, newline insensitive
+^[ n   Repeat the last search type without editing the command line
 ^r     Regex replace region, where the first character is the delimiter, e.g:
            |find|replace
 ^[ r   Regex replace region, newline insensitive

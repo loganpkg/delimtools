@@ -50,6 +50,13 @@ struct buf *init_buf(size_t init_buf_size)
     return b;
 }
 
+void free_buf_wrapping(struct buf *b)
+{
+    /* Just frees the struct, not the mem inside */
+    if (b != NULL)
+       free(b);
+}
+
 void free_buf(struct buf *b)
 {
     if (b != NULL) {

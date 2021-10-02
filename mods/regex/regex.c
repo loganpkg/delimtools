@@ -34,6 +34,7 @@
 #include <limits.h>
 
 #include "../gen/gen.h"
+#include "../buf/buf.h"
 #include "regex.h"
 
 #define match_atom(atom, ch) (atom->set[(unsigned char) ch] != atom->negate)
@@ -467,10 +468,12 @@ static void fill_in_capture_groups(struct cap_grp *cg, char *match_p,
     cg[0].len = running_total;
 }
 
-struct buf *regex_replace(char *find, char *replace, char *str, int nl_sen)
+char *regex_replace(char *str, char *find, char *replace, int nl_insen)
 {
-    /* Regular expression find and replace */
-
+    /*
+     * Regular expression find and replace. Returns NULL upon failure.
+     * Must free the returned string after success.
+     */
     int ret = 0;
     char *t = NULL, *line, *q = NULL;
     char *p;                    /* Pointer to regex match */
@@ -480,6 +483,7 @@ struct buf *regex_replace(char *find, char *replace, char *str, int nl_sen)
     size_t j;
     struct buf *result = NULL;
     size_t init_buf_size = BUFSIZ;
+    char *res_str = NULL;
     struct atom *cr = NULL;
     struct cap_grp cg[NUM_CAP_GRP];
     struct hook hk;
@@ -493,7 +497,7 @@ struct buf *regex_replace(char *find, char *replace, char *str, int nl_sen)
      * Copy string if in newline sensitive mode as the \n chars will be
      * replaced with \0.
      */
-    if (nl_sen) {
+    if (!nl_insen) {
         if ((t = strdup(str)) == NULL)
             quit();
         else
@@ -515,7 +519,7 @@ struct buf *regex_replace(char *find, char *replace, char *str, int nl_sen)
     /* Process line by line */
     do {
         /* Terminate line */
-        if (nl_sen) {
+        if (!nl_insen) {
             if ((q = strchr(line, '\n')) != NULL)
                 *q = '\0';
             /* Do not process the last line if empty. Not an error. */
@@ -587,7 +591,7 @@ struct buf *regex_replace(char *find, char *replace, char *str, int nl_sen)
         if (put_str(result, line))
             quit();
         /* Replace the newline character */
-        if (nl_sen && q != NULL && put_ch(result, '\n'))
+        if (!nl_insen && q != NULL && put_ch(result, '\n'))
             quit();
 
         /* Reset start of line indicator ready for the next line */
@@ -595,9 +599,9 @@ struct buf *regex_replace(char *find, char *replace, char *str, int nl_sen)
         /* Clear previous match len as this does not carry from one line to the next */
         prev_len = 0;
         /* Move to the next line if doing newline sensitive matching */
-        if (nl_sen && q != NULL)
+        if (!nl_insen && q != NULL)
             line = q + 1;
-    } while (nl_sen && q != NULL);
+    } while (!nl_insen && q != NULL);
 
   clean_up:
     free(cr);
@@ -612,5 +616,85 @@ struct buf *regex_replace(char *find, char *replace, char *str, int nl_sen)
         return NULL;
     }
 
-    return result;
+    if (result != NULL)
+         res_str = result->a;
+    free_buf_wrapping(result);
+
+    return res_str;
+}
+
+char *regex_search(char *str, char *find, int nl_insen, int *err)
+{
+    /*
+     * Regular expression search. Returns a pointer to the first match
+     * of find in str, or NULL upon no match or error (and sets err
+     * to 1 upon error).
+     */
+    char *t = NULL, *text, *line, *q = NULL;
+    char *p;                    /* Pointer to regex match */
+    size_t len = 0;             /* Length of regex match */
+    struct atom *cr = NULL;
+    struct cap_grp cg[NUM_CAP_GRP];
+    struct hook hk;
+
+    /* Compile regex expression */
+    if ((cr = compile_regex(find, cg, &hk)) == NULL) {
+        *err = 1;
+        return NULL;
+    }
+
+    /*
+     * Copy string if in newline sensitive mode as the \n chars will be
+     * replaced with \0.
+     */
+    if (!nl_insen) {
+        if ((t = strdup(str)) == NULL) {
+                 free(cr);
+                 *err = 1;
+                 return NULL;
+        }
+        text = t;
+    } else {
+        text = str;
+    }
+
+    /*
+     * Do not process an empty string (but an in-the-middle line can be empty).
+     * Not an error.
+     */
+    if (!*text)
+        goto no_match;
+
+    line = text;
+
+    /* Process line by line */
+    do {
+        /* Terminate line */
+        if (!nl_insen) {
+            if ((q = strchr(line, '\n')) != NULL)
+                *q = '\0';
+            /* Do not process the last line if empty. Not an error. */
+            else if (!*line)
+                goto no_match;
+        }
+
+            /* See if there is any match on a line */
+            if ((p = match_regex(cr, &hk, line, 1, &len)) == NULL) {
+                break;
+            } else {
+                free(cr);
+                free(t);
+                /* Make the location relative to the original string */
+                return str + (p - text);
+            }
+
+        /* Move to the next line if doing newline sensitive matching */
+        if (!nl_insen && q != NULL)
+            line = q + 1;
+    } while (!nl_insen && q != NULL);
+
+no_match:
+    free(cr);
+    free(t);
+    return NULL;
 }

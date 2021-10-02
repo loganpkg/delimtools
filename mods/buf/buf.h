@@ -34,6 +34,7 @@ struct buf {
 
 int del_ch(struct buf *b);
 struct buf *init_buf(size_t init_buf_size);
+void free_buf_wrapping(struct buf *b);
 void free_buf(struct buf *b);
 int unget_ch(struct buf *b, int ch);
 int include(struct buf *b, char *fn);

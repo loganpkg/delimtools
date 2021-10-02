@@ -52,7 +52,7 @@
 #include "../../mods/buf/buf.h"
 #include "../../mods/hashtable/hashtable.h"
 #include "../../mods/fs/fs.h"
-
+#include "../../mods/regex/regex.h"
 
 #if ESYSCMD_MAKETEMP && defined _WIN32
 #define popen _popen
@@ -251,10 +251,7 @@ int terminate_args(struct mcall *stack)
 
 int main(int argc, char **argv)
 {
-    int ret = 0, read_stdin = 1, r, j;
-#if ESYSCMD_MAKETEMP && !defined _WIN32
-    int fd;
-#endif
+    int ret = 0, read_stdin = 1, r, j, err = 0;
     struct buf *input = NULL, *token = NULL, *next_token = NULL, *result =
         NULL, *tmp_buf = NULL;
     struct hashtable *ht = NULL;
@@ -325,6 +322,10 @@ int main(int argc, char **argv)
     if (upsert_entry(ht, "len", NULL))
         quit();
     if (upsert_entry(ht, "index", NULL))
+        quit();
+    if (upsert_entry(ht, "regexindex", NULL))
+        quit();
+    if (upsert_entry(ht, "regexreplace", NULL))
         quit();
     if (upsert_entry(ht, "translit", NULL))
         quit();
@@ -477,22 +478,6 @@ int main(int argc, char **argv)
     quit(); \
 } while (0)
 
-#if ESYSCMD_MAKETEMP
-#ifdef _WIN32
-/* No integer overflow risk, as already a string. */
-/* This function does not actually create the file */
-#define maketemp(s) if (_mktemp_s(s, strlen(s) + 1)) \
-    equit("maketemp: Failed")
-#else
-#define maketemp(s) do { \
-    if ((fd = mkstemp(s)) == -1) \
-        equit("maketemp: Failed"); \
-    if (close(fd)) \
-        equit("maketemp: Failed to close temp file"); \
-} while (0)
-#endif
-#endif
-
 #ifdef _WIN32
 #define DIRSEP "\\"
 #else
@@ -561,6 +546,24 @@ int main(int argc, char **argv)
             snprintf(num, NUM_SIZE, "%lu", (unsigned long) (p - arg(1))); \
         if (unget_str(input, num)) \
             quit(); \
+    } else if (!strcmp(SN, "regexindex")) { \
+        p = regex_search(arg(1), arg(2), *arg(3) == '1' ? 1 : 0, &err); \
+        if (err) \
+            quit(); \
+        if (p == NULL) \
+            snprintf(num, NUM_SIZE, "%d", -1); \
+        else \
+            snprintf(num, NUM_SIZE, "%lu", (unsigned long) (p - arg(1))); \
+        if (unget_str(input, num)) \
+            quit(); \
+    } else if (!strcmp(SN, "regexreplace")) { \
+        if ((tmp_str = regex_replace(arg(1), arg(2), arg(3), \
+            *arg(4) == '1' ? 1 : 0)) == NULL) \
+            quit(); \
+        if (unget_str(input, tmp_str)) \
+            quit(); \
+        free(tmp_str); \
+        tmp_str = NULL; \
     } else if (!strcmp(SN, "translit")) { \
         /* Set mapping to pass through (-1) */ \
         for (k = 0; k < UCHAR_NUM; k++) \
@@ -726,10 +729,13 @@ int main(int argc, char **argv)
 /* These tag onto the end of the list of built-in macros with args */
 #define process_bi_with_args_extra() \
     else if (!strcmp(SN, "maketemp")) { \
-        /* arg(1) is the template string which is modified in-place */ \
-        maketemp(arg(1)); \
-        if (unget_str(input, arg(1))) \
+        /* arg(1) is the enclosing directory. No template string is used. */ \
+        if ((tmp_str = make_tmp(arg(1), 0)) == NULL) \
+            equit("maketemp: Failed"); \
+        if (unget_str(input, tmp_str)) \
             quit(); \
+        free(tmp_str); \
+        tmp_str = NULL; \
     } else if (!strcmp(SN, "esyscmd")) { \
         if (esyscmd(input, tmp_buf, arg(1))) \
             equit("esyscmd: Failed"); \

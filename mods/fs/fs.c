@@ -27,10 +27,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #include "../gen/gen.h"
+#include "../random/random.h"
 #include "fs.h"
-
 
 
 int is_dir(char *dn)
@@ -369,4 +370,110 @@ int make_subdirs(char *file_path)
     }
     free(p);
     return 0;
+}
+
+int create_new_file(char *fn)
+{
+    /*
+     * Creates a new file fn.
+     * Returns 0 on success.
+     * Returns 2 if the file fn already exists (failure).
+     * Otherwise returns 1 for all other failures.
+     */
+    int fd;
+    errno = 0;
+#ifdef _WIN32
+    if (_sopen_s
+        (&fd, fn, _O_WRONLY | _O_CREAT | _O_EXCL | _O_BINARY, _SH_DENYRW,
+         _S_IREAD | _S_IWRITE))
+#else
+    if ((fd =
+         open(fn, O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR)) == -1)
+#endif
+    {
+        if (errno == EEXIST)
+            return 2;
+        else
+            return 1;
+    }
+#ifdef _WIN32
+    if (_close(fd))
+#else
+    if (close(fd))
+#endif
+        return 1;
+    return 0;
+}
+
+int create_new_dir(char *dn)
+{
+    /*
+     * Creates a new directory dn.
+     * Returns 0 on success.
+     * Returns 2 if the directory dn already exists (failure).
+     * Otherwise returns 1 for all other failures.
+     */
+    errno = 0;
+#ifdef _WIN32
+    if (_mkdir(dn))
+#else
+    if (mkdir(dn, S_IRWXU))
+#endif
+    {
+        if (errno == EEXIST)
+            return 2;
+        else
+            return 1;
+    }
+    return 0;
+}
+
+char *make_tmp(char *in_dir, int dir)
+{
+    /*
+     * Creates a temporary directory (if dir is non-zero)
+     * or file under in_dir.
+     * Need to free after use. Returns NULL on failure.
+     */
+    char *name;
+    char *path;
+    char *d;
+    size_t try = 10;            /* Number of times to try */
+    int r;
+
+    d = in_dir == NULL || *in_dir == '\0' ? "." : in_dir; 
+
+    while (try--) {
+        if ((name = random_alnum_str(36)) == NULL)
+            return NULL;
+        if ((path = concat(d, DIRSEP_STR, name, NULL)) == NULL) {
+            free(name);
+            return NULL;
+        }
+        free(name);
+
+        if (dir) {
+            /* Create a temporary directory */
+            if ((r = create_new_dir(path)) != 0) {
+                free(path);
+                if (r != 2)
+                    return NULL;
+            } else {
+                /* Success */
+                return path;
+            }
+        } else {
+            /* Create a temporary file */
+            if ((r = create_new_file(path)) != 0) {
+                free(path);
+                if (r != 2)
+                    return NULL;
+            } else {
+                /* Success */
+                return path;
+            }
+        }
+    }
+    /* All tries failed */
+    return NULL;
 }

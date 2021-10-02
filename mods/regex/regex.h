@@ -18,9 +18,7 @@
 #ifndef RX_H
 #define RX_H
 
-#include "../buf/buf.h"
-
-struct buf *regex_replace(char *find, char *replace, char *str,
-                          int nl_sen);
+char *regex_replace(char *str, char *find, char *replace, int nl_insen);
+char *regex_search(char *str, char *find, int nl_insen, int *err);
 
 #endif
