@@ -20,9 +20,15 @@
 #include <sys/stat.h>
 
 #include <fcntl.h>
+
+#ifdef _WIN32
+#include <io.h>
+#include <Windows.h>
+#else
 #include <unistd.h>
 #include <libgen.h>
 #include <dirent.h>
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -106,48 +112,74 @@ int walk_dir(char *dir_name, void *info,
              int (*process_file) (char *, void *))
 {
     int ret = 0;
+#ifdef _WIN32
+    WIN32_FIND_DATA wfd;
+    HANDLE hdl;
+#else
     DIR *dirp = NULL;
     struct dirent *entry;
+    unsigned char dt;
+#endif
     char *fn = NULL, *path_name = NULL;
     size_t dn_s;
-    unsigned char dt;
-
     dn_s = strlen(dir_name);
 
+#ifdef _WIN32
+    if ((hdl = FindFirstFile(dir_name, &wfd)) == INVALID_HANDLE_VALUE) quit();
+    do {
+        if ((fn = strdup(wfd.cFileName)) == NULL) quit();
+
+#else
     if ((dirp = opendir(dir_name)) == NULL)
         quit();
-
     while ((entry = readdir(dirp)) != NULL) {
-        /* Copy variables */
-        if ((fn = strdup(entry->d_name)) == NULL)
-            quit();
+        if ((fn = strdup(entry->d_name)) == NULL) quit();
         dt = entry->d_type;
+#endif
         /* Concatenate file path */
         if ((path_name = concat(dir_name, DIRSEP_STR, fn, NULL)) == NULL)
             quit();
+
+#ifdef _WIN32
+        if (wfd.dwFileAttributes == FILE_ATTRIBUTE_DIRECTORY) {
+#else
         if (dt == DT_DIR) {
+#endif
             if (strcmp(fn, ".") && strcmp(fn, "..")
                 && walk_dir(path_name, info, process_file))
                 quit();
+#ifdef _WIN32
+        } else if (wfd.dwFileAttributes == FILE_ATTRIBUTE_NORMAL) {
+#else
         } else if (dt == DT_REG) {
+#endif
             if ((*process_file) (path_name, info))
                 quit();
         } else {
-            /* Not a directory or regular file */
+            /* Not a directory or regular (normal) file */
             quit();
         }
         free(fn);
         fn = NULL;
         free(path_name);
         path_name = NULL;
+#ifdef _WIN32
+    } while (FindNextFile(hdl, &wfd));
+#else
     }
+#endif
 
   clean_up:
     free(fn);
     free(path_name);
 
+#ifdef _WIN32
+    if (!FindClose(hdl))
+        ret = 1;
+#else
     if (closedir(dirp))
         ret = 1;
+#endif
 
     return ret;
 }
@@ -441,7 +473,7 @@ char *make_tmp(char *in_dir, int dir)
     size_t try = 10;            /* Number of times to try */
     int r;
 
-    d = in_dir == NULL || *in_dir == '\0' ? "." : in_dir; 
+    d = in_dir == NULL || *in_dir == '\0' ? "." : in_dir;
 
     while (try--) {
         if ((name = random_alnum_str(36)) == NULL)

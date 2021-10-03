@@ -21,9 +21,13 @@
 /* For SIZE_MAX */
 #include <stdint.h>
 
+
 #ifdef _WIN32
 /* For SSIZE_T */
 #include <BaseTsd.h>
+
+/* For access */
+#define F_OK 0
 #endif
 
 
