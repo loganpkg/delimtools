@@ -125,15 +125,18 @@ int walk_dir(char *dir_name, void *info,
     dn_s = strlen(dir_name);
 
 #ifdef _WIN32
-    if ((hdl = FindFirstFile(dir_name, &wfd)) == INVALID_HANDLE_VALUE) quit();
+    if ((hdl = FindFirstFile(dir_name, &wfd)) == INVALID_HANDLE_VALUE)
+        quit();
     do {
-        if ((fn = strdup(wfd.cFileName)) == NULL) quit();
+        if ((fn = strdup(wfd.cFileName)) == NULL)
+            quit();
 
 #else
     if ((dirp = opendir(dir_name)) == NULL)
         quit();
     while ((entry = readdir(dirp)) != NULL) {
-        if ((fn = strdup(entry->d_name)) == NULL) quit();
+        if ((fn = strdup(entry->d_name)) == NULL)
+            quit();
         dt = entry->d_type;
 #endif
         /* Concatenate file path */
@@ -164,7 +167,8 @@ int walk_dir(char *dir_name, void *info,
         free(path_name);
         path_name = NULL;
 #ifdef _WIN32
-    } while (FindNextFile(hdl, &wfd));
+    }
+    while (FindNextFile(hdl, &wfd));
 #else
     }
 #endif

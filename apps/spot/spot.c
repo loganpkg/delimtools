@@ -746,15 +746,17 @@ int main(int argc, char **argv)
                 /* Repeat the last search without editing the command line */
                 if (!cl_active) {
                     start_of_gapbuf(cl);
-                    switch(last_search_type) {
-                      case 's': rv = forward_search(z, cl->c, cl->e - cl->c);
-                            break;
-                      case 'z': rv = regex_forward_search(z, cl->c, 0);
-                            break;
-                      case 'Z': /* newline insensitive */
-                             rv = regex_forward_search(z, cl->c, 1);
-                            break;
-                     }
+                    switch (last_search_type) {
+                    case 's':
+                        rv = forward_search(z, cl->c, cl->e - cl->c);
+                        break;
+                    case 'z':
+                        rv = regex_forward_search(z, cl->c, 0);
+                        break;
+                    case 'Z':  /* newline insensitive */
+                        rv = regex_forward_search(z, cl->c, 1);
+                        break;
+                    }
                 } else {
                     rv = 1;
                 }

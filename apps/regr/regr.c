@@ -29,15 +29,16 @@ int main(int argc, char **argv)
     char *find, *replace, *str, *res;
 
     if (argc < 4) {
-       fprintf(stderr, "Usage: %s find replace file...\n", *argv);
-       return 1;
+        fprintf(stderr, "Usage: %s find replace file...\n", *argv);
+        return 1;
     }
 
     find = *(argv + 1);
     replace = *(argv + 2);
 
     for (i = 3; i < argc; ++i) {
-        if ((str = file_to_str(*(argv + i))) == NULL) return 1;
+        if ((str = file_to_str(*(argv + i))) == NULL)
+            return 1;
         if ((res = regex_replace(str, find, replace, 1)) == NULL) {
             free(str);
             return 1;
@@ -46,6 +47,6 @@ int main(int argc, char **argv)
         printf("%s", res);
         free(res);
     }
-    
-return 0;
+
+    return 0;
 }

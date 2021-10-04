@@ -54,7 +54,7 @@ void free_buf_wrapping(struct buf *b)
 {
     /* Just frees the struct, not the mem inside */
     if (b != NULL)
-       free(b);
+        free(b);
 }
 
 void free_buf(struct buf *b)
@@ -95,11 +95,11 @@ int unget_ch(struct buf *b, int ch)
 
 int del_ch(struct buf *b)
 {
-     if (b->i) {
-         --b->i;
-         return 0;
-     }
-     return 1;
+    if (b->i) {
+        --b->i;
+        return 0;
+    }
+    return 1;
 }
 
 int include(struct buf *b, char *fn)
@@ -245,14 +245,15 @@ int buf_dump_buf(struct buf *dst, struct buf *src)
     return 0;
 }
 
-int write_buf_details(FILE *fp, void *x) {
+int write_buf_details(FILE * fp, void *x)
+{
     /* Write details to be called via a function pointer in atomic_write */
     struct buf *b = x;
 
     if (fwrite(b->a, 1, b->i, fp) != b->i)
         return 1;
 
-   return 0;
+    return 0;
 }
 
 int write_buf(struct buf *b, char *fn)

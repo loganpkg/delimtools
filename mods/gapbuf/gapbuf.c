@@ -471,7 +471,7 @@ int regex_forward_search(struct gapbuf *b, char *find, int nl_insen)
     if (b->c == b->e)
         return 1;
     if ((q = regex_search(b->c + 1, find, nl_insen, &err)) == NULL)
-        return 1; /* No match or error */
+        return 1;               /* No match or error */
     while (b->c != q)
         RIGHTCH(b);
     return 0;
@@ -528,10 +528,10 @@ int regex_replace_region(struct gapbuf *b, char *dfdr, int nl_insen)
      * without the spaces, for example:
      * |cool|wow
      */
-    size_t ci; /* Cursor index */
-    size_t rs; /* Region size */
-    char *res;   /* Regex result string */
-    size_t res_len; /* Length of regex result string */
+    size_t ci;                  /* Cursor index */
+    size_t rs;                  /* Region size */
+    char *res;                  /* Regex result string */
+    size_t res_len;             /* Length of regex result string */
     char delim, *p, *find, *replace, *str;
 
     if (!b->m_set || dfdr == NULL || *dfdr == '\0')
@@ -848,7 +848,8 @@ int insert_file(struct gapbuf *b, char *fn)
     return 0;
 }
 
-int write_gapbuf_details(FILE *fp, void *x) {
+int write_gapbuf_details(FILE * fp, void *x)
+{
     /* Write details to be called via a function pointer in atomic_write */
     struct gapbuf *b = x;
     size_t n;
@@ -863,12 +864,13 @@ int write_gapbuf_details(FILE *fp, void *x) {
     if (fwrite(b->c, 1, n, fp) != n)
         return 1;
 
-   return 0;
+    return 0;
 }
 
 int write_file(struct gapbuf *b)
 {
-    if (atomic_write(b->fn, b, write_gapbuf_details)) return 1;
+    if (atomic_write(b->fn, b, write_gapbuf_details))
+        return 1;
 
     /* Success */
     b->mod = 0;

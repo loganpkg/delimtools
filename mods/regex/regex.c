@@ -617,7 +617,7 @@ char *regex_replace(char *str, char *find, char *replace, int nl_insen)
     }
 
     if (result != NULL)
-         res_str = result->a;
+        res_str = result->a;
     free_buf_wrapping(result);
 
     return res_str;
@@ -649,9 +649,9 @@ char *regex_search(char *str, char *find, int nl_insen, int *err)
      */
     if (!nl_insen) {
         if ((t = strdup(str)) == NULL) {
-                 free(cr);
-                 *err = 1;
-                 return NULL;
+            free(cr);
+            *err = 1;
+            return NULL;
         }
         text = t;
     } else {
@@ -678,22 +678,22 @@ char *regex_search(char *str, char *find, int nl_insen, int *err)
                 goto no_match;
         }
 
-            /* See if there is any match on a line */
-            if ((p = match_regex(cr, &hk, line, 1, &len)) == NULL) {
-                break;
-            } else {
-                free(cr);
-                free(t);
-                /* Make the location relative to the original string */
-                return str + (p - text);
-            }
+        /* See if there is any match on a line */
+        if ((p = match_regex(cr, &hk, line, 1, &len)) == NULL) {
+            break;
+        } else {
+            free(cr);
+            free(t);
+            /* Make the location relative to the original string */
+            return str + (p - text);
+        }
 
         /* Move to the next line if doing newline sensitive matching */
         if (!nl_insen && q != NULL)
             line = q + 1;
     } while (!nl_insen && q != NULL);
 
-no_match:
+  no_match:
     free(cr);
     free(t);
     return NULL;
