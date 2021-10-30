@@ -679,9 +679,7 @@ char *regex_search(char *str, char *find, int nl_insen, int *err)
         }
 
         /* See if there is any match on a line */
-        if ((p = match_regex(cr, &hk, line, 1, &len)) == NULL) {
-            break;
-        } else {
+        if ((p = match_regex(cr, &hk, line, 1, &len)) != NULL) {
             free(cr);
             free(t);
             /* Make the location relative to the original string */

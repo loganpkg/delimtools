@@ -110,7 +110,7 @@ int process_pair_capybara(char *name, char *def, void *info)
 #define make_store_subdir(res, suffix) do { \
     if ((res = concat(pinfo.store_dir, DIRSEP_STR, suffix, NULL)) == NULL) \
         mquit("concat failed to create res"); \
-    if (!is_dir(res) && mkdir(res, 0700)) \
+    if (!is_dir(res) && mkdir(res)) \
         mquit("mkdir failed"); \
 } while (0)
 

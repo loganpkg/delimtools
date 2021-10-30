@@ -23,6 +23,7 @@
 
 #ifdef _WIN32
 #include <io.h>
+#include <direct.h>
 #include <Windows.h>
 #else
 #include <unistd.h>
@@ -397,7 +398,7 @@ int make_subdirs(char *file_path)
     q = p;
     while ((q = strchr(q, DIRSEP_CH)) != NULL) {
         *q = '\0';
-        if (!is_dir(p) && mkdir(p, 0700)) {
+        if (!is_dir(p) && mkdir(p)) {
             free(p);
             return 1;
         }
@@ -450,11 +451,7 @@ int create_new_dir(char *dn)
      * Otherwise returns 1 for all other failures.
      */
     errno = 0;
-#ifdef _WIN32
-    if (_mkdir(dn))
-#else
-    if (mkdir(dn, S_IRWXU))
-#endif
+    if (mkdir(dn))
     {
         if (errno == EEXIST)
             return 2;

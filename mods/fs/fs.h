@@ -22,6 +22,10 @@
 #define DIRSEP_STR "/"
 #endif
 
+/* Always want directories to have permissions of 0700 */
+#ifndef _WIN32
+#define mkdir(dn) mkdir(dn, S_IRWXU)
+#endif
 
 int is_dir(char *dn);
 int filesize(char *fn, size_t * fs);
