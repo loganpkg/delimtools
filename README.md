@@ -54,14 +54,15 @@ toucan has the following modules:
 History
 -------
 
-The `toucan` C development environment will be supported indefinitely.
+The toucan C development environment will be supported indefinitely.
 toucan is the correct repository to access the supported version of the
 spot text editor and my implementation of the m4 macro processor.
 My GitHub page has older versions of the spot text editor and my
 m4 macro processor for historical reasons, but those older versions
 are no longer supported.
-This repository uses `sloth` version control (not git or fossil) and
-simply converts to either git or fossil to be displayed online.
+
+This repository uses sloth version control (not git or fossil) and simply
+converts to either git or fossil to be displayed online.
 
 Mascot
 ------
