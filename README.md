@@ -27,10 +27,9 @@ History
 
 The toucan is a **production quality** C development environment which will
 be **supported indefinitely**.
-toucan is the correct repository to access the supported version of the
-spot text editor and my implementation of the m4 macro processor.
-My GitHub page has older versions of the spot text editor, my
-m4 macro processor, freq, and delim, for historical reasons,
+toucan is the correct repository to access the current supported version of the
+spot text editor, my implementation of the m4 macro processor, freq, and delim.
+My GitHub page has older versions of these applications for historical reasons,
 but those older versions are no longer supported.
 
 This repository uses sloth version control (not git or fossil) and simply
