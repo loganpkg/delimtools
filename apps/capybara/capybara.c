@@ -55,6 +55,7 @@ int process_file_capybara(char *fn, void *info)
 
     /* Check to see if it is in hash table already */
     if (lookup_entry(p->ht, hash) == NULL) {
+        /* Process new file data */
         /* Prepare destination path */
         if ((hash_path =
              concat(p->path_to_files, DIRSEP_STR, hash, NULL)) == NULL)
@@ -65,16 +66,17 @@ int process_file_capybara(char *fn, void *info)
         /* Add entry to hash table */
         if (upsert_entry(p->ht, hash, NULL))
             mquit("upsert_entry failed");
-        /* Add filename mapping to snapshot list */
-        if (put_str(p->snapshot, fn))
-            mquit("put_str failed");
-        if (put_ch(p->snapshot, '\0'))
-            mquit("put_ch failed");
-        if (put_str(p->snapshot, hash))
-            mquit("put_str failed");
-        if (put_ch(p->snapshot, '\0'))
-            mquit("put_ch failed");
     }
+
+    /* Add filename mapping to snapshot list */
+    if (put_str(p->snapshot, fn))
+        mquit("put_str failed");
+    if (put_ch(p->snapshot, '\0'))
+        mquit("put_ch failed");
+    if (put_str(p->snapshot, hash))
+        mquit("put_str failed");
+    if (put_ch(p->snapshot, '\0'))
+        mquit("put_ch failed");
 
   clean_up:
     free(hash);

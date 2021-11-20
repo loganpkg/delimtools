@@ -56,6 +56,10 @@ all:
 		mods\sha256\sha256.c \
 		mods\hashtable\hashtable.c \
 		mods\buf\buf.c
+	cl /Ot \
+        apps\freq\freq.c
+	cl /Ot \
+        apps\delim\delim.c
 
 clean:
 	del *.exe *.obj

@@ -15,6 +15,11 @@
  */
 
 #ifdef _WIN32
+/* For mkdir */
+#include <direct.h>
+#endif
+
+#ifdef _WIN32
 #define DIRSEP_CH '\\'
 #define DIRSEP_STR "\\"
 #else

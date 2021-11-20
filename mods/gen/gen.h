@@ -19,6 +19,7 @@
 #define GEN_H
 
 /* For SIZE_MAX */
+#include <limits.h>
 #include <stdint.h>
 
 

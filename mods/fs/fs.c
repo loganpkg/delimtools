@@ -16,6 +16,13 @@
 
 /* File system operations */
 
+#ifdef __linux__
+/* For strdup */
+#define _XOPEN_SOURCE 500
+/* For readdir macros: DT_DIR and DT_REG */
+#define _DEFAULT_SOURCE
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -23,7 +30,6 @@
 
 #ifdef _WIN32
 #include <io.h>
-#include <direct.h>
 #include <Windows.h>
 #else
 #include <unistd.h>
@@ -122,8 +128,6 @@ int walk_dir(char *dir_name, void *info,
     unsigned char dt;
 #endif
     char *fn = NULL, *path_name = NULL;
-    size_t dn_s;
-    dn_s = strlen(dir_name);
 
 #ifdef _WIN32
     if ((hdl = FindFirstFile(dir_name, &wfd)) == INVALID_HANDLE_VALUE)

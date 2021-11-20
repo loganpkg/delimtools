@@ -22,12 +22,29 @@ spot text editor and an implementation of the m4 macro processor
 toucan
 ======
 
+History
+-------
+
+The toucan is a **production quality** C development environment which will
+be **supported indefinitely**.
+toucan is the correct repository to access the supported version of the
+spot text editor and my implementation of the m4 macro processor.
+My GitHub page has older versions of the spot text editor, my
+m4 macro processor, freq, and delim, for historical reasons,
+but those older versions are no longer supported.
+
+This repository uses sloth version control (not git or fossil) and simply
+converts to either git or fossil to be displayed online. See the sloth
+repository for more details.
+
+About
+-----
+
 toucan is a C development environment that has the following features:
 
 * Cross-platform,
 * Self-contained (no explicit linking is required),
-* Scalable, modular design,
-* and Consistent function return values.
+* and a Scalable, modular design.
 
 All code and documentation is released under the ISC license.
 
@@ -37,7 +54,12 @@ Applications
 The following applications use the toucan environment:
 
 * spot text editor,
-* and an implementation of the m4 macro processor.
+* an implementation of the m4 macro processor,
+* capybara (a backup utility),
+* regr (regular expression find and replace),
+* lsha256 (SHA-256 utility),
+* freq (character frequency),
+* and delim (checks a delimiter).
 
 Modules
 -------
@@ -49,20 +71,10 @@ toucan has the following modules:
 * gapbuf: Gap buffer,
 * minicurses: Curses,
 * hashtable: Hash table,
-* and regex: Regular expression engine.
-
-History
--------
-
-The toucan C development environment will be supported indefinitely.
-toucan is the correct repository to access the supported version of the
-spot text editor and my implementation of the m4 macro processor.
-My GitHub page has older versions of the spot text editor and my
-m4 macro processor for historical reasons, but those older versions
-are no longer supported.
-
-This repository uses sloth version control (not git or fossil) and simply
-converts to either git or fossil to be displayed online.
+* regex: Regular expression engine,
+* fs: File system operations,
+* random: Random functions,
+* and sha256: SHA-256 algorithm.
 
 Mascot
 ------

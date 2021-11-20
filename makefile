@@ -57,7 +57,11 @@ all:
 		mods/hashtable/hashtable.c \
 		mods/buf/buf.c \
         apps/capybara/capybara.c
+	cc ${F} -o freq \
+        apps/freq/freq.c
+	cc ${F} -o delim \
+        apps/delim/delim.c
 
 .PHONY: clean
 clean:
-	rm -f spot m4 regr lsha256 capybara
+	rm -f spot m4 regr lsha256 capybara freq delim
