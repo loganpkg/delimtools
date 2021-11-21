@@ -1,7 +1,20 @@
 # loganutils
 
-loganutils is a collection of my software. It includes the
-spot text editor and various command line utilities.
+## History
+
+loganutils is an unsupported, old, collection of my software. It contains
+a version of the spot text editor, charcount (equivalent to freq),
+and cutcheck (equivalent to delim). The current supported version of these
+applications are inside the toucan repository.
+
+This repo uses git (and not sloth) as there are forks caused from merging in
+the various applications. This can be seen by running:
+
+```
+$ git log --oneline --decorate --graph --all
+```
+
+## About
 
 Each subdirectory is its own project. The projects
 share the same repository to make it easy to share code
@@ -11,13 +24,16 @@ All software is released under the ISC licence (OpenBSD style).
 
 ## Installation
 
-    $ git clone https://github.com/loganpkg/loganutils.git
+```
+$ git clone https://github.com/loganpkg/loganutils.git
+```
 
 Set `installdir` in the `buildall.sh` file, the default is
 the `$HOME` directory.
 
-    $ m4 buildall.sh | sh
-
+```
+$ m4 buildall.sh | sh
+```
 
 ## buf
 
