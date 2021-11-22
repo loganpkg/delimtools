@@ -39,7 +39,7 @@ int main(int argc, char **argv)
     for (i = 3; i < argc; ++i) {
         if ((str = file_to_str(*(argv + i))) == NULL)
             return 1;
-        if ((res = regex_replace(str, find, replace, 1)) == NULL) {
+        if ((res = regex_replace(str, find, replace, 0)) == NULL) {
             free(str);
             return 1;
         }

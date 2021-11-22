@@ -90,6 +90,8 @@ mult( , 5, , 3)
 sub(80, 20, 5)
 div(5, 2)
 mod(5, 2)
+regexreplace(tiger, ^, big)
+regexindex(abcaad, a{2})
 ```
 
 Enjoy,
