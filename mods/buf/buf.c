@@ -149,6 +149,7 @@ int get_word(struct buf *token, struct buf *input, int read_stdin)
      * Deletes the contents of the token buffer, then reads a word from the
      * input buffer and writes it to the token buffer. If read_stdin is
      * non-zero, then stdin will be read when the input buffer is empty.
+     * This function discards \r chars.
      * Returns 1 on error and 2 on EOF (with no error).
      */
     int x;
@@ -156,7 +157,9 @@ int get_word(struct buf *token, struct buf *input, int read_stdin)
 
     /* Always read at least one char */
     errno = 0;
-    if ((x = get_ch(input, read_stdin)) == EOF) {
+    /* Discard \r chars */
+    while ((x = get_ch(input, read_stdin)) == '\r');
+    if (x == EOF) {
         if (errno)
             return 1;           /* Error */
         return 2;               /* EOF with no error */
@@ -170,7 +173,9 @@ int get_word(struct buf *token, struct buf *input, int read_stdin)
         while (1) {
             /* Read another char */
             errno = 0;
-            if ((x = get_ch(input, read_stdin)) == EOF) {
+            /* Discard \r chars */
+            while ((x = get_ch(input, read_stdin)) == '\r');
+            if (x == EOF) {
                 if (errno)
                     return 1;   /* Error */
                 return 2;       /* EOF with no error */

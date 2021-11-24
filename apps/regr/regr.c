@@ -28,6 +28,15 @@ int main(int argc, char **argv)
     int i;
     char *find, *replace, *str, *res;
 
+#ifdef _WIN32
+    if (_setmode(_fileno(stdin), _O_BINARY) == -1)
+        return 1;
+    if (_setmode(_fileno(stdout), _O_BINARY) == -1)
+        return 1;
+    if (_setmode(_fileno(stderr), _O_BINARY) == -1)
+        return 1;
+#endif
+
     if (argc < 4) {
         fprintf(stderr, "Usage: %s find replace file...\n", *argv);
         return 1;

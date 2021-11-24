@@ -481,7 +481,7 @@ char *make_tmp(char *in_dir, int dir)
     d = in_dir == NULL || *in_dir == '\0' ? "." : in_dir;
 
     while (try--) {
-        if ((name = random_alnum_str(36)) == NULL)
+        if ((name = random_alnum_str(16)) == NULL)
             return NULL;
         if ((path = concat(d, DIRSEP_STR, name, NULL)) == NULL) {
             free(name);

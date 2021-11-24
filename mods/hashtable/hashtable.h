@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/* Hash table module */
+
 #ifndef HASHTABLE_H
 #define HASHTABLE_H
 

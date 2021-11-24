@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/* Gap buffer module */
+
 #ifndef GAPBUF_H
 #define GAPBUF_H
 

@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/* Gap buffer module */
+
 #ifdef __linux__
 /* For strdup */
 #define _XOPEN_SOURCE 500

@@ -14,9 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*
- * Double buffering terminal graphics
- */
+/* Double buffering terminal graphics module */
 
 #ifdef __linux__
 #define _GNU_SOURCE

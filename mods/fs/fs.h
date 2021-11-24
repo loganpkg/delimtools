@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/* File system operations */
+
 #ifdef _WIN32
 /* For mkdir */
 #include <direct.h>

@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/* Double buffering terminal graphics module */
+
 #ifndef MINICURSES_H
 #define MINICURSES_H
 

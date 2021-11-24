@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/* Buffer module */
+
 #ifndef BUF_H
 #define BUF_H
 

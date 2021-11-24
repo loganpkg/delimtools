@@ -21,7 +21,7 @@ Backslash
 ---------
 
 A backslash must always be followed by a character. A literal backslash is
-entered as two backslashes `//`.
+entered as two backslashes `\\`.
 
 The following sequences denote special character sets:
 
