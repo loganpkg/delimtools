@@ -19,6 +19,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
+
 #include "../../mods/gen/gen.h"
 #include "../../mods/regex/regex.h"
 #include "../../mods/fs/fs.h"
