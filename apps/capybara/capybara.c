@@ -152,6 +152,11 @@ int main(int argc, char **argv)
         if (!is_dir(search_dir))
             mquit("search_dir is not a directory");
 
+#ifdef _WIN32
+        if (strchr(search_dir, ':') != NULL)
+            mquit("search_dir must be a relative path");
+#endif
+
         if (!is_dir(pinfo.store_dir))
             mquit("store_dir is not a directory");
 

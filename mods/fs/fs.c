@@ -115,83 +115,114 @@ char *file_to_str(char *fn)
     return str;
 }
 
+#ifdef _WIN32
 int walk_dir(char *dir_name, void *info,
              int (*process_file) (char *, void *))
 {
     int ret = 0;
-#ifdef _WIN32
     WIN32_FIND_DATA wfd;
     HANDLE hdl;
-#else
-    DIR *dirp = NULL;
-    struct dirent *entry;
-    unsigned char dt;
-#endif
+    char *dn_wildcard = NULL;
     char *fn = NULL, *path_name = NULL;
 
-#ifdef _WIN32
-    if ((hdl = FindFirstFile(dir_name, &wfd)) == INVALID_HANDLE_VALUE)
+    if ((dn_wildcard = concat(dir_name, DIRSEP_STR, "*", NULL)) == NULL)
         quit();
+    if ((hdl = FindFirstFile(dn_wildcard, &wfd)) == INVALID_HANDLE_VALUE)
+        quit();
+
     do {
+        /* Copy filename */
         if ((fn = strdup(wfd.cFileName)) == NULL)
             quit();
 
-#else
-    if ((dirp = opendir(dir_name)) == NULL)
-        quit();
-    while ((entry = readdir(dirp)) != NULL) {
-        if ((fn = strdup(entry->d_name)) == NULL)
-            quit();
-        dt = entry->d_type;
-#endif
         /* Concatenate file path */
         if ((path_name = concat(dir_name, DIRSEP_STR, fn, NULL)) == NULL)
             quit();
 
-#ifdef _WIN32
-        if (wfd.dwFileAttributes == FILE_ATTRIBUTE_DIRECTORY) {
-#else
-        if (dt == DT_DIR) {
-#endif
+        if (wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
             if (strcmp(fn, ".") && strcmp(fn, "..")
                 && walk_dir(path_name, info, process_file))
                 quit();
-#ifdef _WIN32
-        } else if (wfd.dwFileAttributes == FILE_ATTRIBUTE_NORMAL) {
+        } else {
+            /* Assume it is a file */
+            if ((*process_file) (path_name, info))
+                quit();
+        }
+
+        free(dn_wildcard);
+        dn_wildcard = NULL;
+        free(fn);
+        fn = NULL;
+        free(path_name);
+        path_name = NULL;
+
+    } while (FindNextFile(hdl, &wfd));
+
+    if (GetLastError() != ERROR_NO_MORE_FILES)
+        ret = 1;
+
+  clean_up:
+    free(dn_wildcard);
+    free(fn);
+    free(path_name);
+
+    if (!FindClose(hdl))
+        ret = 1;
+
+    return ret;
+}
 #else
+int walk_dir(char *dir_name, void *info,
+             int (*process_file) (char *, void *))
+{
+    int ret = 0;
+    DIR *dirp = NULL;
+    struct dirent *entry;
+    unsigned char dt;
+    char *fn = NULL, *path_name = NULL;
+
+    if ((dirp = opendir(dir_name)) == NULL)
+        quit();
+
+    while ((entry = readdir(dirp)) != NULL) {
+        /* Copy filename */
+        if ((fn = strdup(entry->d_name)) == NULL)
+            quit();
+        dt = entry->d_type;
+
+        /* Concatenate file path */
+        if ((path_name = concat(dir_name, DIRSEP_STR, fn, NULL)) == NULL)
+            quit();
+
+        if (dt == DT_DIR) {
+            if (strcmp(fn, ".") && strcmp(fn, "..")
+                && walk_dir(path_name, info, process_file))
+                quit();
         } else if (dt == DT_REG) {
-#endif
             if ((*process_file) (path_name, info))
                 quit();
         } else {
             /* Not a directory or regular (normal) file */
             quit();
         }
+
         free(fn);
         fn = NULL;
         free(path_name);
         path_name = NULL;
-#ifdef _WIN32
     }
-    while (FindNextFile(hdl, &wfd));
-#else
-    }
-#endif
 
   clean_up:
     free(fn);
     free(path_name);
 
-#ifdef _WIN32
-    if (!FindClose(hdl))
-        ret = 1;
-#else
     if (closedir(dirp))
         ret = 1;
-#endif
 
     return ret;
 }
+#endif
+
 
 int atomic_write(char *fn, void *info,
                  int (*write_details) (FILE *, void *))
@@ -397,12 +428,13 @@ int make_subdirs(char *file_path)
 {
     /* Makes the subdirectories leading up to the file in file_path */
     char *p, *q;
+    /* Copy the path so that it can be edited */
     if ((p = strdup(file_path)) == NULL)
         return 1;
     q = p;
     while ((q = strchr(q, DIRSEP_CH)) != NULL) {
         *q = '\0';
-        if (!is_dir(p) && mkdir(p)) {
+        if (strlen(p) && !is_dir(p) && mkdir(p)) {
             free(p);
             return 1;
         }
@@ -455,8 +487,7 @@ int create_new_dir(char *dn)
      * Otherwise returns 1 for all other failures.
      */
     errno = 0;
-    if (mkdir(dn))
-    {
+    if (mkdir(dn)) {
         if (errno == EEXIST)
             return 2;
         else
