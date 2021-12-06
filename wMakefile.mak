@@ -14,52 +14,68 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+PREFIX = %HOMEPATH%
 
+all: spot.exe m4.exe regr.exe lsha256.exe capybara.exe freq.exe delim.exe
 
+spot.exe: gen.obj buf.obj minicurses.obj regex.obj random.obj fs.obj gapbuf.obj apps\spot\spot.c
+        cl /Ot apps\spot\spot.c gen.obj buf.obj minicurses.obj regex.obj random.obj fs.obj gapbuf.obj
 
-all:
-	cl /Ot \
-		apps\spot\spot.c \
-		mods\gen\gen.c \
-		mods\buf\buf.c \
-		mods\minicurses\minicurses.c \
-        mods\regex\regex.c \
-        mods\random\random.c \
-		mods\fs\fs.c \
-		mods\gapbuf\gapbuf.c
-	cl /Ot \
-		apps\m4\m4.c \
-		mods\gen\gen.c \
-		mods\buf\buf.c \
-        mods\random\random.c \
-        mods\fs\fs.c \
-		mods\hashtable\hashtable.c \
-        mods\regex\regex.c
-	cl /Ot \
-		apps\regr\regr.c \
-		mods\gen\gen.c \
-		mods\buf\buf.c \
-        mods\random\random.c \
-		mods\fs\fs.c \
-		mods\regex\regex.c
-	cl /Ot \
-		apps\lsha256\lsha256.c \
-		mods\gen\gen.c \
-        mods\random\random.c \
-		mods\fs\fs.c \
-		mods\sha256\sha256.c
-	cl /Ot \
-        apps\capybara\capybara.c \
-		mods\gen\gen.c \
-        mods\random\random.c \
-        mods\fs\fs.c \
-		mods\sha256\sha256.c \
-		mods\hashtable\hashtable.c \
-		mods\buf\buf.c
-	cl /Ot \
-        apps\freq\freq.c
-	cl /Ot \
-        apps\delim\delim.c
+m4.exe: gen.obj buf.obj random.obj fs.obj hashtable.obj regex.obj apps\m4\m4.c
+        cl /Ot apps\m4\m4.c gen.obj buf.obj random.obj fs.obj hashtable.obj regex.obj
+
+regr.exe: gen.obj buf.obj random.obj fs.obj regex.obj apps\regr\regr.c
+        cl /Ot apps\regr\regr.c gen.obj buf.obj random.obj fs.obj regex.obj
+
+lsha256.exe: gen.obj random.obj fs.obj sha256.obj apps\lsha256\lsha256.c
+        cl /Ot apps\lsha256\lsha256.c gen.obj random.obj fs.obj sha256.obj
+
+capybara.exe: gen.obj random.obj fs.obj sha256.obj hashtable.obj buf.obj apps\capybara\capybara.c
+        cl /Ot apps\capybara\capybara.c gen.obj random.obj fs.obj sha256.obj hashtable.obj buf.obj
+
+freq.exe: mods\gen\gen.h apps\freq\freq.c
+        cl /Ot apps\freq\freq.c
+
+delim.exe: mods\gen\gen.h apps\delim\delim.c
+        cl /Ot apps\delim\delim.c
+
+gen.obj: mods\gen\gen.h mods\gen\gen.c
+        cl /c /Ot mods\gen\gen.c
+
+buf.obj: mods\gen\gen.h mods\fs\fs.h \
+        mods\buf\buf.h mods\buf\buf.c
+        cl /c /Ot mods\buf\buf.c
+
+gapbuf.obj: mods\gen\gen.h mods\buf\buf.h mods\regex\regex.h mods\fs\fs.h \
+        mods\gapbuf\gapbuf.h mods\gapbuf\gapbuf.c
+        cl /c /Ot mods\gapbuf\gapbuf.c
+
+hashtable.obj: mods\gen\gen.h mods\fs\fs.h \
+        mods\hashtable\hashtable.h mods\hashtable\hashtable.c
+        cl /c /Ot mods\hashtable\hashtable.c
+
+minicurses.obj: mods\gen\gen.h mods\buf\buf.h \
+        mods\minicurses\minicurses.h mods\minicurses\minicurses.c
+        cl /c /Ot mods\minicurses\minicurses.c
+
+random.obj: mods\gen\gen.h \
+        mods\random\random.h mods\random\random.c
+        cl /c /Ot mods\random\random.c
+
+fs.obj: mods\gen\gen.h mods\random\random.h \
+        mods\fs\fs.h mods\fs\fs.c
+        cl /c /Ot mods\fs\fs.c
+
+sha256.obj: mods\gen\gen.h mods\fs\fs.h \
+        mods\sha256\sha256.h mods\sha256\sha256.c
+        cl /c /Ot mods\sha256\sha256.c
+
+regex.obj: mods\gen\gen.h mods\buf\buf.h \
+        mods\regex\regex.h mods\regex\regex.c
+        cl /c /Ot mods\regex\regex.c
+
+install:
+        move *.exe $(PREFIX)\bin\
 
 clean:
-	del *.exe *.obj
+        del *.exe *.obj

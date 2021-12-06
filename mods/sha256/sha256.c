@@ -27,6 +27,7 @@
 #include <string.h>
 #include "../gen/gen.h"
 #include "../fs/fs.h"
+#include "sha256.h"
 
 /* Bits in a word */
 #define w 32

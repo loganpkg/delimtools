@@ -24,6 +24,7 @@
 #include <ctype.h>
 
 #include "../gen/gen.h"
+#include "random.h"
 
 char *random_alnum_str(size_t len)
 {
