@@ -52,7 +52,6 @@ The following applications use the toucan environment:
 
 * spot text editor,
 * an implementation of the m4 macro processor,
-* capybara (a backup utility),
 * regr (regular expression find and replace),
 * lsha256 (SHA-256 utility),
 * freq (character frequency),

@@ -16,7 +16,7 @@
 
 PREFIX = %HOMEPATH%
 
-all: spot.exe m4.exe regr.exe lsha256.exe capybara.exe freq.exe delim.exe
+all: spot.exe m4.exe regr.exe lsha256.exe freq.exe delim.exe
 
 spot.exe: gen.obj buf.obj minicurses.obj regex.obj random.obj fs.obj gapbuf.obj apps\spot\spot.c
         cl /Ot apps\spot\spot.c gen.obj buf.obj minicurses.obj regex.obj random.obj fs.obj gapbuf.obj

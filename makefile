@@ -20,7 +20,7 @@ F = -ansi -g -O3 -Wall -Wextra -pedantic
 PREFIX = ${HOME}
 
 .PHONY: all
-all: spot m4 regr lsha256 capybara freq delim
+all: spot m4 regr lsha256 freq delim
 
 spot: gen.o buf.o minicurses.o regex.o random.o fs.o gapbuf.o apps/spot/spot.c
 	cc ${F} -o spot gen.o buf.o minicurses.o regex.o random.o fs.o gapbuf.o apps/spot/spot.c
@@ -77,9 +77,9 @@ regex.o: mods/gen/gen.h mods/buf/buf.h \
 
 .PHONY: install
 install:
-	mv spot m4 regr lsha256 capybara freq delim ${PREFIX}/bin/
+	mv spot m4 regr lsha256 freq delim ${PREFIX}/bin/
 
 .PHONY: clean
 clean:
 	rm -f gen.o buf.o gapbuf.o hashtable.o minicurses.o random.o fs.o sha256.o regex.o \
-	spot m4 regr lsha256 capybara freq delim
+	spot m4 regr lsha256 freq delim
