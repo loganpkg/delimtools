@@ -30,9 +30,6 @@ regr.exe: gen.obj buf.obj random.obj fs.obj regex.obj apps\regr\regr.c
 lsha256.exe: gen.obj random.obj fs.obj sha256.obj apps\lsha256\lsha256.c
         cl /Ot apps\lsha256\lsha256.c gen.obj random.obj fs.obj sha256.obj
 
-capybara.exe: gen.obj random.obj fs.obj sha256.obj hashtable.obj buf.obj apps\capybara\capybara.c
-        cl /Ot apps\capybara\capybara.c gen.obj random.obj fs.obj sha256.obj hashtable.obj buf.obj
-
 freq.exe: mods\gen\gen.h apps\freq\freq.c
         cl /Ot apps\freq\freq.c
 

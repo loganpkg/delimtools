@@ -34,9 +34,6 @@ regr: gen.o buf.o random.o fs.o regex.o apps/regr/regr.c
 lsha256: gen.o random.o fs.o sha256.o apps/lsha256/lsha256.c
 	cc ${F} -o lsha256 gen.o random.o fs.o sha256.o apps/lsha256/lsha256.c
 
-capybara: gen.o random.o fs.o sha256.o hashtable.o buf.o apps/capybara/capybara.c
-	cc ${F} -o capybara gen.o random.o fs.o sha256.o hashtable.o buf.o apps/capybara/capybara.c
-
 freq: mods/gen/gen.h apps/freq/freq.c
 	cc ${F} -o freq apps/freq/freq.c
 
