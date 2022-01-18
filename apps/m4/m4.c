@@ -22,15 +22,12 @@
  *     Bell Laboratories, Murray Hill, New Jersey 07974, July 1, 1977.
  */
 
-/* Set to 1 to enable the esyscmd and maketemp built-in macros */
-#define ESYSCMD_MAKETEMP 1
-
 #ifdef __linux__
 /* For strdup and popen */
 #define _XOPEN_SOURCE 500
 #endif
 
-#if ESYSCMD_MAKETEMP && !defined _WIN32
+#ifndef _WIN32
 #include <sys/wait.h>
 #endif
 
@@ -53,8 +50,9 @@
 #include "../../mods/hashtable/hashtable.h"
 #include "../../mods/fs/fs.h"
 #include "../../mods/regex/regex.h"
+#include "../../mods/sha256/sha256.h"
 
-#if ESYSCMD_MAKETEMP && defined _WIN32
+#ifdef _WIN32
 #define popen _popen
 #define pclose _pclose
 #endif
@@ -77,7 +75,6 @@ struct mcall {
     struct buf *arg_buf[10];    /* For argument collection */
 };
 
-#if ESYSCMD_MAKETEMP
 int esyscmd(struct buf *input, struct buf *tmp_buf, char *cmd)
 {
     FILE *fp;
@@ -118,7 +115,6 @@ int esyscmd(struct buf *input, struct buf *tmp_buf, char *cmd)
         return 1;
     return 0;
 }
-#endif
 
 
 void free_mcall(struct mcall *m)
@@ -337,12 +333,10 @@ int main(int argc, char **argv)
         quit();
     if (upsert_entry(ht, "undivert", NULL))
         quit();
-#if ESYSCMD_MAKETEMP
     if (upsert_entry(ht, "esyscmd", NULL))
         quit();
     if (upsert_entry(ht, "maketemp", NULL))
         quit();
-#endif
     if (upsert_entry(ht, "incr", NULL))
         quit();
     if (upsert_entry(ht, "htdist", NULL))
@@ -723,12 +717,7 @@ int main(int argc, char **argv)
         snprintf(num, NUM_SIZE, "%lu", (unsigned long) w); \
         if (unget_str(input, num)) \
             quit(); \
-    }
-
-#if ESYSCMD_MAKETEMP
-/* These tag onto the end of the list of built-in macros with args */
-#define process_bi_with_args_extra() \
-    else if (!strcmp(SN, "maketemp")) { \
+    } else if (!strcmp(SN, "maketemp")) { \
         /* arg(1) is the enclosing directory. No template string is used. */ \
         if ((tmp_str = make_tmp(arg(1), 0)) == NULL) \
             equit("maketemp: Failed"); \
@@ -740,8 +729,6 @@ int main(int argc, char **argv)
         if (esyscmd(input, tmp_buf, arg(1))) \
             equit("esyscmd: Failed"); \
     }
-#endif
-
 
 /* Process built-in macro with no arguments */
 #define process_bi_no_args() do { \
@@ -840,9 +827,6 @@ int main(int argc, char **argv)
                     quit();
                 /* Deliberately no semicolons after these macro calls */
                 process_bi_with_args()
-#if ESYSCMD_MAKETEMP
-                    process_bi_with_args_extra()
-#endif
             } else {
                 /* User defined macro */
                 if (sub_args(result, stack))
