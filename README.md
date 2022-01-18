@@ -21,10 +21,8 @@ delimtools is a collection of utilities for working with delimited files.
 ## History
 
 delimtools is unsupported and just presented for historical reasons. The current
-supported versions of freq and delim are inside of the toucan repository.
-
-This repository uses sloth version control (not git or fossil) and simply
-converts to either git or fossil to be displayed online.
+supported versions of freq and delim are inside of the toucan repository
+(the master branch of this repository).
 
 ## Installation
 
