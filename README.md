@@ -5,14 +5,10 @@
 loganutils is an unsupported, old, collection of my software. It contains
 a version of the spot text editor, charcount (equivalent to freq),
 and cutcheck (equivalent to delim). The current supported version of these
-applications are inside the toucan repository.
+applications are inside toucan (the master branch of this
+repository).
 
-This repo uses git (and not sloth) as there are forks caused from merging in
-the various applications. This can be seen by running:
-
-```
-$ git log --oneline --decorate --graph --all
-```
+This branch has "forks" caused from merging in the various applications.
 
 ## About
 
