@@ -27,7 +27,7 @@ int main(int argc, char **argv)
     int i;
 
     if (argc < 2) {
-        fprintf(stderr, "Usage: %s file ...\n", *argv);
+        fprintf(stderr, "Usage: %s file...\n", *argv);
         return 1;
     }
 
