@@ -14,65 +14,76 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-PREFIX = %HOMEPATH%
+# Change this to install somewhere else
+INSTALL_PREFIX = %HOMEPATH%\bin
+
+F = /Ot /Wall
 
 all: spot.exe m4.exe regr.exe lsha256.exe freq.exe delim.exe
 
 spot.exe: gen.obj buf.obj minicurses.obj regex.obj random.obj fs.obj gapbuf.obj apps\spot\spot.c
-        cl /Ot apps\spot\spot.c gen.obj buf.obj minicurses.obj regex.obj random.obj fs.obj gapbuf.obj
+        cl $(F) apps\spot\spot.c gen.obj buf.obj minicurses.obj regex.obj random.obj fs.obj gapbuf.obj
 
 m4.exe: gen.obj buf.obj random.obj fs.obj hashtable.obj regex.obj apps\m4\m4.c
-        cl /Ot apps\m4\m4.c gen.obj buf.obj random.obj fs.obj hashtable.obj regex.obj
+        cl $(F) apps\m4\m4.c gen.obj buf.obj random.obj fs.obj hashtable.obj regex.obj
 
 regr.exe: gen.obj buf.obj random.obj fs.obj regex.obj apps\regr\regr.c
-        cl /Ot apps\regr\regr.c gen.obj buf.obj random.obj fs.obj regex.obj
+        cl $(F) apps\regr\regr.c gen.obj buf.obj random.obj fs.obj regex.obj
 
 lsha256.exe: gen.obj random.obj fs.obj sha256.obj apps\lsha256\lsha256.c
-        cl /Ot apps\lsha256\lsha256.c gen.obj random.obj fs.obj sha256.obj
+        cl $(F) apps\lsha256\lsha256.c gen.obj random.obj fs.obj sha256.obj
 
-freq.exe: mods\gen\gen.h apps\freq\freq.c
-        cl /Ot apps\freq\freq.c
+freq.exe: gen.obj apps\freq\freq.c
+        cl $(f) apps\freq\freq.c gen.obj
 
-delim.exe: mods\gen\gen.h apps\delim\delim.c
-        cl /Ot apps\delim\delim.c
+delim.exe: gen.obj apps\delim\delim.c
+        cl $(F) apps\delim\delim.c gen.obj
+
+llama.exe: gen.obj apps\llama\llama.c
+        cl $(F) apps\llama\llama.c gen.obj
 
 gen.obj: mods\gen\gen.h mods\gen\gen.c
-        cl /c /Ot mods\gen\gen.c
+        cl /c $(F) mods\gen\gen.c
 
 buf.obj: mods\gen\gen.h mods\fs\fs.h \
         mods\buf\buf.h mods\buf\buf.c
-        cl /c /Ot mods\buf\buf.c
+        cl /c $(F) mods\buf\buf.c
 
 gapbuf.obj: mods\gen\gen.h mods\buf\buf.h mods\regex\regex.h mods\fs\fs.h \
         mods\gapbuf\gapbuf.h mods\gapbuf\gapbuf.c
-        cl /c /Ot mods\gapbuf\gapbuf.c
+        cl /c $(F) mods\gapbuf\gapbuf.c
 
 hashtable.obj: mods\gen\gen.h mods\fs\fs.h \
         mods\hashtable\hashtable.h mods\hashtable\hashtable.c
-        cl /c /Ot mods\hashtable\hashtable.c
+        cl /c $(F) mods\hashtable\hashtable.c
 
 minicurses.obj: mods\gen\gen.h mods\buf\buf.h \
         mods\minicurses\minicurses.h mods\minicurses\minicurses.c
-        cl /c /Ot mods\minicurses\minicurses.c
+        cl /c $(F) mods\minicurses\minicurses.c
 
 random.obj: mods\gen\gen.h \
         mods\random\random.h mods\random\random.c
-        cl /c /Ot mods\random\random.c
+        cl /c $(F) mods\random\random.c
 
 fs.obj: mods\gen\gen.h mods\random\random.h \
         mods\fs\fs.h mods\fs\fs.c
-        cl /c /Ot mods\fs\fs.c
+        cl /c $(F) mods\fs\fs.c
 
 sha256.obj: mods\gen\gen.h mods\fs\fs.h \
         mods\sha256\sha256.h mods\sha256\sha256.c
-        cl /c /Ot mods\sha256\sha256.c
+        cl /c $(F) mods\sha256\sha256.c
 
 regex.obj: mods\gen\gen.h mods\buf\buf.h \
         mods\regex\regex.h mods\regex\regex.c
-        cl /c /Ot mods\regex\regex.c
+        cl /c $(F) mods\regex\regex.c
 
-install:
-        move *.exe $(PREFIX)\bin\
+install: copy_files
+
+copy_files: establish_dir
+        copy /Y *.exe $(INSTALL_DIR)
+
+establish_dir:
+        if not exist $(INSTALL_DIR) mkdir $(INSTALL_DIR)
 
 clean:
         del *.exe *.obj

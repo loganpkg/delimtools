@@ -14,13 +14,13 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+# Change this to install somewhere else
+INSTALL_DIR = ${HOME}/bin
+
 F = -ansi -g -O3 -Wall -Wextra -pedantic
 
-# Change this to install somewhere else
-PREFIX = ${HOME}
-
 .PHONY: all
-all: spot m4 regr lsha256 freq delim
+all: spot m4 regr lsha256 freq delim llama
 
 spot: gen.o buf.o minicurses.o regex.o random.o fs.o gapbuf.o apps/spot/spot.c
 	cc ${F} -o spot gen.o buf.o minicurses.o regex.o random.o fs.o gapbuf.o apps/spot/spot.c
@@ -34,11 +34,14 @@ regr: gen.o buf.o random.o fs.o regex.o apps/regr/regr.c
 lsha256: gen.o random.o fs.o sha256.o apps/lsha256/lsha256.c
 	cc ${F} -o lsha256 gen.o random.o fs.o sha256.o apps/lsha256/lsha256.c
 
-freq: mods/gen/gen.h apps/freq/freq.c
-	cc ${F} -o freq apps/freq/freq.c
+freq: gen.o apps/freq/freq.c
+	cc ${F} -o freq gen.o apps/freq/freq.c
 
-delim: mods/gen/gen.h apps/delim/delim.c
-	cc ${F} -o delim apps/delim/delim.c
+delim: gen.o apps/delim/delim.c
+	cc ${F} -o delim gen.o apps/delim/delim.c
+
+llama: gen.o apps/llama/llama.c
+	cc ${F} -o llama gen.o apps/llama/llama.c
 
 gen.o: mods/gen/gen.h mods/gen/gen.c
 	cc -c ${F} mods/gen/gen.c
@@ -77,9 +80,10 @@ regex.o: mods/gen/gen.h mods/buf/buf.h \
 
 .PHONY: install
 install:
-	mv spot m4 regr lsha256 freq delim ${PREFIX}/bin/
+	mkdir -p ${INSTALL_DIR}
+	cp -p spot m4 regr lsha256 freq delim ${INSTALL_DIR}
 
 .PHONY: clean
 clean:
 	rm -f gen.o buf.o gapbuf.o hashtable.o minicurses.o random.o fs.o sha256.o regex.o \
-	spot m4 regr lsha256 freq delim
+	spot m4 regr lsha256 freq delim llama

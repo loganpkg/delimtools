@@ -21,11 +21,6 @@
 #include <string.h>
 #include <ctype.h>
 
-#ifdef _WIN32
-#include <fcntl.h>
-#include <io.h>
-#endif
-
 #include "../../mods/gen/gen.h"
 
 int main(int argc, char **argv)
@@ -38,14 +33,8 @@ int main(int argc, char **argv)
     int i, k;
     size_t r, j;
 
-#ifdef _WIN32
-    if (_setmode(_fileno(stdin), _O_BINARY) == -1)
+    if (sane_standard_streams())
         return 1;
-    if (_setmode(_fileno(stdout), _O_BINARY) == -1)
-        return 1;
-    if (_setmode(_fileno(stderr), _O_BINARY) == -1)
-        return 1;
-#endif
 
     if ((chunk = malloc(BUFSIZ)) == NULL)
         return 1;

@@ -16,10 +16,7 @@
 
 /* Gap buffer module */
 
-#ifdef __linux__
-/* For strdup */
-#define _XOPEN_SOURCE 500
-#endif
+#include "../sane_ftm.h"
 
 #ifndef _WIN32
 #include <sys/types.h>

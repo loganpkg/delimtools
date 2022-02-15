@@ -47,5 +47,6 @@ int put_str(struct buf *b, char *str);
 int put_mem(struct buf *b, char *mem, size_t mem_s);
 int buf_dump_buf(struct buf *dst, struct buf *src);
 int write_buf(struct buf *b, char *fn);
+int esyscmd(struct buf *input, struct buf *tmp_buf, char *cmd);
 
 #endif

@@ -29,10 +29,7 @@
  * Hash Functions, http://www.cse.yorku.ca/~oz/hash.html
  */
 
-#ifdef __linux__
-/* For strdup */
-#define _XOPEN_SOURCE 500
-#endif
+#include "../sane_ftm.h"
 
 #include <stdio.h>
 #include <stdlib.h>

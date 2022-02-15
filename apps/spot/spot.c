@@ -19,17 +19,7 @@
  * Dedicated to my son who was only a 4mm "spot" in his first ultrasound.
  */
 
-#ifdef __linux__
-#define _GNU_SOURCE
-#endif
-
-#ifdef _WIN32
-#include <fcntl.h>
-#include <io.h>
-#else
-#include <unistd.h>
-#include <termios.h>
-#endif
+#include "../../mods/sane_ftm.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -473,14 +463,8 @@ int main(int argc, char **argv)
     HELP;
     char **h;
 
-#ifdef _WIN32
-    if (_setmode(_fileno(stdin), _O_BINARY) == -1)
-        return 1;
-    if (_setmode(_fileno(stdout), _O_BINARY) == -1)
-        return 1;
-    if (_setmode(_fileno(stderr), _O_BINARY) == -1)
-        return 1;
-#endif
+    if (sane_standard_streams())
+        quit();
 
     if (argc <= 1) {
         if ((b = new_gapbuf(NULL, NULL)) == NULL)

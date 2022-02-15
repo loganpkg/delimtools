@@ -16,12 +16,20 @@
 
 /* Generic module */
 
+#include "../sane_ftm.h"
+
 #include <sys/types.h>
 #include <sys/stat.h>
+
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <limits.h>
 #include <ctype.h>
 
@@ -144,4 +152,16 @@ char *concat(char *str0, ...)
     }
 
     return p;
+}
+
+int sane_standard_streams(void) {
+#ifdef _WIN32
+    if (_setmode(_fileno(stdin), _O_BINARY) == -1)
+        return 1;
+    if (_setmode(_fileno(stdout), _O_BINARY) == -1)
+        return 1;
+    if (_setmode(_fileno(stderr), _O_BINARY) == -1)
+        return 1;
+#endif
+    return 0;
 }

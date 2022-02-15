@@ -19,8 +19,10 @@
 #ifndef GEN_H
 #define GEN_H
 
+
 /* For SIZE_MAX */
 #include <limits.h>
+#include <stddef.h>
 #include <stdint.h>
 
 
@@ -78,11 +80,9 @@
 #define ssize_t SSIZE_T
 #endif
 
-#define strlcpy(dst, src, d_size) snprintf(dst, d_size, "%s", src)
-#define reallocarray(p, num, size) (mof(num, size) ? NULL : realloc(p, (num) * (size)))
-
 int str_to_num(char *s, size_t * num);
 char *memmatch(char *big, size_t big_len, char *little, size_t little_len);
 char *concat(char *str0, ...);
+int sane_standard_streams(void);
 
 #endif

@@ -16,9 +16,7 @@
 
 /* Double buffering terminal graphics module */
 
-#ifdef __linux__
-#define _GNU_SOURCE
-#endif
+#include "../sane_ftm.h"
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN

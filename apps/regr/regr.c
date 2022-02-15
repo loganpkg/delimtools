@@ -19,11 +19,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifdef _WIN32
-#include <fcntl.h>
-#include <io.h>
-#endif
-
 #include "../../mods/gen/gen.h"
 #include "../../mods/regex/regex.h"
 #include "../../mods/fs/fs.h"
@@ -33,14 +28,8 @@ int main(int argc, char **argv)
     int i;
     char *find, *replace, *str, *res;
 
-#ifdef _WIN32
-    if (_setmode(_fileno(stdin), _O_BINARY) == -1)
+    if (sane_standard_streams())
         return 1;
-    if (_setmode(_fileno(stdout), _O_BINARY) == -1)
-        return 1;
-    if (_setmode(_fileno(stderr), _O_BINARY) == -1)
-        return 1;
-#endif
 
     if (argc < 4) {
         fprintf(stderr, "Usage: %s find replace file...\n", *argv);

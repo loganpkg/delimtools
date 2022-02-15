@@ -82,16 +82,40 @@ Meet Toucan, this project's mascot, painted by my loving wife Juliana.
 Build
 -----
 
-To build the applications, on POSIX-like systems, run:
+Install on POSIX-like systems:
+------------------------------
+
+The default install directory is `"$HOME"/bin`, but this can be changed by
+editing the `INSTALL_DIR` variable at the top of the `makefile` file.
+
+Then run:
+
 ```
 make
-```
-Otherwise:
-```
-nmake /f wMakefile.mak
+make install
+make clean
 ```
 
-Then place the executables somewhere in your PATH.
+Ensure that the install directory is included in your `PATH`.
+
+
+Other Install:
+--------------
+
+The default install directory is `%HOMEPATH%\bin`, but this can be changed by
+editing the `INSTALL_DIR` variable at the top of the `wMakefile.mak` file.
+
+
+Then run:
+
+```
+nmake /f wMakefile.mak
+nmake /f wMakefile.mak install
+nmake /f wMakefile.mak clean
+```
+
+Ensure that the install directory is included in your `PATH`.
+
 
 Enjoy,
 Logan =)_

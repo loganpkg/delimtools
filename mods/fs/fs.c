@@ -16,12 +16,7 @@
 
 /* File system operations */
 
-#ifdef __linux__
-/* For strdup */
-#define _XOPEN_SOURCE 500
-/* For readdir macros: DT_DIR and DT_REG */
-#define _DEFAULT_SOURCE
-#endif
+#include "../sane_ftm.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>

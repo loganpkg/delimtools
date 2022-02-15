@@ -30,12 +30,6 @@ It has many nice features:
 
 This implementation does not follow the POSIX standards in regards to m4.
 
-Configuration
--------------
-
-By default the esyscmd and maketemp built-in macros are excluded.
-Set `ESYSCMD_MAKETEMP` to 1 in m4.c before building to include them.
-
 To use
 ------
 ```

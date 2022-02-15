@@ -25,6 +25,12 @@
  *     PTR Prentice Hall Software Series, New Jersey, 1989.
  */
 
+#include "../sane_ftm.h"
+
+#ifndef _WIN32
+#include <sys/wait.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,6 +39,11 @@
 #include "../gen/gen.h"
 #include "../fs/fs.h"
 #include "buf.h"
+
+#ifdef _WIN32
+#define popen _popen
+#define pclose _pclose
+#endif
 
 #define buf_free_size(b) (b->s - b->i)
 
@@ -264,4 +275,45 @@ int write_buf_details(FILE * fp, void *x)
 int write_buf(struct buf *b, char *fn)
 {
     return atomic_write(fn, b, write_buf_details);
+}
+
+int esyscmd(struct buf *input, struct buf *tmp_buf, char *cmd)
+{
+    FILE *fp;
+    int x, status;
+    delete_buf(tmp_buf);
+
+#ifdef _WIN32
+#define R_STR "rb"
+#else
+#define R_STR "r"
+#endif
+    if ((fp = popen(cmd, R_STR)) == NULL)
+        return 1;
+
+    errno = 0;
+    while ((x = getc(fp)) != EOF)
+        if (x != '\0' && unget_ch(tmp_buf, x)) {
+            pclose(fp);
+            return 1;
+        }
+    if (errno) {
+        pclose(fp);
+        return 1;
+    }
+    if ((status = pclose(fp)) == -1)
+        return 1;
+#ifdef _WIN32
+    if (status)
+        return 1;
+#else
+#define EXIT_OK (WIFEXITED(status) && !WEXITSTATUS(status))
+    if (!EXIT_OK)
+        return 1;
+#endif
+    if (unget_ch(tmp_buf, '\0'))
+        return 1;
+    if (unget_str(input, tmp_buf->a))
+        return 1;
+    return 0;
 }

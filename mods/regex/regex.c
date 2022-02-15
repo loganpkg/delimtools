@@ -27,11 +27,7 @@
  *     O'Reilly Media, California, 2007.
  */
 
-#ifdef __linux__
-/* For strdup */
-#define _XOPEN_SOURCE 500
-#define _DEFAULT_SOURCE
-#endif
+#include "../sane_ftm.h"
 
 #include <stdio.h>
 #include <stdlib.h>

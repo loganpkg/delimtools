@@ -22,21 +22,7 @@
  *     Bell Laboratories, Murray Hill, New Jersey 07974, July 1, 1977.
  */
 
-#ifdef __linux__
-/* For strdup and popen */
-#define _XOPEN_SOURCE 500
-#endif
-
-#ifndef _WIN32
-#include <sys/wait.h>
-#endif
-
-#ifdef _WIN32
-#include <fcntl.h>
-#include <io.h>
-#else
-#include <unistd.h>
-#endif
+#include "../../mods/sane_ftm.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,10 +38,6 @@
 #include "../../mods/regex/regex.h"
 #include "../../mods/sha256/sha256.h"
 
-#ifdef _WIN32
-#define popen _popen
-#define pclose _pclose
-#endif
 
 #define INIT_BUF_SIZE 512
 
@@ -74,48 +56,6 @@ struct mcall {
     size_t act_arg;             /* The current argument being collected */
     struct buf *arg_buf[10];    /* For argument collection */
 };
-
-int esyscmd(struct buf *input, struct buf *tmp_buf, char *cmd)
-{
-    FILE *fp;
-    int x, status;
-    delete_buf(tmp_buf);
-
-#ifdef _WIN32
-#define R_STR "rb"
-#else
-#define R_STR "r"
-#endif
-    if ((fp = popen(cmd, R_STR)) == NULL)
-        return 1;
-
-    errno = 0;
-    while ((x = getc(fp)) != EOF)
-        if (x != '\0' && unget_ch(tmp_buf, x)) {
-            pclose(fp);
-            return 1;
-        }
-    if (errno) {
-        pclose(fp);
-        return 1;
-    }
-    if ((status = pclose(fp)) == -1)
-        return 1;
-#ifdef _WIN32
-    if (status)
-        return 1;
-#else
-#define EXIT_OK (WIFEXITED(status) && !WEXITSTATUS(status))
-    if (!EXIT_OK)
-        return 1;
-#endif
-    if (unget_ch(tmp_buf, '\0'))
-        return 1;
-    if (unget_str(input, tmp_buf->a))
-        return 1;
-    return 0;
-}
-
 
 void free_mcall(struct mcall *m)
 {
@@ -268,14 +208,8 @@ int main(int argc, char **argv)
     if (argc < 1)
         return 1;
 
-#ifdef _WIN32
-    if (_setmode(_fileno(stdin), _O_BINARY) == -1)
+    if (sane_standard_streams())
         return 1;
-    if (_setmode(_fileno(stdout), _O_BINARY) == -1)
-        return 1;
-    if (_setmode(_fileno(stderr), _O_BINARY) == -1)
-        return 1;
-#endif
 
     /* Setup buffers */
     if ((token = init_buf(INIT_BUF_SIZE)) == NULL)

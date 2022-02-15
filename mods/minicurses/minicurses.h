@@ -19,6 +19,11 @@
 #ifndef MINICURSES_H
 #define MINICURSES_H
 
+#ifndef _WIN32
+#include <unistd.h>
+#include <termios.h>
+#endif
+
 /* Number of spaces used to display a tab (must be at least 1) */
 #define TABSIZE 4
 
