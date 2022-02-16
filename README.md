@@ -18,9 +18,17 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 toucan
 ======
 
-toucan is a cross-platform C development environment that contains the
-spot text editor, an implementation of the m4 macro processor, and other
-applications.
+toucan is a cross-platform C module. The idea is, you write code once,
+place it in toucan, then in your apps you simple use `#include "use_toucan.h"`.
+
+This repo contains the following apps:
+* The spot text editor,
+* an implementation of the m4 macro processor,
+* regr (regular expression find and replace),
+* lsha256 (SHA-256 utility),
+* freq (character frequency),
+* delim (checks a delimiter),
+* and llama (an x86_64 assembler).
 
 The toucan module contains code in the following areas:
 * Generic functions,
@@ -34,19 +42,6 @@ The toucan module contains code in the following areas:
 * SHA-256 algorithm.
 
 All code and documentation is released under the ISC license.
-
-Applications
-------------
-
-The following applications use the toucan environment:
-
-* spot text editor,
-* an implementation of the m4 macro processor,
-* regr (regular expression find and replace),
-* lsha256 (SHA-256 utility),
-* freq (character frequency),
-* and delim (checks a delimiter).
-
 
 Mascot
 ------
