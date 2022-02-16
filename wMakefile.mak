@@ -17,7 +17,7 @@
 # Change this to install somewhere else
 INSTALL_PREFIX = %HOMEPATH%\bin
 
-F = /Ot /Wall
+F = /Ot
 
 all: spot.exe m4.exe regr.exe lsha256.exe freq.exe delim.exe
 
