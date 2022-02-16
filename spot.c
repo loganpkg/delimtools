@@ -19,18 +19,7 @@
  * Dedicated to my son who was only a 4mm "spot" in his first ultrasound.
  */
 
-#include "../../mods/sane_ftm.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-
-#include "../../mods/gen/gen.h"
-#include "../../mods/buf/buf.h"
-#include "../../mods/minicurses/minicurses.h"
-#include "../../mods/gapbuf/gapbuf.h"
-#include "../../mods/fs/fs.h"
+#include "use_toucan.h"
 
 #define HELP char *help[] = { \
 "spot keybindings", \
@@ -87,9 +76,6 @@ NULL \
 
 /* Initial gap buffer size */
 #define INIT_GAPBUF_SIZE BUFSIZ
-
-/* Global variable */
-WINDOW *stdscr = NULL;
 
 int insert_hex(struct gapbuf *b, size_t mult)
 {

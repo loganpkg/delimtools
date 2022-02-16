@@ -14,6 +14,26 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* SHA-256 algorithm */
+/* SHA-256 utility */
 
-char *sha256(char *fn);
+#include "use_toucan.h"
+
+int main(int argc, char **argv)
+{
+    char *hash;
+    int i;
+
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s file...\n", *argv);
+        return 1;
+    }
+
+    for (i = 1; i < argc; ++i) {
+        if ((hash = sha256(*(argv + i))) == NULL)
+            return 1;
+        printf("%s %s\n", hash, *(argv + i));
+        free(hash);
+    }
+
+    return 0;
+}
