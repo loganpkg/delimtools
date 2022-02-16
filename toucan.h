@@ -33,10 +33,8 @@
 #define _CRT_RAND_S
 #endif
 
-
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 
 #ifdef _WIN32
 #include <conio.h>
@@ -45,6 +43,7 @@
 #include <windows.h>
 #include <BaseTsd.h>
 #else
+#include <sys/wait.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <libgen.h>
@@ -52,10 +51,7 @@
 #include <unistd.h>
 #endif
 
-
 #include <fcntl.h>
-
-
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -73,8 +69,6 @@
 /* For access */
 #define F_OK 0
 #endif
-
-
 
 
 /* size_t Addition OverFlow test */
