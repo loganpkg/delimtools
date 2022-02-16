@@ -43,7 +43,7 @@ delim: toucan.o delim.c
 llama: toucan.o llama.c
 	cc ${F} -o llama toucan.o llama.c
 
-toucan.o: toucan.h toucan.c
+toucan.o: use_toucan.h toucan.h toucan.c
 	cc -c ${F} toucan.c
 
 .PHONY: install
