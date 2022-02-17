@@ -22,11 +22,27 @@
  *     Bell Laboratories, Murray Hill, New Jersey 07974, July 1, 1977.
  */
 
-#include "use_toucan.h"
+#include "../../mods/sane_ftm.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <errno.h>
+#include <limits.h>
+
+#include "../../mods/gen/gen.h"
+#include "../../mods/buf/buf.h"
+#include "../../mods/hashtable/hashtable.h"
+#include "../../mods/fs/fs.h"
+#include "../../mods/regex/regex.h"
+#include "../../mods/sha256/sha256.h"
+
 
 #define INIT_BUF_SIZE 512
 
 #define HASH_TABLE_SIZE 16384
+
 
 /*
  * mcall used to stack on nested macro calls.

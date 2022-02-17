@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Logan Ryan McLintock
+ * Copyright (c) 2021 Logan Ryan McLintock
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,16 +14,29 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* llama assembler for x86_64 */
+/* SHA-256 utility */
 
-#include "use_toucan.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "../../mods/sha256/sha256.h"
 
 int main(int argc, char **argv)
 {
+    char *hash;
+    int i;
 
-    if (sane_standard_streams())
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s file...\n", *argv);
         return 1;
+    }
 
+    for (i = 1; i < argc; ++i) {
+        if ((hash = sha256(*(argv + i))) == NULL)
+            return 1;
+        printf("%s %s\n", hash, *(argv + i));
+        free(hash);
+    }
 
     return 0;
 }

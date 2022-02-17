@@ -14,14 +14,16 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* Header file used by applications that use toucan */
+/* Sane feature test macros */
 
-#ifndef USE_TOUCAN_H
-#define USE_TOUCAN_H
+#ifndef SANE_FTM_H
+#define SANE_FTM_H
 
-#include "toucan.h"
-
-/* Global variable */
-WINDOW *stdscr = NULL;
+#ifdef __linux__
+/* For strdup, snprintf, popen */
+#define _XOPEN_SOURCE 500
+/* For readdir macros: DT_DIR and DT_REG */
+#define _DEFAULT_SOURCE
+#endif
 
 #endif

@@ -16,7 +16,12 @@
 
 /* freq: Character frequency */
 
-#include "use_toucan.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+#include "../../mods/gen/gen.h"
 
 int main(int argc, char **argv)
 {
@@ -65,7 +70,7 @@ int main(int argc, char **argv)
                     /* A read error occurred */
                     free(chunk);
                     if (!stdin_read)
-                        fclose(fp);
+                         fclose(fp);
 
                     return 1;
                 }

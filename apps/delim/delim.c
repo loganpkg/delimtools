@@ -16,7 +16,12 @@
 
 /* delim: Checks a delimiter */
 
-#include "use_toucan.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+#include "../../mods/gen/gen.h"
 
 int main(int argc, char **argv)
 {
@@ -43,7 +48,8 @@ int main(int argc, char **argv)
 
     if (strlen(*(argv + 1)) != 1) {
         fprintf(stderr,
-                "%s: Delimiter must be a single character\n", *argv);
+                "%s: Delimiter must be a single character\n",
+                *argv);
         return 1;
     }
 
