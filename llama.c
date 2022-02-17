@@ -18,11 +18,12 @@
 
 #include "use_toucan.h"
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
 
     if (sane_standard_streams())
         return 1;
 
 
-    return 0;    
+    return 0;
 }

@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* toucan */
+/* toucan C module */
 
 
 /*
@@ -46,13 +46,9 @@
  */
 
 
-
 #include "toucan.h"
 
 #define buf_free_size(b) (b->s - b->i)
-
-
-
 
 /* Calculates the gap size */
 #define GAPSIZE(b) ((size_t) (b->c - b->g))
@@ -68,8 +64,6 @@
 #define RIGHTCH(b) do {if (*b->c == '\n') ++b->r; *b->g++ = *b->c++;} while (0)
 
 
-
-
 #define INIT_BUF_SIZE 512
 
 /* ANSI escape sequences */
@@ -82,9 +76,6 @@
 #define phy_attr_off() printf("\033[m")
 
 #define phy_inverse_video() printf("\033[7m")
-
-
-
 
 
 #define match_atom(atom, ch) (atom->set[(unsigned char) ch] != atom->negate)
@@ -122,7 +113,6 @@ struct cap_grp {
 } while (0)
 
 
-
 #define bits_in_word 32
 /* Rotate left */
 #define ROTL(x, n) ((x >> n) | (x >> (bits_in_word - n)))
@@ -140,7 +130,19 @@ struct cap_grp {
 #define sigma1(x) (ROTR(x, 17) ^ ROTR(x, 19) ^ SHR(x, 10))
 
 
+#define INIT_STR_BUF 512
 
+
+static struct atom *compile_regex(char *find, struct cap_grp *cg,
+                                  struct hook *hk);
+static char *match_regex(struct atom *find, struct hook *hk, char *str,
+                         int sol, size_t * len);
+static char *match_regex_here(struct atom *find, struct hook *hk,
+                              char *str);
+static char *match_regex_mult(struct atom *find, struct hook *hk,
+                              char *str);
+static void fill_in_capture_groups(struct cap_grp *cg, char *match_p,
+                                   struct atom *find);
 
 
 int str_to_num(char *s, size_t * num)
@@ -205,7 +207,6 @@ char *memmatch(char *big, size_t big_len, char *little, size_t little_len)
     return NULL;
 }
 
-#define INIT_STR_BUF 512
 
 char *concat(char *str0, ...)
 {
@@ -262,7 +263,8 @@ char *concat(char *str0, ...)
     return p;
 }
 
-int sane_standard_streams(void) {
+int sane_standard_streams(void)
+{
 #ifdef _WIN32
     if (_setmode(_fileno(stdin), _O_BINARY) == -1)
         return 1;
@@ -1117,7 +1119,6 @@ int esyscmd(struct buf *input, struct buf *tmp_buf, char *cmd)
         return 1;
     return 0;
 }
-
 
 
 static int grow_gap(struct gapbuf *b, size_t will_use)
@@ -2157,8 +2158,6 @@ int load_file_into_ht(struct hashtable *ht, char *fn)
 }
 
 
-
-
 int addnstr(char *str, int n)
 {
     char ch;
@@ -2473,19 +2472,6 @@ int getch(void)
     return EOF;
 #endif
 }
-
-
-
-static struct atom *compile_regex(char *find, struct cap_grp *cg,
-                                  struct hook *hk);
-static char *match_regex(struct atom *find, struct hook *hk, char *str,
-                         int sol, size_t * len);
-static char *match_regex_here(struct atom *find, struct hook *hk,
-                              char *str);
-static char *match_regex_mult(struct atom *find, struct hook *hk,
-                              char *str);
-static void fill_in_capture_groups(struct cap_grp *cg, char *match_p,
-                                   struct atom *find);
 
 
 static struct atom *compile_regex(char *find, struct cap_grp *cg,

@@ -65,7 +65,7 @@ int main(int argc, char **argv)
                     /* A read error occurred */
                     free(chunk);
                     if (!stdin_read)
-                         fclose(fp);
+                        fclose(fp);
 
                     return 1;
                 }

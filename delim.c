@@ -43,8 +43,7 @@ int main(int argc, char **argv)
 
     if (strlen(*(argv + 1)) != 1) {
         fprintf(stderr,
-                "%s: Delimiter must be a single character\n",
-                *argv);
+                "%s: Delimiter must be a single character\n", *argv);
         return 1;
     }
 

@@ -198,7 +198,6 @@ struct hashtable {
 };
 
 
-
 /* Number of spaces used to display a tab (must be at least 1) */
 #define TABSIZE 4
 
@@ -321,8 +320,6 @@ extern WINDOW *stdscr;
 #define ungetch(ch) unget_ch(stdscr->input, ch)
 
 
-
-
 int str_to_num(char *s, size_t * num);
 char *memmatch(char *big, size_t big_len, char *little, size_t little_len);
 char *concat(char *str0, ...);
@@ -364,7 +361,6 @@ int write_buf(struct buf *b, char *fn);
 int esyscmd(struct buf *input, struct buf *tmp_buf, char *cmd);
 
 
-
 struct gapbuf *init_gapbuf(size_t init_gapbuf_size);
 void free_gapbuf_list(struct gapbuf *b);
 int insert_ch(struct gapbuf *b, char c, size_t mult);
@@ -402,7 +398,6 @@ int insert_file(struct gapbuf *b, char *fn);
 int write_file(struct gapbuf *b);
 
 
-
 struct hashtable *init_hashtable(size_t num_buckets);
 void free_hashtable(struct hashtable *ht);
 void htdist(struct hashtable *ht);
@@ -421,7 +416,6 @@ int endwin(void);
 WINDOW *initscr(void);
 int refresh(void);
 int getch(void);
-
 
 
 char *regex_replace(char *str, char *find, char *replace, int nl_insen);
