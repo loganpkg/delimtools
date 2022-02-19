@@ -462,11 +462,13 @@ int unget_ch(struct buf *b, int ch);
 int put_str(struct buf *b, char *str);
 int put_mem(struct buf *b, char *mem, size_t mem_s);
 
-char *xstrdup(char *str) {
+char *xstrdup(char *str)
+{
     /* Overflow is not possible as the original string is already in memmory */
     char *new_str;
     size_t len = strlen(str);
-    if ((new_str = malloc(len + 1)) == NULL) return NULL;
+    if ((new_str = malloc(len + 1)) == NULL)
+        return NULL;
     memcpy(new_str, str, len + 1);
     return new_str;
 }
@@ -2764,8 +2766,7 @@ int main(int argc, char **argv)
 
     while (running) {
       top:
-        if (draw_screen
-            (b, cl, cl_active, rv, &req_centre, &req_clear))
+        if (draw_screen(b, cl, cl_active, rv, &req_centre, &req_clear))
             quit();
 
         /* Clear internal return value */
