@@ -4,9 +4,7 @@
 
 loganutils is an unsupported, old, collection of my software. It contains
 a version of the spot text editor, charcount (equivalent to freq),
-and cutcheck (equivalent to delim). The current supported version of these
-applications are inside toucan (the master branch of this
-repository).
+and cutcheck (equivalent to delim).
 
 This branch has "forks" caused from merging in the various applications.
 
