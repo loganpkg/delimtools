@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 Logan Ryan McLintock
+ * Copyright (c) 2021, 2022 Logan Ryan McLintock
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,19 +34,30 @@
  *     O'Reilly Media, California, 2007.
  */
 
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
+#ifdef __linux__
+/* For cfmakeraw */
+#define _DEFAULT_SOURCE
 #endif
 
 #ifdef _WIN32
+/* For _getch */
 #include <conio.h>
-#include <io.h>
+/* For _O_BINARY */
 #include <fcntl.h>
+/* For _setmode and _isatty */
+#include <io.h>
+/*
+ * For GetStdHandle, GetConsoleScreenBufferInfo, GetConsoleMode,
+ * and SetConsoleMode.
+ */
 #include <windows.h>
 #else
+/* For struct winsize, ioctl, and TIOCGWINSZ */
 #include <sys/ioctl.h>
-#include <unistd.h>
+/* For struct termios, tcgetattr, tcsetattr, TCSANOW, and cfmakeraw */
 #include <termios.h>
+/* For STDOUT_FILENO and isatty */
+#include <unistd.h>
 #endif
 
 #include <stdint.h>
@@ -170,8 +181,12 @@ struct graph {
     int iv;                     /* Inverse video mode (virtual) */
     int phy_iv;                 /* Mirrors the physical inverse video mode */
     struct buf *input;          /* Keyboard input buffer */
-#ifndef _WIN32
-    struct termios t_orig;      /* Original terminal attributes */
+    /* Original terminal attributes */
+#ifdef _WIN32
+    HANDLE h_out;
+    DWORD t_orig;
+#else
+    struct termios t_orig;
 #endif
 };
 
@@ -216,7 +231,6 @@ extern WINDOW *stdscr;
 } while (0)
 
 #define get_cursor_y(y) y = stdscr->v / stdscr->w
-
 #define get_cursor_x(x) x = stdscr->v % stdscr->w
 
 #define get_cursor(y, x) do { \
@@ -415,7 +429,7 @@ int addnstr(char *str, int n);
 int erase(void);
 int clear(void);
 int endwin(void);
-WINDOW *initscr(void);
+int initscr(void);
 int refresh(void);
 int getch(void);
 struct gapbuf *init_gapbuf(size_t init_gapbuf_size);
@@ -739,12 +753,17 @@ int clear(void)
 int endwin(void)
 {
     int ret = 0;
+
     /* Screen is not initialised */
     if (stdscr == NULL)
         return 1;
     phy_attr_off();
     phy_clear_screen();
-#ifndef _WIN32
+
+#ifdef _WIN32
+    if (!SetConsoleMode(stdscr->h_out, stdscr->t_orig))
+        ret = 1;
+#else
     if (tcsetattr(STDIN_FILENO, TCSANOW, &stdscr->t_orig))
         ret = 1;
 #endif
@@ -755,72 +774,83 @@ int endwin(void)
     return ret;
 }
 
-WINDOW *initscr(void)
+int initscr(void)
 {
 #ifdef _WIN32
-    HANDLE out;
-    DWORD mode;
+    HANDLE h_out;
+    DWORD term_orig;
 #else
     struct termios term_orig, term_new;
 #endif
 
     /* Error, screen is already initialised */
     if (stdscr != NULL)
-        return NULL;
+        return 1;
 
+    if ((stdscr = calloc(1, sizeof(WINDOW))) == NULL)
+        return 1;
+    if ((stdscr->input = init_buf(INIT_BUF_SIZE)) == NULL) {
+        free(stdscr);
+        return 1;
+    }
 #ifdef _WIN32
     /* Check input is from a terminal */
-    if (!_isatty(_fileno(stdin)))
-        return NULL;
-    /* Turn on interpretation of VT100-like escape sequences */
-    if ((out = GetStdHandle(STD_OUTPUT_HANDLE)) == INVALID_HANDLE_VALUE)
-        return NULL;
-    if (!GetConsoleMode(out, &mode))
-        return NULL;
-    if (!SetConsoleMode(out, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING))
-        return NULL;
-#else
-    if (!isatty(STDIN_FILENO))
-        return NULL;
-    /* Change terminal input to raw and no echo */
-    if (tcgetattr(STDIN_FILENO, &term_orig))
-        return NULL;
-    term_new = term_orig;
-    cfmakeraw(&term_new);
-    if (tcsetattr(STDIN_FILENO, TCSANOW, &term_new))
-        return NULL;
-#endif
-
-    if ((stdscr = calloc(1, sizeof(WINDOW))) == NULL) {
-#ifndef _WIN32
-        tcsetattr(STDIN_FILENO, TCSANOW, &term_orig);
-#endif
-        return NULL;
-    }
-
-    if ((stdscr->input = init_buf(INIT_BUF_SIZE)) == NULL) {
-#ifndef _WIN32
-        tcsetattr(STDIN_FILENO, TCSANOW, &term_orig);
-#endif
-        free(stdscr);
-        stdscr = NULL;
-        return NULL;
-    }
-
-    if (clear()) {
-#ifndef _WIN32
-        tcsetattr(STDIN_FILENO, TCSANOW, &term_orig);
-#endif
+    if (!_isatty(_fileno(stdin))) {
         free_buf(stdscr->input);
         free(stdscr);
         stdscr = NULL;
-        return NULL;
+        return 1;
     }
-#ifndef _WIN32
-    stdscr->t_orig = term_orig;
+    /* Turn on interpretation of VT100-like escape sequences */
+    if ((h_out = GetStdHandle(STD_OUTPUT_HANDLE)) == INVALID_HANDLE_VALUE) {
+        free_buf(stdscr->input);
+        free(stdscr);
+        stdscr = NULL;
+        return 1;
+    }
+    if (!GetConsoleMode(h_out, &term_orig)) {
+        free_buf(stdscr->input);
+        free(stdscr);
+        stdscr = NULL;
+        return 1;
+    }
+    if (!SetConsoleMode
+        (h_out, term_orig | ENABLE_VIRTUAL_TERMINAL_PROCESSING)) {
+        free_buf(stdscr->input);
+        free(stdscr);
+        stdscr = NULL;
+        return 1;
+    }
+#else
+    if (!isatty(STDIN_FILENO)) {
+        free_buf(stdscr->input);
+        free(stdscr);
+        stdscr = NULL;
+        return 1;
+    }
+    /* Change terminal input to raw and no echo */
+    if (tcgetattr(STDIN_FILENO, &term_orig)) {
+        free_buf(stdscr->input);
+        free(stdscr);
+        stdscr = NULL;
+        return 1;
+    }
+    term_new = term_orig;
+    cfmakeraw(&term_new);
+    if (tcsetattr(STDIN_FILENO, TCSANOW, &term_new)) {
+        free_buf(stdscr->input);
+        free(stdscr);
+        stdscr = NULL;
+        return 1;
+    }
 #endif
 
-    return stdscr;
+#ifdef _WIN32
+    stdscr->h_out = h_out;
+#endif
+
+    stdscr->t_orig = term_orig;
+    return 0;
 }
 
 void draw_diff(void)
@@ -1772,8 +1802,6 @@ int write_file(struct gapbuf *b)
     /* Success */
     b->mod = 0;
     return 0;
-
-    return 0;
 }
 
 struct atom *compile_regex(char *find, struct cap_grp *cg, struct hook *hk)
@@ -2415,8 +2443,7 @@ int insert_hex(struct gapbuf *b, size_t mult)
 
 int init_ncurses(void)
 {
-    /* Starts ncurses */
-    if (initscr() == NULL)
+    if (initscr())
         return 1;
 
     return 0;
@@ -2475,6 +2502,8 @@ int draw_gapbuf(struct gapbuf *b, int y_top, int y_bottom, int ed,
     int centred = 0;            /* Indicates if centreing has occurred */
 
   draw_start:
+    standend();
+
     move_cursor(y_top, 0);
     if (ret)
         return 1;
@@ -2558,7 +2587,6 @@ int draw_screen(struct gapbuf *b, struct gapbuf *cl, int cl_active,
 {
     /* Draws the text and command line gap buffers to the screen */
     int h, w;                   /* Screen size */
-    size_t width;               /* Screen width as size_t */
     int cl_cy, cl_cx;           /* Cursor position in command line */
     int cy = 0, cx = 0;         /* Final cursor position */
     int ret = 0;                /* Macro "return value" */
@@ -2577,7 +2605,6 @@ int draw_screen(struct gapbuf *b, struct gapbuf *cl, int cl_active,
 
     if (h < 1 || w < 1)
         return 1;
-    width = (size_t) w;
 
     /* Draw the text portion of the screen */
     if (draw_gapbuf
