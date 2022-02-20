@@ -20,9 +20,7 @@ delimtools is a collection of utilities for working with delimited files.
 
 ## History
 
-delimtools is unsupported and just presented for historical reasons. The current
-supported versions of freq and delim are inside of the toucan repository
-(the master branch of this repository).
+delimtools is unsupported and just presented for historical reasons.
 
 ## Installation
 
