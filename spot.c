@@ -125,6 +125,13 @@ NULL \
 #define ssize_t SSIZE_T
 #endif
 
+/* ********** Configuration ********************************** */
+#define INIT_BUF_SIZE 512
+#define INIT_GAPBUF_SIZE BUFSIZ
+/* Number of spaces used to display a tab (must be at least 1) */
+#define TABSIZE 4
+/* *********************************************************** */
+
 /* size_t Addition OverFlow test */
 #define aof(a, b) ((a) > SIZE_MAX - (b))
 /* size_t Multiplication OverFlow test */
@@ -149,15 +156,6 @@ NULL \
     ret = 1; \
     goto clean_up; \
 } while (0)
-
-#define mquit(msg) do { \
-    ret = 1; \
-    fprintf(stderr, "Error: " msg "\n"); \
-    goto clean_up; \
-} while (0)
-
-/* Number of spaces used to display a tab (must be at least 1) */
-#define TABSIZE 4
 
 #define KEY_ENTER 343
 #define KEY_DC 330
@@ -190,10 +188,8 @@ struct graph {
 #endif
 };
 
-typedef struct graph WINDOW;
-
-/* Declare this in the application */
-extern WINDOW *stdscr;
+/* Global variable */
+struct graph *stdscr = NULL;
 
 /* Index starts from zero. Top left is (0, 0). Sets ret. */
 #define move_cursor(y, x) do { \
@@ -342,14 +338,6 @@ struct gapbuf {
 /* Delete gap buffer */
 #define DELETEGAPBUF(b) do {b->g = b->a; b->c = b->e; b->r = 1; b->d = 0; \
     b->m = 0; b->mr = 1; b->m_set = 0; b->mod = 1;} while (0)
-
-/* Initial gap buffer size */
-#define INIT_GAPBUF_SIZE BUFSIZ
-
-/* Global variable */
-WINDOW *stdscr = NULL;
-
-#define INIT_BUF_SIZE 512
 
 /* ANSI escape sequences */
 #define phy_clear_screen() printf("\033[2J\033[1;1H")
@@ -787,7 +775,7 @@ int initscr(void)
     if (stdscr != NULL)
         return 1;
 
-    if ((stdscr = calloc(1, sizeof(WINDOW))) == NULL)
+    if ((stdscr = calloc(1, sizeof(struct graph))) == NULL)
         return 1;
     if ((stdscr->input = init_buf(INIT_BUF_SIZE)) == NULL) {
         free(stdscr);
@@ -2441,14 +2429,6 @@ int insert_hex(struct gapbuf *b, size_t mult)
     return 0;
 }
 
-int init_ncurses(void)
-{
-    if (initscr())
-        return 1;
-
-    return 0;
-}
-
 int insert_help_line(struct gapbuf *b, char *str)
 {
     char ch;
@@ -2788,7 +2768,7 @@ int main(int argc, char **argv)
     if ((p = init_gapbuf(INIT_GAPBUF_SIZE)) == NULL)
         quit();
 
-    if (init_ncurses())
+    if (initscr())
         quit();
 
     while (running) {
