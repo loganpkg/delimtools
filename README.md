@@ -20,7 +20,7 @@ spot text editor
 spot is a fast text editor with many advanced features:
 
 * Flicker-free built-in terminal graphics, with no curses library need!
-* Can copy and paste between multiple buffers.
+* Copy and paste between multiple buffers.
 * Command multiplier prefix.
 * Row and column numbers.
 * Trim trailing whitespace.
