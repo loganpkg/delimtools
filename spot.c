@@ -199,6 +199,7 @@ struct graph {
     int iv;                     /* Inverse video mode (virtual) */
     int phy_iv;                 /* Mirrors the physical inverse video mode */
     struct buf *input;          /* Keyboard input buffer */
+    int tty;                    /* Input is from a terminal */
     /* Original terminal attributes */
 #ifdef _WIN32
     HANDLE h_out;
@@ -303,16 +304,14 @@ struct graph *stdscr = NULL;
     printch(ch); \
 } while(0)
 
-/* Raw getch */
-#ifdef _WIN32
-#define getch_raw() _getch()
-#else
-#define getch_raw() getchar()
-#endif
-
 /* Buffered getch with no key interpretation */
+#ifdef _WIN32
 #define getch_nk() (stdscr->input->i ? *(stdscr->input->a + --stdscr->input->i) \
-    : getch_raw())
+    : (stdscr->tty ? _getch() : getchar()))
+#else
+#define getch_nk() (stdscr->input->i ? *(stdscr->input->a + --stdscr->input->i) \
+    : getchar())
+#endif
 
 #define ungetch(ch) unget_ch(stdscr->input, ch)
 
@@ -690,21 +689,16 @@ int clear(void)
     return erase();
 }
 
-int endwin(void)
+int end_scr(void)
 {
     int ret = 0;
-
-    /* Screen is not initialised */
-    if (stdscr == NULL)
-        return 1;
     phy_attr_off();
     phy_clear_screen();
-
 #ifdef _WIN32
     if (!SetConsoleMode(stdscr->h_out, stdscr->t_orig))
         ret = 1;
 #else
-    if (tcsetattr(STDIN_FILENO, TCSANOW, &stdscr->t_orig))
+    if (stdscr->tty && tcsetattr(STDIN_FILENO, TCSANOW, &stdscr->t_orig))
         ret = 1;
 #endif
     free(stdscr->ns);
@@ -714,7 +708,7 @@ int endwin(void)
     return ret;
 }
 
-int initscr(void)
+int init_scr(void)
 {
 #ifdef _WIN32
     HANDLE h_out;
@@ -722,11 +716,6 @@ int initscr(void)
 #else
     struct termios term_orig, term_new;
 #endif
-
-    /* Error, screen is already initialised */
-    if (stdscr != NULL)
-        return 1;
-
     if ((stdscr = calloc(1, sizeof(struct graph))) == NULL)
         return 1;
     if ((stdscr->input = init_buf(INIT_BUF_SIZE)) == NULL) {
@@ -735,12 +724,9 @@ int initscr(void)
     }
 #ifdef _WIN32
     /* Check input is from a terminal */
-    if (!_isatty(_fileno(stdin))) {
-        free_buf(stdscr->input);
-        free(stdscr);
-        stdscr = NULL;
-        return 1;
-    }
+    if (_isatty(_fileno(stdin)))
+        stdscr->tty = 1;
+
     /* Turn on interpretation of VT100-like escape sequences */
     if ((h_out = GetStdHandle(STD_OUTPUT_HANDLE)) == INVALID_HANDLE_VALUE) {
         free_buf(stdscr->input);
@@ -762,12 +748,9 @@ int initscr(void)
         return 1;
     }
 #else
-    if (!isatty(STDIN_FILENO)) {
-        free_buf(stdscr->input);
-        free(stdscr);
-        stdscr = NULL;
-        return 1;
-    }
+    if (isatty(STDIN_FILENO)) stdscr->tty = 1;
+
+if (stdscr->tty) {
     /* Change terminal input to raw and no echo */
     if (tcgetattr(STDIN_FILENO, &term_orig)) {
         free_buf(stdscr->input);
@@ -783,6 +766,7 @@ int initscr(void)
         stdscr = NULL;
         return 1;
     }
+}
 #endif
 
 #ifdef _WIN32
@@ -2708,7 +2692,7 @@ int main(int argc, char **argv)
     if ((p = init_gapbuf(INIT_GAPBUF_SIZE)) == NULL)
         quit();
 
-    if (initscr())
+    if (init_scr())
         quit();
 
     while (running) {
@@ -3048,7 +3032,7 @@ int main(int argc, char **argv)
     free_gapbuf_list(cl);
     free_gapbuf_list(p);
     if (stdscr != NULL)
-        if (endwin())
+        if (end_scr())
             ret = 1;
 
     return ret;
