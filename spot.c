@@ -144,14 +144,13 @@ NULL \
 /* Converts a lowercase letter to the corresponding control value */
 #define c(l) ((l) - 'a' + 1)
 
-/* Control 2 (control spacebar or control @ may work too) */
+/* Control 2 (control spacebar or control at-symbol may work too) */
 #define C_2 0
 
 /* Escape key */
 #define ESC 27
 
 #define UCHAR_NUM (UCHAR_MAX + 1)
-#define ASCII_NUM 128
 
 #define quit() do { \
     ret = 1; \
@@ -376,6 +375,7 @@ struct gapbuf {
 #define match_atom(atom, ch) (atom->set[(unsigned char) ch] != atom->negate)
 
 #define NUM_CAP_GRP 10
+#define ASCII_NUM 128
 
 struct atom {
     char set[UCHAR_NUM];        /* Character set */
@@ -388,7 +388,7 @@ struct atom {
 
 struct hook {
     char start;                 /* ^ */
-    char end;                   /* $ */
+    char end;                   /* Dollar sign */
 };
 
 /*
@@ -467,13 +467,6 @@ struct buf *init_buf(size_t init_buf_size)
     b->s = init_buf_size;
     b->i = 0;
     return b;
-}
-
-void free_buf_wrapping(struct buf *b)
-{
-    /* Just frees the struct, not the mem inside */
-    if (b != NULL)
-        free(b);
 }
 
 void free_buf(struct buf *b)
@@ -900,6 +893,13 @@ int getch(void)
 
 /* ************************************************************************** */
 
+void free_buf_wrapping(struct buf *b)
+{
+    /* Just frees the struct, not the mem inside */
+    if (b != NULL)
+        free(b);
+}
+
 struct atom *compile_regex(char *find, struct cap_grp *cg, struct hook *hk)
 {
     struct atom *cr;
@@ -994,7 +994,7 @@ struct atom *compile_regex(char *find, struct cap_grp *cg, struct hook *hk)
             /* Eat char */
             ++find;
             break;
-        case '$':
+        case 0x24:
             if (in_set) {
                 cr[atom_index].set[u] = 'Y';
             } else if (!*find) {
@@ -1198,7 +1198,7 @@ char *match_regex(struct atom *find, struct hook *hk, char *str,
     if (hk->start && !sol)
         return NULL;
 
-    /* End of line hook $ by itself */
+    /* End of line hook dollar sign by itself */
     if (hk->end && find->end) {
         *len = 0;
         return str + strlen(str);
@@ -1438,6 +1438,80 @@ char *regex_replace(char *str, char *find, char *replace, int nl_insen)
     free_buf_wrapping(result);
 
     return res_str;
+}
+
+char *regex_search(char *str, char *find, int nl_insen, int *err)
+{
+    /*
+     * Regular expression search. Returns a pointer to the first match
+     * of find in str, or NULL upon no match or error (and sets err
+     * to 1 upon error).
+     */
+    char *t = NULL, *text, *line, *q = NULL;
+    char *p;                    /* Pointer to regex match */
+    size_t len = 0;             /* Length of regex match */
+    struct atom *cr = NULL;
+    struct cap_grp cg[NUM_CAP_GRP];
+    struct hook hk;
+
+    /* Compile regex expression */
+    if ((cr = compile_regex(find, cg, &hk)) == NULL) {
+        *err = 1;
+        return NULL;
+    }
+
+    /*
+     * Copy string if in newline sensitive mode as the \n chars will be
+     * replaced with \0.
+     */
+    if (!nl_insen) {
+        if ((t = xstrdup(str)) == NULL) {
+            free(cr);
+            *err = 1;
+            return NULL;
+        }
+        text = t;
+    } else {
+        text = str;
+    }
+
+    /*
+     * Do not process an empty string (but an in-the-middle line can be empty).
+     * Not an error.
+     */
+    if (!*text)
+        goto no_match;
+
+    line = text;
+
+    /* Process line by line */
+    do {
+        /* Terminate line */
+        if (!nl_insen) {
+            if ((q = strchr(line, '\n')) != NULL)
+                *q = '\0';
+            /* Do not process the last line if empty. Not an error. */
+            else if (!*line)
+                goto no_match;
+        }
+
+        /* See if there is any match on a line */
+        if ((p = match_regex(cr, &hk, line, 1, &len)) != NULL) {
+            free(cr);
+            free(t);
+            /* Make the location relative to the original string */
+            return str + (p - text);
+        }
+
+        /* Move to the next line if doing newline sensitive matching */
+        if (!nl_insen && q != NULL)
+            line = q + 1;
+    } while (!nl_insen && q != NULL);
+
+  no_match:
+    free(cr);
+    free(t);
+    return NULL;
 }
 
 /* ************************************************************************** */
@@ -1846,80 +1920,6 @@ int forward_search(struct gapbuf *b, char *p, size_t n)
     while (b->c != q)
         RIGHTCH(b);
     return 0;
-}
-
-char *regex_search(char *str, char *find, int nl_insen, int *err)
-{
-    /*
-     * Regular expression search. Returns a pointer to the first match
-     * of find in str, or NULL upon no match or error (and sets err
-     * to 1 upon error).
-     */
-    char *t = NULL, *text, *line, *q = NULL;
-    char *p;                    /* Pointer to regex match */
-    size_t len = 0;             /* Length of regex match */
-    struct atom *cr = NULL;
-    struct cap_grp cg[NUM_CAP_GRP];
-    struct hook hk;
-
-    /* Compile regex expression */
-    if ((cr = compile_regex(find, cg, &hk)) == NULL) {
-        *err = 1;
-        return NULL;
-    }
-
-    /*
-     * Copy string if in newline sensitive mode as the \n chars will be
-     * replaced with \0.
-     */
-    if (!nl_insen) {
-        if ((t = xstrdup(str)) == NULL) {
-            free(cr);
-            *err = 1;
-            return NULL;
-        }
-        text = t;
-    } else {
-        text = str;
-    }
-
-    /*
-     * Do not process an empty string (but an in-the-middle line can be empty).
-     * Not an error.
-     */
-    if (!*text)
-        goto no_match;
-
-    line = text;
-
-    /* Process line by line */
-    do {
-        /* Terminate line */
-        if (!nl_insen) {
-            if ((q = strchr(line, '\n')) != NULL)
-                *q = '\0';
-            /* Do not process the last line if empty. Not an error. */
-            else if (!*line)
-                goto no_match;
-        }
-
-        /* See if there is any match on a line */
-        if ((p = match_regex(cr, &hk, line, 1, &len)) != NULL) {
-            free(cr);
-            free(t);
-            /* Make the location relative to the original string */
-            return str + (p - text);
-        }
-
-        /* Move to the next line if doing newline sensitive matching */
-        if (!nl_insen && q != NULL)
-            line = q + 1;
-    } while (!nl_insen && q != NULL);
-
-  no_match:
-    free(cr);
-    free(t);
-    return NULL;
 }
 
 int regex_forward_search(struct gapbuf *b, char *find, int nl_insen)
